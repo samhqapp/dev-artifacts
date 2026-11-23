@@ -53,7 +53,7 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 - A blue dot opens options to pick. A green dot opens only a comment field (`options: [], current: false`).
 - Dots float just outside the section; hover lights the section with a padded highlight.
 - The popover opens beside the section and never covers it; on a phone it is a bottom sheet.
-- The dock has back and next (`[` and `]` keys) over the blue dots only, a "Hide dots" switch (`.` key, kept after a
+- The dock has back and next (`[` and `]` keys) over the blue dots only, an eye button that hides the dots (`.` key, kept after a
   reload), Reset, and Copy choices. Back and next move to another page when needed and open the popover there.
 - The "2 / 5" count is the site total of blue dots. Clicking it lists every group by page with its pick; a row goes there.
 - Picks, comments, and Copy choices cover the whole site (one store per origin).

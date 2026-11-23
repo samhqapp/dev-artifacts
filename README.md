@@ -11,7 +11,7 @@ Show design options live on your local site. Click a dot, try each look, copy yo
   |                                dot    | 3 Pill      | |
   |                                       +-------------+ |
   |                                            menu       |
-  |  [ < 1 / 3 > ] [ 1 pick ] [ Copy choices ] [ Hide dots ] [ Reset ]
+  |  [ < 1 / 3 > ] [ eye ] [ 1 pick ] [ Reset ] [ Copy choices ]
   +-------------------------------------------------------+
                           dock
 ```
@@ -50,11 +50,11 @@ The server only listens on your own computer. When you edit a file, the page rel
 
 - Each section with options gets a small blue **dot** just outside its top-right corner. A group with only a comment
   field (`options: [], current: false`) gets a green dot, so the blue dots are the ones that still need a pick.
-  Back and next step through the blue dots only. **Hide dots** is a switch, and a reload keeps it.
+  Back and next step through the blue dots only. The eye button hides the dots, and a reload keeps it.
 - The dots, menu, and dock are `dots.js`, shared with other tools. Edit it there and run `node dots-sync.mjs devpanel.js`.
 - Hover a dot to see the section outlined. Click it to open the **menu** next to the section. On a phone it is a bottom sheet.
 - Hover an option to preview it. Click it to keep it. Type a comment if you like.
-- The **dock** at the bottom shows how many picks you made. It has **Copy choices**, **Hide dots** (key `.`), and **Reset**.
+- The **dock** at the bottom shows how many picks you made. It has the eye button (hide dots, key `.`), **Reset**, and **Copy choices**.
 - **Back** and **next** (keys `[` and `]`) go to every blue dot on the whole site and open its menu. A group on another
   page takes you to that page first. If a group never shows up, the dock says so.
 - The "2 / 5" count is for the whole site. Click it to see **every group**, grouped by page, with each one's current pick.

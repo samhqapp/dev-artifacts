@@ -21,13 +21,13 @@
   const CSS = `
 :root, :host { --od-blue: #007aff; --od-green: #34c759; --od-ink: #1c1c1e; --od-muted: rgba(60,60,67,.62);
   --od-line: rgba(60,60,67,.16); --od-pop: rgba(255,255,255,.94); --od-dock: rgba(255,255,255,.66); --od-hi: rgba(255,255,255,.7);
-  --od-fill: rgba(120,120,128,.12); --od-field: rgba(120,120,128,.08); --od-off: rgba(120,120,128,.24); --od-ring: #fff; --od-knob: #000;
+  --od-fill: rgba(120,120,128,.12); --od-card: #fff; --od-ring: #fff; --od-knob: #000;
   --od-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06);
   --od-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
   --od-ease: ${EASE}; --od-out: cubic-bezier(.22, 1, .36, 1); --od-open: 380ms; --od-close: 220ms; }
 :root[data-od-dark], :host([data-od-dark]) { --od-blue: #0a84ff; --od-green: #30d158; --od-ink: #f2f2f7; --od-muted: rgba(235,235,245,.6);
   --od-line: rgba(84,84,88,.6); --od-pop: rgba(44,44,48,.94); --od-dock: rgba(40,40,44,.6); --od-hi: rgba(255,255,255,.14);
-  --od-fill: rgba(255,255,255,.1); --od-field: rgba(0,0,0,.22); --od-off: rgba(120,120,128,.4); --od-ring: #1c1c1e; --od-knob: #fff;
+  --od-fill: rgba(255,255,255,.1); --od-card: #1c1c1e; --od-ring: #1c1c1e; --od-knob: #fff;
   --od-shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3); }
 .od-layer { position: fixed; inset: 0; pointer-events: none; z-index: 2147483000; }
 .od-dot { all: unset; box-sizing: border-box; position: absolute; left: 0; top: 0; width: 22px; height: 22px; border-radius: 50%;
@@ -61,8 +61,10 @@
 .od-body { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 8px 14px 14px;
   scrollbar-width: none; overflow-wrap: anywhere; }
 .od-body::-webkit-scrollbar { display: none; }
-.od-body textarea:not(.k-comment) { display: block; width: 100%; margin: 8px 0 0; min-height: 36px; padding: 8px 10px; resize: none; overflow: hidden;
-  font: inherit; color: inherit; background: var(--od-field); border: .5px solid var(--od-line); border-radius: 10px; outline: none; }
+.od-body textarea:not(.k-comment) { display: block; width: 100%; margin: 10px 0 0; min-height: 46px; padding: 11px 14px; resize: none; overflow: hidden;
+  font: 15px/1.4 var(--od-font); color: inherit; background: var(--od-card); border: .5px solid var(--od-line); border-radius: 12px; outline: none;
+  box-shadow: var(--od-shadow); }
+.od-body > textarea:first-child, .od-body > :first-child textarea:first-child { margin-top: 0; }
 .od-body textarea:not(.k-comment):focus { border-color: var(--od-blue); }
 .od-body textarea::placeholder { color: var(--od-muted); }
 .od-knob { position: absolute; right: 2px; top: 0; width: 4px; border-radius: 2px; background: var(--od-knob); opacity: 0;
@@ -82,35 +84,51 @@
 .od-dock > button[hidden] { display: none; }
 .od-dock > button:hover, .od-dock > button:focus-visible { background: var(--od-fill); }
 .od-dock > .od-primary, .od-dock > .od-primary:hover, .od-dock > .od-primary:focus-visible { background: var(--od-blue); color: #fff; }
-.od-ctl { display: flex; align-items: center; gap: 2px; font: 600 14px/1 var(--od-font); color: var(--od-ink); }
+.od-ctl { display: flex; align-items: center; gap: 4px; font: 600 14px/1 var(--od-font); color: var(--od-ink); }
 .od-ctl button { all: unset; box-sizing: border-box; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.od-ctl .od-nav { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; }
-.od-ctl .od-nav svg { width: 12px; height: 12px; }
-.od-ctl .od-count { all: unset; box-sizing: border-box; height: 32px; min-width: 56px; padding: 0 6px; border-radius: 999px; display: flex; align-items: center;
-  justify-content: center; gap: 6px; font: 600 14px/1 var(--od-font); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.od-ctl .od-count::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--od-blue); flex: none; }
+.od-ctl .od-step { display: flex; align-items: center; padding: 2px; border-radius: 999px; background: var(--od-fill); }
+.od-ctl .od-nav { width: 28px; height: 28px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
+.od-ctl .od-nav svg { width: 11px; height: 11px; }
+.od-ctl .od-count { all: unset; box-sizing: border-box; height: 28px; padding: 0 4px; border-radius: 999px; display: flex; align-items: center;
+  justify-content: center; gap: 5px; font: 600 13px/1 var(--od-font); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.od-ctl .od-count::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--od-blue); flex: none; }
 .od-ctl button:hover, .od-ctl button:focus-visible { background: var(--od-fill); }
-.od-hide { display: flex; align-items: center; gap: 8px; padding: 0 4px 0 10px; color: var(--od-muted); cursor: pointer; white-space: nowrap; user-select: none; }
-.od-ctl .od-sw { position: relative; width: 38px; height: 22px; border-radius: 11px; background: var(--od-off); flex: none; transition: background-color .2s ease; }
-.od-ctl .od-sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06); transition: transform .2s cubic-bezier(.3,.7,.3,1); }
-.od-ctl .od-sw:hover, .od-ctl .od-sw:focus-visible { background: var(--od-off); filter: brightness(.94); }
-.od-ctl .od-sw[aria-checked="true"] { background: var(--od-blue); }
-.od-ctl .od-sw[aria-checked="true"]::after { transform: translateX(16px); }
+.od-ctl .od-step button:hover, .od-ctl .od-step button:focus-visible { background: var(--od-fill); }
+.od-ctl .od-eye { width: 32px; height: 32px; padding: 0; border-radius: 50%; display: grid; place-items: center; color: var(--od-muted);
+  transition: background-color .15s ease, color .15s ease; }
+.od-ctl .od-eye svg { width: 17px; height: 17px; }
+.od-ctl .od-eye[aria-checked="true"] { color: var(--od-blue); background: color-mix(in srgb, var(--od-blue) 14%, transparent); }
+
+/* option rows and the comment field, the same look as the kit's options in a popover */
+.od-opts { display: grid; gap: 10px; }
+.od-opt { all: unset; box-sizing: border-box; position: relative; overflow: hidden; display: flex; align-items: flex-start; gap: 10px; padding: 12px;
+  border-radius: 14px; border: 2px solid transparent; background: var(--od-card); box-shadow: var(--od-shadow); cursor: pointer;
+  font: 15px/1.3 var(--od-font); color: var(--od-ink); transition: border-color .18s ease; }
+.od-opt:hover, .od-opt:focus-visible { border-color: color-mix(in srgb, var(--od-blue) 35%, transparent); }
+.od-opt[aria-selected="true"] { border-color: var(--od-blue); }
+.od-radio { width: 20px; height: 20px; margin-top: -0.5px; border-radius: 50%; border: 1.5px solid var(--od-line); flex: none; display: grid; place-items: center; }
+.od-opt[aria-selected="true"] .od-radio { border-color: var(--od-blue); background: var(--od-blue); }
+.od-opt[aria-selected="true"] .od-radio::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+.od-name { font-weight: 600; min-width: 0; }
+.od-name .od-num { color: var(--od-muted); font-weight: 500; font-variant-numeric: tabular-nums; margin-right: 6px; }
+.od-name small { display: block; font-size: 12px; font-weight: 500; margin-top: 2px; color: var(--od-muted); }
 .od-dot:focus-visible, .od-pop :focus-visible, .od-dock :focus-visible, .od-ctl :focus-visible { outline: none !important; }
 
 @media (max-width: 600px) {
   .od-pop { left: 8px !important; right: 8px; top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); width: auto !important;
     min-width: 0; max-width: none; max-height: 60vh !important; border-radius: 18px; transform-origin: bottom center; transform: translateY(16px); }
   .od-body textarea:not(.k-comment) { font-size: 16px; } /* 16 px stops iOS zoom on focus */
-  .od-hide { padding-left: 6px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .od-dot, .od-pop, .od-pop.od-show, .od-ctl .od-sw, .od-ctl .od-sw::after { transition: none !important; }
+  .od-dot, .od-pop, .od-pop.od-show, .od-ctl .od-eye, .od-opt { transition: none !important; }
   .od-dot.od-pulse::after { animation: none; }
 }`;
   const svg = (d, w = 1.7) => `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const BUBBLE = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 2h7A1.5 1.5 0 0 1 11 3.5v4A1.5 1.5 0 0 1 9.5 9H6L3.5 11V9h-1A1.5 1.5 0 0 1 1 7.5v-4A1.5 1.5 0 0 1 2.5 2Z" fill="currentColor"/></svg>';
+
+  const EYE_D = 'M1.5 8S3.9 3.5 8 3.5 14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z';
+  const eyeSvg = (slash) => `<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="${EYE_D}"/><circle cx="8" cy="8" r="2.1"/>${slash ? '<path d="M2.5 2.5l11 11"/>' : ''}</svg>`;
+  const EYE = eyeSvg(false), EYE_OFF = eyeSvg(true);
 
   window.OptionDots = (o = {}) => {
     const d = document, root = o.root || d.body, host = root.host, themeEl = o.theme || host || d.documentElement;
@@ -131,12 +149,12 @@
     const ctl = el('div', 'od-ctl'); ctl.setAttribute('role', 'group'); ctl.setAttribute('aria-label', 'Option dots');
     const back = btn('od-nav', svg('M7.5 2.5 4 6l3.5 3.5'), 'Back to the previous dot to pick  ['), next = btn('od-nav', svg('M4.5 2.5 8 6l-3.5 3.5'), 'Next dot to pick  ]');
     const count = o.list ? btn('od-count', '', 'Every group') : el('output', 'od-count');
-    const sw = btn('od-sw'); sw.setAttribute('role', 'switch'); sw.id = 'od-sw-' + Math.random().toString(36).slice(2, 7);
-    const hide = el('label', 'od-hide'); hide.htmlFor = sw.id; hide.append('Hide dots', sw);
-    ctl.append(back, count, next, hide);
+    const grp = el('div', 'od-step'); grp.append(back, count, next);
+    const eye = btn('od-eye'); eye.setAttribute('role', 'switch'); eye.setAttribute('aria-label', 'Hide dots');
+    ctl.append(grp, eye);
     back.onclick = () => step(-1); next.onclick = () => step(1);
     if (o.list) count.onclick = o.list;
-    sw.onclick = () => setHidden(!hidden);
+    eye.onclick = () => setHidden(!hidden);
 
     const box = (r) => { if (typeof r.target === 'function') return r.target() || {}; const t = r.target; return t && t.isConnected ? { t, r: t.getBoundingClientRect() } : {}; };
     const order = (a, b) => (a.t && b.t && a.t !== b.t ? (a.t.compareDocumentPosition(b.t) & 4 ? -1 : 1) : 0);
@@ -149,7 +167,8 @@
         r.el.setAttribute('aria-label', (r.pick ? 'Options for ' : 'Comment on ') + r.label);
         if (r.pick) r.el.textContent = r.n != null ? r.n : list.indexOf(r) + 1; else r.el.innerHTML = BUBBLE;
       });
-      sw.setAttribute('aria-checked', String(hidden));
+      eye.setAttribute('aria-checked', String(hidden)); eye.innerHTML = hidden ? EYE_OFF : EYE;
+      eye.title = (hidden ? 'Show dots' : 'Hide dots') + '  ( . )';
       if (!o.list || o.count) count.textContent = o.count ? o.count() : `${cur && list.includes(cur) ? list.indexOf(cur) + 1 : '–'} / ${list.length}`;
       schedule();
     }
@@ -215,15 +234,19 @@
     function place() {
       raf = 0;
       const vw = innerWidth, vh = innerHeight;
+      // a fixed or sticky header at the top: other targets' dots stay below its bottom edge, so they never cover its controls
+      const bar = d.elementsFromPoint(vw - 40, 2).find((n) => n !== host && !n.closest('.od-layer, .od-pop, .od-dock')
+        && /fixed|sticky/.test(getComputedStyle(n).position) && n.offsetWidth >= vw / 2 && n.offsetHeight <= vh / 3);
+      const barB = bar ? bar.getBoundingClientRect().bottom : 0;
       for (const r of recs) {
-        const { r: b } = box(r);
-        const on = !hidden && b && b.width > 0 && b.bottom > 0 && b.top < vh && b.right > 0 && b.left < vw;
+        const { t, r: b } = box(r), top = bar && !(t && bar.contains(t)) ? barB : 0;
+        const on = !hidden && b && b.width > 0 && b.bottom > top + 22 && b.top < vh && b.right > 0 && b.left < vw;
         r.el.hidden = !on; r.r = b;
         if (!on) continue;
         // just outside the target's top corner (4 px gap); inside the corner when the target fills the width
         const tl = r.pos === 'tl', out = tl ? b.left >= 30 : b.right + 30 <= vw;
         const x = Math.min(Math.max(tl ? (out ? b.left - 26 : b.left + 8) : (out ? b.right + 4 : b.right - 30), 6), vw - 28);
-        const y = out ? Math.min(Math.max(b.top - 26, 6), b.bottom - 22) : Math.min(Math.max(b.top + 8, 6), b.bottom - 30);
+        const y = out ? Math.min(Math.max(b.top - 26, top + 6), b.bottom - 22) : Math.min(Math.max(b.top + 8, top + 6), b.bottom - 30);
         r.el.style.translate = `${x}px ${y}px`;
       }
       if (shown && shown.el && shown.el.hidden && !hidden) return close();
