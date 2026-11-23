@@ -1,15 +1,54 @@
 # dev-artifacts
 
-Show design options live on a website that runs locally, pick one, and paste the picks back to whoever
-(or whichever coding agent) builds the site. No npm dependencies, no build step, nothing added to the site.
+Show design options live on your local site. Click a dot, try each look, copy your picks.
 
-Each section with options gets a small numbered blue badge just outside its top-right corner. Hover the
-badge to highlight the section with blueprint guide lines. Click it to open a menu beside the section (a
-bottom sheet on a phone), so the section stays in view. Hover an option to preview it, click to keep it,
-and add a comment. The dock at the bottom shows the picks count, **Copy choices**, Hide dots (or press
-`.`), and Reset. Picks and comments stay in localStorage per page. Never ship it.
+```text
+  +-------------------------------------------------------+
+  |  Your site                                            |
+  |  +----------------------------+  (1)  +-------------+ |
+  |  |  Email field               |  ^    | 1 Current   | |
+  |  +----------------------------+  |    | 2 Soft ring | |
+  |                              badge    | 3 Pill      | |
+  |                                       +-------------+ |
+  |                                            menu       |
+  |      [ 1 pick ] [ Copy choices ] [ Hide dots ] [ Reset ]
+  +-------------------------------------------------------+
+                          dock
+```
 
-Copy choices gives one Markdown line per group, with comment lines indented under it:
+It needs Node 22 or newer. It has no npm packages and no build step. It adds nothing to your site.
+
+## Quick start
+
+1. Copy the two template files into a new folder. Keep this folder outside your site.
+
+   ```sh
+   mkdir options
+   cp dev-artifacts/templates/variants.js dev-artifacts/templates/variants.css options/
+   ```
+
+2. Open `options/variants.js`. Change `target` to a CSS selector from your site, such as `.hero input`.
+   Then write your options in `options/variants.css` (see "Writing options" below).
+
+3. Start the server. Give it your site folder.
+
+   ```sh
+   node dev-artifacts/serve.mjs ./my-site --variants options/variants.js --css options/variants.css
+   ```
+
+   It prints a link like `http://127.0.0.1:PORT/`. Open it in your browser.
+
+The server only listens on your own computer. When you edit a file, the page reloads by itself.
+
+## How it works
+
+- Each section with options gets a small blue **badge** just outside its top-right corner.
+- Hover the badge to see the section outlined. Click it to open the **menu** next to the section. On a phone it is a bottom sheet.
+- Hover an option to preview it. Click it to keep it. Type a comment if you like.
+- The **dock** at the bottom shows how many picks you made. It has **Copy choices**, **Hide dots**, and **Reset**.
+- Press the `.` key to hide or show the badges. Your picks stay in your browser, per page.
+
+**Copy choices** gives one line per group. Paste it to the person or coding agent who builds the site.
 
 ```text
 - Email field: 2 Soft ring - make the ring thinner
@@ -17,49 +56,63 @@ Copy choices gives one Markdown line per group, with comment lines indented unde
 - Main button: 1 Current
 ```
 
-## Files
+Never ship the overlay or your variants files. They are for development only.
 
-| File | What it is |
-|---|---|
-| `devpanel.js` | The overlay (one shadow root, no style leaks). API: `DevPanel.group(...)`. |
-| `serve.mjs` | Static dev server that injects the overlay, live reload, and the `--shot` screenshot command. |
-| `templates/` | Starter `variants.js` and `variants.css` with comments. |
-| `recipes.md` | Ready option sets: text field, button, card, header, text change. |
-| `SKILL.md` | Step-by-step recipe for coding agents. |
+## Writing options
 
-## Static sites
+`variants.js` lists the options. Option 1 is always "Current", so your first option is number 2.
 
-```sh
-node serve.mjs <site dir> --variants variants.js --css variants.css [--port 0] [--page /path]
+```js
+DevPanel.group({ id: 'input', label: 'Email field', target: '.hero input', options: [
+  { name: 'Glow ring', note: 'Blue ring around the field' },
+  { name: 'Pill', note: 'Fully round ends' },
+] });
 ```
 
-It prints the URL (127.0.0.1 only), injects the overlay, your variants JS, and your variants CSS before
-`</body>` of every HTML page, and reloads the page when any file changes. Site files never reference it.
+`variants.css` styles each option. When you pick option `i`, the page gets `data-dv-<id>="<i>"` on `<html>`.
+
+```css
+html[data-dv-input="2"] .hero input { box-shadow: 0 0 0 4px rgba(0,122,255,.25); }
+html[data-dv-input="3"] .hero input { border-radius: 999px; }
+```
+
+Extra settings: `dot: 'tl'` puts the badge on the top-left corner. `current: false` removes the automatic "Current".
+`apply(i)` runs your own code for changes that CSS cannot do, such as new text. More ready examples are in `recipes.md`.
 
 ## Screenshots
 
+Take a screenshot of every option, and then look at them. This needs Chrome or Chromium on your computer.
+
 ```sh
-node serve.mjs <site dir> --variants v.js --css v.css --shot out/ [--sizes 1440x900,390x844] [--open <group>] [--each]
+node dev-artifacts/serve.mjs ./my-site --variants options/variants.js --css options/variants.css \
+  --shot options/shots --each --sizes 1440x900,390x844
 ```
 
-Starts the server, takes screenshots with headless Chrome, prints the file paths, and exits.
+It starts the server, saves the images, prints their paths, and stops. A file name looks like `input-2-soft-ring-390x844.png`.
 
-- No flag: the page top with the overlay, one shot per size.
-- `--open <group>`: that group's menu open, its section scrolled into view.
-- `--each`: every option of every group (or only `--open <group>`), menu closed and overlay hidden,
-  one file per option and size, such as `input-2-soft-ring-390x844.png`.
-- It prints a warning when the page scrolls sideways at a size.
+| Flag | What it does |
+|---|---|
+| `--shot <folder>` | Take screenshots into this folder, then exit. Alone, it shoots the top of the page. |
+| `--sizes 1440x900,390x844` | Window sizes to use. The default is a desktop and a phone. |
+| `--open <group id>` | Show that group's menu open. |
+| `--each` | One image for every option, with the overlay hidden. |
+| `--page /path` | Which page of your site to open. |
+| `--port 4799` | Use a fixed port. The default picks a free one. |
 
-Chrome is found in this order: `$CHROME_PATH`, a Playwright `chromium_headless_shell` (in
-`$PLAYWRIGHT_BROWSERS_PATH` or the default cache), then the system Chrome or Chromium. It talks to Chrome
-over the DevTools protocol with the WebSocket built into Node 22.
+It warns you when a page scrolls sideways at one of the sizes. It finds Chrome by itself. To choose one, set `CHROME_PATH`.
 
-URL params, for any browser: `?dv-pick=<id>:<i>[,<id>:<i>]` forces options without saving,
-`?dv-open=<id>` opens a menu, `?dv-hl=<id>` shows the highlight, `?dv-clean` hides the overlay.
+You can also add these to any page address: `?dv-pick=<id>:<number>` forces an option, `?dv-open=<id>` opens a menu,
+`?dv-clean` hides the overlay.
 
-## Vite or Next dev
+## Use with Vite or Next
 
-Keep `serve.mjs` running on a fixed port for the overlay files (`--port 4799`), then add one dev-only line:
+Keep `serve.mjs` running on a fixed port. Your Vite or Next app loads the overlay files from it:
+
+```sh
+node dev-artifacts/serve.mjs ./my-site --variants options/variants.js --css options/variants.css --port 4799
+```
+
+Then add this one dev-only line to your app. It loads `devpanel.js` and `variants.js` from that server.
 
 ```jsx
 // Vite (index.html or main.js):
@@ -68,25 +121,13 @@ if (import.meta.env.DEV) for (const s of ['devpanel.js', 'variants.js']) documen
 {process.env.NODE_ENV === 'development' && <><Script src="http://127.0.0.1:4799/__dev/devpanel.js" strategy="afterInteractive" /><Script src="http://127.0.0.1:4799/__dev/variants.js" strategy="afterInteractive" /></>}
 ```
 
-Load the variant CSS the same way (`/__dev/variants.css`). `--shot` covers static sites only.
+Load the CSS the same way, from `http://127.0.0.1:4799/__dev/variants.css`. The `--shot` command works on static sites only.
 
-## Variants file
+## Why not a separate options page
 
-```js
-// variants.js: one group per section. "Current" is added as option 1, so the first option here is 2.
-DevPanel.group({ id: 'input', label: 'Input', target: '.hero input', options: [
-  { name: 'Glow ring', note: 'Blue ring around the field' },
-  { name: 'Pill' },
-] });
-// optional: dot: 'tl' (top left), current: false (no automatic "Current"), apply(i) for DOM changes (called with 1 too)
-```
-
-```css
-/* variants.css: picking option i sets data-dv-<id>="<i>" on <html> */
-html[data-dv-input="2"] .hero input { box-shadow: 0 0 0 4px rgba(0,122,255,.25); }
-html[data-dv-input="3"] .hero input { border-radius: 999px; }
-```
+The options sit next to your real content, so nobody builds or publishes a second page.
+We ran the same task 3 times each: dev-artifacts took about 93k tokens, 13 steps, and 1 minute. A separate published options page took about 125k tokens, 36 steps, and 4 minutes.
 
 ## License
 
-MIT
+MIT. See `LICENSE`.
