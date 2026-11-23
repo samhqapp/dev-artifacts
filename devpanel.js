@@ -15,7 +15,10 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
   const sheetMQ = matchMedia('(max-width: 600px)'), darkMQ = matchMedia('(prefers-color-scheme: dark)');
-  let host, sh, layer, hl, ring, bps, pop, scr, knob, count, hideBtn, copyBtn, open = null, hover = null, raf = 0, knobT = 0;
+  let host, sh, layer, hl, ring, bps, pop, scr, knob, count, hideBtn, copyBtn, busy, open = null, hover = null, raf = 0, knobT = 0;
+  // The menu is placed once when it opens and stays put while previews change the page under it,
+  // so the option under the pointer never changes by itself. It re-places on resize or a user scroll.
+  let placePop = false, previewT = 0, hoverT = 0, busyG = null, busyN = 0;
 
   const CSS = `
 :host { all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; color-scheme: light;
@@ -52,6 +55,13 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   mask: linear-gradient(90deg, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
 .bp.v { width: 1px; -webkit-mask: linear-gradient(180deg, transparent, #000 48px, #000 calc(100% - 48px), transparent);
   mask: linear-gradient(180deg, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
+/* loading state while a preview settles: a soft fill over the target with a sweep across it */
+.busy { position: absolute; left: 0; top: 0; border-radius: 10px; overflow: hidden; opacity: 0; transition: opacity .25s ease;
+  background: color-mix(in srgb, var(--blue) 6%, transparent); }
+.busy::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 45%; animation: dv-sweep .8s linear infinite;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--blue) 16%, transparent), transparent); }
+.busy.on { opacity: 1; transition-duration: .12s; }
+@keyframes dv-sweep { from { transform: translateX(-100%); } to { transform: translateX(223%); } }
 .hl.on .ring { opacity: 1; }
 .hl.on .bp { opacity: .45; }
 
@@ -113,10 +123,10 @@ textarea::placeholder { color: var(--muted); }
     if (host || !document.body) return;
     host = document.createElement('dev-panel');
     sh = host.attachShadow({ mode: 'open' });
-    sh.innerHTML = `<style>${CSS}</style><div class="hl"><div class="ring"></div><div class="bp h"></div><div class="bp h"></div><div class="bp v"></div><div class="bp v"></div></div>
+    sh.innerHTML = `<style>${CSS}</style><div class="busy"></div><div class="hl"><div class="ring"></div><div class="bp h"></div><div class="bp h"></div><div class="bp v"></div><div class="bp v"></div></div>
 <div class="layer"></div><div class="pop" role="dialog" aria-label="Dev artifacts" hidden><div class="scroll"></div><div class="knob"></div></div>
 <div class="dock" aria-label="Dev artifacts"><output></output><button class="copy" type="button">Copy choices</button><button class="hide" type="button"></button><button class="reset" type="button">Reset</button></div>`;
-    [hl, ring, layer, pop, scr, knob] = ['.hl', '.ring', '.layer', '.pop', '.scroll', '.knob'].map((s) => sh.querySelector(s));
+    [hl, ring, layer, pop, scr, knob, busy] = ['.hl', '.ring', '.layer', '.pop', '.scroll', '.knob', '.busy'].map((s) => sh.querySelector(s));
     bps = sh.querySelectorAll('.bp');
     count = sh.querySelector('output'); hideBtn = sh.querySelector('.hide'); copyBtn = sh.querySelector('.copy');
     copyBtn.onclick = copy;
@@ -167,11 +177,30 @@ textarea::placeholder { color: var(--muted); }
   }
 
   const pick = (g) => st.picks[g.id] || 1;
-  function setVar(g, i) {
-    const attr = 'data-dv-' + g.id, root = document.documentElement;
+  function setVar(g, i, force) {
+    if (g.cur === i && !force) return; // never apply the same value twice
+    const changed = g.cur !== i, attr = 'data-dv-' + g.id, root = document.documentElement;
+    g.cur = i;
     if (i === 1 && g.current !== false) root.removeAttribute(attr); else root.setAttribute(attr, String(i));
     try { g.apply && g.apply(i); } catch (e) { console.error('[dev artifacts]', g.id, e); }
+    if (changed && busy) { previewT = performance.now(); settle(g); }
     schedule();
+  }
+  // Hover previews wait 60 ms and apply only the last one, so a pass over the list doesn't flicker.
+  const preview = (g, i) => { clearTimeout(hoverT); hoverT = setTimeout(() => setVar(g, i), 60); };
+
+  // The loading state shows until the change has settled: fonts loaded, 2 frames, and the target's
+  // transitions (and a page view transition) finished, at most 600 ms.
+  function settle(g) {
+    const n = ++busyN; busyG = g; busy.classList.add('on'); schedule();
+    const t = document.querySelector(g.target);
+    const frames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const finite = (a) => a.effect && a.effect.getComputedTiming().endTime !== Infinity;
+    const anims = () => Promise.all([...(t ? t.getAnimations({ subtree: true }) : []),
+      ...document.getAnimations().filter((a) => /^::view-transition/.test(a.effect && a.effect.pseudoElement || ''))]
+      .filter(finite).map((a) => a.finished.catch(() => {})));
+    Promise.race([document.fonts.ready.then(frames).then(anims), new Promise((r) => setTimeout(r, 600))])
+      .then(() => { if (n === busyN) { busy.classList.remove('on'); busyG = null; } });
   }
 
   function show(g) {
@@ -179,19 +208,20 @@ textarea::placeholder { color: var(--muted); }
     scr.innerHTML = `<div class="head"><span class="dot">${g.n}</span>${esc(g.label)}</div><div class="list" role="listbox">${g.opts.map((o, k) =>
       `<button type="button" class="opt" role="option" data-i="${k + 1}" aria-selected="${pick(g) === k + 1}"><span class="ck">✓</span><span><span class="name">${esc(o.name)}</span>${o.note ? `<span class="note">${esc(o.note)}</span>` : ''}</span><span class="n">${k + 1}</span></button>`).join('')}</div><div class="sep"></div><textarea rows="1" placeholder="Comment"></textarea>`;
     const list = scr.querySelector('.list'), ta = scr.querySelector('textarea');
-    list.onmouseover = (e) => { const b = e.target.closest('.opt'); if (b) setVar(g, +b.dataset.i); };
-    list.onmouseleave = () => setVar(g, pick(g));
+    list.onmouseover = (e) => { const b = e.target.closest('.opt'); if (b) preview(g, +b.dataset.i); };
+    list.onmouseleave = (e) => { if (!inRect(list, e)) preview(g, pick(g)); }; // a leave with the pointer still inside is not real
     list.onclick = (e) => {
       const b = e.target.closest('.opt'); if (!b) return;
+      clearTimeout(hoverT);
       const i = +b.dataset.i; if (i === 1) delete st.picks[g.id]; else st.picks[g.id] = i;
-      save(); setVar(g, i);
+      save(); setVar(g, i, true);
       list.querySelectorAll('.opt').forEach((o) => o.setAttribute('aria-selected', o === b));
       sync();
     };
     ta.value = st.notes[g.id] || '';
     const grow = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
     ta.oninput = () => { const v = ta.value; if (v.trim()) st.notes[g.id] = v; else delete st.notes[g.id]; save(); grow(); };
-    pop.hidden = false; scr.scrollTop = 0; grow();
+    pop.hidden = false; scr.scrollTop = 0; grow(); placePop = true;
     sh.querySelectorAll('.layer .dot').forEach((d) => d.setAttribute('aria-expanded', d === g.el));
     if (sheetMQ.matches) requestAnimationFrame(() => {
       // bring the target into the free part above the bottom sheet
@@ -203,7 +233,8 @@ textarea::placeholder { color: var(--muted); }
 
   function close() {
     if (!open) return;
-    setVar(open, pick(open));
+    clearTimeout(hoverT); // a pending hover preview must not land after the menu closes
+    setVar(open, pick(open), true);
     open = null; pop.hidden = true; scr.innerHTML = '';
     sh.querySelectorAll('.layer .dot').forEach((d) => d.setAttribute('aria-expanded', 'false'));
     schedule();
@@ -229,6 +260,7 @@ textarea::placeholder { color: var(--muted); }
   }
 
   const box = (el, x, y, w, h) => { el.style.transform = `translate(${x}px, ${y}px)`; el.style.width = w + 'px'; el.style.height = h + 'px'; };
+  const inRect = (el, e) => { const r = el.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
 
   function place() {
     raf = 0;
@@ -254,8 +286,15 @@ textarea::placeholder { color: var(--muted); }
       box(bps[2], r.left, r.top - E, 1, r.height + 2 * E);
       box(bps[3], r.right - 1, r.top - E, 1, r.height + 2 * E);
     }
+    if (busyG && busyG.r) { // the padded highlight box, kept inside the window; follows the target while it settles
+      const r = busyG.r, x = Math.max(r.left - 8, 0), y = Math.max(r.top - 8, 0);
+      box(busy, x, y, Math.min(r.right + 8, vw) - x, Math.min(r.bottom + 8, vh) - y);
+      schedule();
+    }
     if (!open || sheetMQ.matches) return;
     if (open.el.hidden) return close();
+    if (!placePop) return;
+    placePop = false;
     // beside the target on the roomiest side (right, left, below, above), so the target stays in view
     const keep = scr.scrollTop; // resetting the size below would otherwise jump the list back to the top
     pop.style.width = pop.style.maxHeight = '';
@@ -303,8 +342,13 @@ textarea::placeholder { color: var(--muted); }
     copyBtn.textContent = 'Copied'; setTimeout(() => (copyBtn.textContent = 'Copy choices'), 1200);
   }
 
-  addEventListener('scroll', schedule, { passive: true, capture: true });
-  addEventListener('resize', schedule);
+  addEventListener('scroll', (e) => {
+    // only a scroll that moves the target re-places the menu, and not one a preview's layout change caused
+    const t = open && document.querySelector(open.target);
+    if (t && performance.now() - previewT > 500 && (e.target === document || (e.target.contains && e.target.contains(t)))) placePop = true;
+    schedule();
+  }, { passive: true, capture: true });
+  addEventListener('resize', () => { placePop = true; schedule(); });
   addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && open) return close();
     const t = e.composedPath()[0];
@@ -314,7 +358,13 @@ textarea::placeholder { color: var(--muted); }
   addEventListener('pointerdown', (e) => {
     if (!open) return;
     const p = e.composedPath();
-    if (!p.includes(pop) && !p.includes(open.el)) close();
+    if (!p.includes(pop) && !p.includes(open.el) && !inRect(pop, e) && !inRect(open.el, e)) close();
+  }, true);
+  // While a page view transition runs, Chrome sends every click to <html>. Hand it to the option or badge under the pointer.
+  addEventListener('click', (e) => {
+    if (!open || e.composedPath()[0] !== document.documentElement) return;
+    const b = [...scr.querySelectorAll('.opt'), ...layer.children].find((el) => !el.hidden && inRect(el, e));
+    if (b) b.click();
   }, true);
   const boot = () => {
     mount();
@@ -334,6 +384,7 @@ textarea::placeholder { color: var(--muted); }
         opts: cfg.current === false ? cfg.options : [{ name: 'Current' }, ...cfg.options] };
       if (forced[g.id]) st.picks[g.id] = forced[g.id];
       if (pick(g) > g.opts.length) delete st.picks[g.id];
+      g.cur = 1; // the page starts on option 1
       groups.push(g);
       if (pick(g) !== 1) setVar(g, pick(g));
       if (host) { addDot(g); sync(); }
