@@ -83,6 +83,8 @@ html[data-dv-input="3"] .hero input { border-radius: 999px; }
 ```
 
 Extra settings: `dot: 'tl'` puts the badge on the top-left corner. `current: false` removes the automatic "Current".
+When `target` matches many elements, such as every card, the badge and outline sit on one card: the first one you can see.
+Your options still change every card. `sample: 'all'` outlines all of them in one box instead.
 `apply(i)` runs your own code for changes that CSS cannot do, such as new text. More ready examples are in `recipes.md`.
 
 ## Screenshots

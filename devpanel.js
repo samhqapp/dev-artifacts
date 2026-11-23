@@ -1,5 +1,5 @@
 /* Dev artifacts (DevPanel): a dev-only overlay that shows design options live on a real site.
-   DevPanel.group({ id, label, target, options: [{ name, note? }], dot?: 'tr'|'tl', current?: false, apply?(i) })
+   DevPanel.group({ id, label, target, options: [{ name, note? }], dot?: 'tr'|'tl', current?: false, sample?: 'first'|'all', apply?(i) })
    Option 1 is "Current" (no attribute) unless current: false. Picking option i > 1 sets data-dv-<id>="<i>" on <html>.
    Everything lives in one shadow root, so no style leaks in or out. Never ship this file.
    URL params: ?dv-open=<id> opens a popover, ?dv-hl=<id> shows the badge-hover highlight,
@@ -197,7 +197,7 @@ textarea::placeholder { color: var(--muted); }
     const n = ++busyN, el = open === g && scr.querySelector(`.opt[data-i="${i}"]`);
     scr.querySelectorAll('.opt.loading').forEach((o) => o.classList.remove('loading'));
     if (el) el.classList.add('loading');
-    const t = document.querySelector(g.target);
+    const t = sample(g).t;
     const frames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     const finite = (a) => a.effect && a.effect.getComputedTiming().endTime !== Infinity;
     const anims = () => Promise.all([...(t ? t.getAnimations({ subtree: true }) : []),
@@ -229,7 +229,7 @@ textarea::placeholder { color: var(--muted); }
     sh.querySelectorAll('.layer .dot').forEach((d) => d.setAttribute('aria-expanded', d === g.el));
     if (sheetMQ.matches) requestAnimationFrame(() => {
       // bring the target into the free part above the bottom sheet
-      const t = document.querySelector(g.target), r = t && t.getBoundingClientRect(), top = innerHeight - pop.offsetHeight - 8;
+      const r = sample(g).r, top = innerHeight - pop.offsetHeight - 8;
       if (r && (r.top < 8 || r.bottom > top - 8)) scrollBy(0, r.top - Math.max(12, (top - r.height) / 2));
     });
     schedule();
@@ -263,6 +263,23 @@ textarea::placeholder { color: var(--muted); }
     knobT = setTimeout(() => { if (!knob.classList.contains('drag')) knob.classList.remove('show'); }, 2000);
   }
 
+  // A target that matches many elements (every card) gets its badge, outline, and menu on one sample:
+  // the first match in view, picked again on every frame. The options still style every match.
+  // sample: 'all' outlines the box around all matches instead.
+  const inView = (r) => r.width > 0 && r.bottom > 36 && r.top < innerHeight - 20 && r.right > 0 && r.left < innerWidth;
+  function sample(g) {
+    const els = [...document.querySelectorAll(g.target)], rs = els.map((t) => t.getBoundingClientRect());
+    if (g.sample === 'all' && els.length > 1) {
+      const live = rs.filter((r) => r.width > 0);
+      if (!live.length) return {};
+      const l = Math.min(...live.map((r) => r.left)), t = Math.min(...live.map((r) => r.top));
+      const rt = Math.max(...live.map((r) => r.right)), b = Math.max(...live.map((r) => r.bottom));
+      return { t: els[0], r: { left: l, top: t, right: rt, bottom: b, width: rt - l, height: b - t } };
+    }
+    const k = Math.max(0, rs.findIndex(inView));
+    return { t: els[k], r: rs[k] };
+  }
+
   const box = (el, x, y, w, h) => { el.style.transform = `translate(${x}px, ${y}px)`; el.style.width = w + 'px'; el.style.height = h + 'px'; };
   const inRect = (el, e) => { const r = el.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
 
@@ -271,14 +288,14 @@ textarea::placeholder { color: var(--muted); }
     const vw = innerWidth, vh = innerHeight;
     let lit = st.hidden ? null : hover;
     for (const g of groups) {
-      const t = document.querySelector(g.target), r = t && t.getBoundingClientRect();
-      const on = !st.hidden && r && r.width > 0 && r.bottom > 36 && r.top < vh - 20;
+      const { t, r } = sample(g);
+      const on = !st.hidden && r && inView(r);
       g.el.hidden = !on;
       if (!on) { if (lit === g) lit = null; continue; }
       // the badge floats just outside the target's top corner (4 px gap) and stays on screen
       const x = clamp(g.pos === 'tl' ? r.left - 24 : r.right + 4, 6, vw - 26);
       const y = Math.min(Math.max(r.top - 24, 6), r.bottom - 20);
-      g.r = r;
+      g.r = r; g.t = t;
       g.el.style.transform = `translate(${x}px, ${y}px)`;
     }
     hl.classList.toggle('on', !!lit);
@@ -343,7 +360,7 @@ textarea::placeholder { color: var(--muted); }
 
   addEventListener('scroll', (e) => {
     // only a scroll that moves the target re-places the menu, and not one a preview's layout change caused
-    const t = open && document.querySelector(open.target);
+    const t = open && open.t;
     if (t && performance.now() - previewT > 500 && (e.target === document || (e.target.contains && e.target.contains(t)))) placePop = true;
     schedule();
   }, { passive: true, capture: true });
@@ -368,6 +385,8 @@ textarea::placeholder { color: var(--muted); }
   const boot = () => {
     mount();
     try { new ResizeObserver(schedule).observe(document.body); } catch {}
+    // targets an app renders later (board cards after a fetch) get their badge as soon as they appear
+    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
     const find = (id) => id && groups.find((x) => x.id === id);
     const g = find(Q.get('dv-open')), h = find(Q.get('dv-hl'));
     if (g) setTimeout(() => show(g), 50);
