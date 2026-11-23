@@ -15,10 +15,10 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
   const sheetMQ = matchMedia('(max-width: 600px)'), darkMQ = matchMedia('(prefers-color-scheme: dark)');
-  let host, sh, layer, hl, ring, bps, pop, scr, knob, count, hideBtn, copyBtn, busy, open = null, hover = null, raf = 0, knobT = 0;
+  let host, sh, layer, hl, ring, bps, pop, scr, knob, count, hideBtn, copyBtn, open = null, hover = null, raf = 0, knobT = 0;
   // The menu is placed once when it opens and stays put while previews change the page under it,
   // so the option under the pointer never changes by itself. It re-places on resize or a user scroll.
-  let placePop = false, previewT = 0, hoverT = 0, busyG = null, busyN = 0;
+  let placePop = false, previewT = 0, hoverT = 0, busyN = 0;
 
   const CSS = `
 :host { all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; color-scheme: light;
@@ -55,12 +55,11 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   mask: linear-gradient(90deg, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
 .bp.v { width: 1px; -webkit-mask: linear-gradient(180deg, transparent, #000 48px, #000 calc(100% - 48px), transparent);
   mask: linear-gradient(180deg, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
-/* loading state while a preview settles: a soft fill over the target with a sweep across it */
-.busy { position: absolute; left: 0; top: 0; border-radius: 10px; overflow: hidden; opacity: 0; transition: opacity .25s ease;
-  background: color-mix(in srgb, var(--blue) 6%, transparent); }
-.busy::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 45%; animation: dv-sweep .8s linear infinite;
-  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--blue) 16%, transparent), transparent); }
-.busy.on { opacity: 1; transition-duration: .12s; }
+/* loading state while a preview settles: a sweep across the hovered option's own highlight */
+.opt { position: relative; overflow: hidden; }
+.opt.loading::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 60%; pointer-events: none;
+  animation: dv-sweep .8s linear infinite; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent); }
+@media (prefers-reduced-motion: reduce) { .opt.loading::after { animation: none; left: 0; width: 100%; background: rgba(255,255,255,.12); } }
 @keyframes dv-sweep { from { transform: translateX(-100%); } to { transform: translateX(223%); } }
 .hl.on .ring { opacity: 1; }
 .hl.on .bp { opacity: .45; }
@@ -123,10 +122,13 @@ textarea::placeholder { color: var(--muted); }
     if (host || !document.body) return;
     host = document.createElement('dev-panel');
     sh = host.attachShadow({ mode: 'open' });
-    sh.innerHTML = `<style>${CSS}</style><div class="busy"></div><div class="hl"><div class="ring"></div><div class="bp h"></div><div class="bp h"></div><div class="bp v"></div><div class="bp v"></div></div>
+    // A page view transition lays a snapshot over everything and takes the pointer (the cursor flips to an
+    // arrow and clicks hit <html>) until it ends. Let the pointer pass through to the real page and menu.
+    document.head.append(Object.assign(document.createElement('style'), { textContent: '::view-transition { pointer-events: none; }' }));
+    sh.innerHTML = `<style>${CSS}</style><div class="hl"><div class="ring"></div><div class="bp h"></div><div class="bp h"></div><div class="bp v"></div><div class="bp v"></div></div>
 <div class="layer"></div><div class="pop" role="dialog" aria-label="Dev artifacts" hidden><div class="scroll"></div><div class="knob"></div></div>
 <div class="dock" aria-label="Dev artifacts"><output></output><button class="copy" type="button">Copy choices</button><button class="hide" type="button"></button><button class="reset" type="button">Reset</button></div>`;
-    [hl, ring, layer, pop, scr, knob, busy] = ['.hl', '.ring', '.layer', '.pop', '.scroll', '.knob', '.busy'].map((s) => sh.querySelector(s));
+    [hl, ring, layer, pop, scr, knob] = ['.hl', '.ring', '.layer', '.pop', '.scroll', '.knob'].map((s) => sh.querySelector(s));
     bps = sh.querySelectorAll('.bp');
     count = sh.querySelector('output'); hideBtn = sh.querySelector('.hide'); copyBtn = sh.querySelector('.copy');
     copyBtn.onclick = copy;
@@ -183,7 +185,7 @@ textarea::placeholder { color: var(--muted); }
     g.cur = i;
     if (i === 1 && g.current !== false) root.removeAttribute(attr); else root.setAttribute(attr, String(i));
     try { g.apply && g.apply(i); } catch (e) { console.error('[dev artifacts]', g.id, e); }
-    if (changed && busy) { previewT = performance.now(); settle(g); }
+    if (changed) { previewT = performance.now(); settle(g, i); }
     schedule();
   }
   // Hover previews wait 60 ms and apply only the last one, so a pass over the list doesn't flicker.
@@ -191,8 +193,10 @@ textarea::placeholder { color: var(--muted); }
 
   // The loading state shows until the change has settled: fonts loaded, 2 frames, and the target's
   // transitions (and a page view transition) finished, at most 600 ms.
-  function settle(g) {
-    const n = ++busyN; busyG = g; busy.classList.add('on'); schedule();
+  function settle(g, i) {
+    const n = ++busyN, el = open === g && scr.querySelector(`.opt[data-i="${i}"]`);
+    scr.querySelectorAll('.opt.loading').forEach((o) => o.classList.remove('loading'));
+    if (el) el.classList.add('loading');
     const t = document.querySelector(g.target);
     const frames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     const finite = (a) => a.effect && a.effect.getComputedTiming().endTime !== Infinity;
@@ -200,7 +204,7 @@ textarea::placeholder { color: var(--muted); }
       ...document.getAnimations().filter((a) => /^::view-transition/.test(a.effect && a.effect.pseudoElement || ''))]
       .filter(finite).map((a) => a.finished.catch(() => {})));
     Promise.race([document.fonts.ready.then(frames).then(anims), new Promise((r) => setTimeout(r, 600))])
-      .then(() => { if (n === busyN) { busy.classList.remove('on'); busyG = null; } });
+      .then(() => { if (el) el.classList.remove('loading'); });
   }
 
   function show(g) {
@@ -285,11 +289,6 @@ textarea::placeholder { color: var(--muted); }
       box(bps[1], r.left - E, r.bottom - 1, r.width + 2 * E, 1);
       box(bps[2], r.left, r.top - E, 1, r.height + 2 * E);
       box(bps[3], r.right - 1, r.top - E, 1, r.height + 2 * E);
-    }
-    if (busyG && busyG.r) { // the padded highlight box, kept inside the window; follows the target while it settles
-      const r = busyG.r, x = Math.max(r.left - 8, 0), y = Math.max(r.top - 8, 0);
-      box(busy, x, y, Math.min(r.right + 8, vw) - x, Math.min(r.bottom + 8, vh) - y);
-      schedule();
     }
     if (!open || sheetMQ.matches) return;
     if (open.el.hidden) return close();
