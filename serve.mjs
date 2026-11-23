@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Dev-only static server: serves <site dir>, injects the DevPanel overlay and your variants into every HTML page,
 // and reloads the page when a file changes. Binds 127.0.0.1 only. No npm dependencies.
-// Usage: node serve.mjs <site dir> [--variants file.js] [--css file.css] [--port 0] [--page /path]
-//        add --shot <out dir> [--sizes 1440x900,390x844] [--open <group>] [--each] to take screenshots and exit.
+// Usage: node serve.mjs <site dir> [--variants file.js] [--css file.css] [--port 0] [--page /path] [--proxy /api=http://127.0.0.1:8080]
+//        add --shot <out dir> [--sizes 1440x900,390x844] [--open <group>] [--each] [--scheme dark] [--run '<js>'] to take screenshots and exit.
 import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -16,6 +16,12 @@ const bool = (name) => { const i = args.indexOf(name); return i >= 0 && !!args.s
 const variants = flag('--variants'), css = flag('--css'), port = Number(flag('--port') ?? 0);
 const shotDir = flag('--shot'), sizes = flag('--sizes') || '1440x900,390x844', openId = flag('--open'), page = flag('--page') || '/';
 const each = bool('--each');
+// --scheme dark|light shoots in that appearance; --run '<js>' sets up a page state (open a menu, pick an item) before a page shot.
+const scheme = flag('--scheme'), run = flag('--run');
+// --proxy /api=http://127.0.0.1:8080 forwards that path prefix to a local API, so the page gets live data.
+// Extra headers (an API key, a dev token) come from DV_PROXY_HEADERS as JSON, so they never show in `ps`.
+const [proxyPath, proxyTo] = (flag('--proxy') || '').split(/=(.*)/);
+const proxyHeaders = JSON.parse(process.env.DV_PROXY_HEADERS || '{}');
 const root = path.resolve(args[0] || '.');
 if (!fs.statSync(root, { throwIfNoEntry: false })?.isDirectory()) { console.error(`Not a folder: ${root}`); process.exit(1); }
 const own = path.dirname(fileURLToPath(import.meta.url));
@@ -64,6 +70,13 @@ function handle(req, res) {
   let url;
   try { url = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400).end(); return; }
   if (url.includes('\0') || url.split('/').some(s => s.startsWith('.') && s.length > 0)) { res.writeHead(404).end(); return; } // no .git, .env
+  if (proxyTo && url.startsWith(proxyPath)) {
+    const up = http.request(new URL(req.url, proxyTo), { method: req.method, headers: { ...req.headers, host: new URL(proxyTo).host, ...proxyHeaders } },
+      (r) => { res.writeHead(r.statusCode, r.headers); r.pipe(res); });
+    up.on('error', () => { if (!res.headersSent) res.writeHead(502); res.end(); });
+    req.pipe(up);
+    return;
+  }
   if (url === '/__dev/version') { res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' }).end(String(version)); return; }
   const abs = DEV[url] || path.join(root, url);
   if (!DEV[url] && abs !== root && !abs.startsWith(root + path.sep)) { res.writeHead(403).end(); return; } // no ../ escapes
@@ -142,7 +155,8 @@ async function shoot(base) {
 
     fs.mkdirSync(shotDir, { recursive: true });
     // Reduced motion, so entrance animations don't leave parts of the page faded or missing in the shots.
-    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' },
+      ...(scheme ? [{ name: 'prefers-color-scheme', value: scheme }] : [])] });
     for (const size of sizes.split(',')) {
       const [w, h] = size.split('x').map(Number);
       await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: w < 600 });
@@ -155,13 +169,16 @@ async function shoot(base) {
         for (const g of groups) for (let i = 1; i <= g.options.length; i++) {
           await load(`dv-clean=1&dv-pick=${encodeURIComponent(g.id)}:${i}`);
           await center(g.target);
-          await snap(`${g.id}-${i}-${slug(g.options[i - 1])}-${size}`);
+          await snap(`${g.id}-${i}-${slug(g.options[i - 1])}-${scheme ? scheme + '-' : ''}${size}`);
         }
       } else if (openId) {
         await center(groups[0].target);
         await evaluate(`DevPanel.open(${JSON.stringify(openId)})`);
         await snap(`${openId}-open-${size}`);
-      } else await snap(`page-${size}`);
+      } else {
+        if (run) { await evaluate(run); await sleep(400); }
+        await snap(`page-${scheme ? scheme + '-' : ''}${size}`);
+      }
     }
     console.log(files.join('\n'));
     session = undefined;

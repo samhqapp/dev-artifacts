@@ -104,6 +104,9 @@ It starts the server, saves the images, prints their paths, and stops. A file na
 | `--each` | One image for every option, with the overlay hidden. |
 | `--page /path` | Which page of your site to open. |
 | `--port 4799` | Use a fixed port. The default picks a free one. |
+| `--scheme dark` | Take the shots in dark (or light) appearance. |
+| `--run '<js>'` | Run this script on the page before a page shot, such as opening an item or a dialog. |
+| `--proxy /api/=http://127.0.0.1:8080` | Forward that path to a local API, so a web app shows live data. Extra headers (a key or dev token) go in `DV_PROXY_HEADERS` as JSON, so they never show in `ps`. |
 
 It warns you when a page scrolls sideways at one of the sizes. It finds Chrome by itself. To choose one, set `CHROME_PATH`.
 
