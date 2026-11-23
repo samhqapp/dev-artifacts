@@ -1,0 +1,11 @@
+/* variants.css: one rule block per option. Keep it OUTSIDE the site repo; serve.mjs injects it.
+   html[data-dv-<group id>="<option number>"] <target> { ... }   Option 1 ("Current") has no attribute.
+   Use the site's own tokens (var(--...)) so the option fits the page in light and dark.
+   Every option must work at phone width with no sideways scroll. See recipes.md for ready patterns. */
+
+/* 2 Soft ring */
+html[data-dv-input="2"] .hero input { background: color-mix(in srgb, currentColor 5%, transparent); border: 1px solid transparent; border-radius: 10px; }
+html[data-dv-input="2"] .hero input:focus { border-color: #007aff; box-shadow: 0 0 0 3px rgba(0, 122, 255, .2); outline: none; }
+
+/* 3 Pill */
+html[data-dv-input="3"] .hero input { border-radius: 999px; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); padding-inline: 18px; }
