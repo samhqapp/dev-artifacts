@@ -48,4 +48,6 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 - Badges float just outside the section, dim at rest; hover lights the section with a padded highlight.
 - The menu opens beside the section and never covers it; on a phone it is a bottom sheet.
 - Each group has a comment field that grows; the dock has Copy choices, Hide dots (`.` key), and Reset.
+- The dock's back and next (`[` and `]` keys) go to each group in page order: off screen it scrolls there,
+  on screen it flashes the highlight and pulses the badge. Click the "2 / 3" count to open that group's menu.
 - It follows the site's light or dark look and draws thin scroll bars that fade out.

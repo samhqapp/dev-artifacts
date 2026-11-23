@@ -3,7 +3,8 @@
    Option 1 is "Current" (no attribute) unless current: false. Picking option i > 1 sets data-dv-<id>="<i>" on <html>.
    Everything lives in one shadow root, so no style leaks in or out. Never ship this file.
    URL params: ?dv-open=<id> opens a popover, ?dv-hl=<id> shows the badge-hover highlight,
-   ?dv-pick=<id>:<i>[,<id>:<i>] forces options (nothing is saved), ?dv-clean hides the whole overlay. */
+   ?dv-pick=<id>:<i>[,<id>:<i>] forces options (nothing is saved), ?dv-clean hides the whole overlay.
+   Keys: . hides the badges, ] and [ go to the next and previous group (also DevPanel.next() and .back()). */
 (() => {
   if (window.DevPanel) return;
   const KEY = 'devpanel:' + location.pathname, Q = new URLSearchParams(location.search);
@@ -19,6 +20,8 @@
   // The menu is placed once when it opens and stays put while previews change the page under it,
   // so the option under the pointer never changes by itself. It re-places on resize or a user scroll.
   let placePop = false, previewT = 0, hoverT = 0, busyN = 0;
+  let posBtn, curG = null, flashG = null, flashT = 0, goN = 0; // back/next: the current group and the one flashing
+  const chev = (d) => `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
   const CSS = `
 :host { all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; color-scheme: light;
@@ -106,6 +109,19 @@ textarea::placeholder { color: var(--muted); }
 .dock .copy { background: linear-gradient(180deg, var(--blue-top), var(--blue) 55%); color: #fff;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.35); }
 .dock .copy:hover, .dock .copy:focus-visible { background: var(--blue); }
+/* back, "2 / 3", next: walks the groups in page order */
+.dock .nav { display: flex; align-items: center; padding-right: 4px; margin-right: 1px; border-right: 1px solid var(--sep); }
+.dock .nav .go { width: 31px; height: 31px; padding: 0; display: grid; place-items: center; }
+.dock .nav .go svg { width: 12px; height: 12px; }
+.dock .nav .pos { min-width: 50px; padding: 7px 6px; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dock .nav .pos:hover, .dock .nav .pos:focus-visible { color: var(--ink); }
+/* go-to flash: the badge pulses a soft blue ring twice */
+.dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none; }
+.dot.pulse { opacity: 1; }
+.dot.pulse::after { animation: dv-pulse .6s cubic-bezier(.2,.7,.3,1) 2; }
+@keyframes dv-pulse { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--blue) 60%, transparent); }
+  to { box-shadow: 0 0 0 12px color-mix(in srgb, var(--blue) 0%, transparent); } }
+.hl.flash > * { transition-duration: .3s; }
 
 @media (max-width: 600px) {
   .pop { position: fixed; left: 8px !important; right: 8px; top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom, 0px));
@@ -114,6 +130,9 @@ textarea::placeholder { color: var(--muted); }
   .scroll { padding: 6px; }
   .pop:not([hidden]) ~ .dock { visibility: hidden; } /* the sheet replaces the dock while open */
   .opt { padding: 9px 9px 9px 7px; }
+  .dock .picks { display: none; } /* room for back and next at phone width */
+  .dock button { padding: 7px 9px; }
+  .dock .nav .pos { min-width: 40px; padding: 7px 2px; }
   textarea { font-size: 16px; } /* 16 px stops iOS zoom on focus */
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }`;
@@ -127,11 +146,15 @@ textarea::placeholder { color: var(--muted); }
     document.head.append(Object.assign(document.createElement('style'), { textContent: '::view-transition { pointer-events: none; }' }));
     sh.innerHTML = `<style>${CSS}</style><div class="hl"><div class="ring"></div><div class="bp h"></div><div class="bp h"></div><div class="bp v"></div><div class="bp v"></div></div>
 <div class="layer"></div><div class="pop" role="dialog" aria-label="Dev artifacts" hidden><div class="scroll"></div><div class="knob"></div></div>
-<div class="dock" aria-label="Dev artifacts"><output></output><button class="copy" type="button">Copy choices</button><button class="hide" type="button"></button><button class="reset" type="button">Reset</button></div>`;
+<div class="dock" aria-label="Dev artifacts"><div class="nav"><button class="go back" type="button" aria-label="Previous group ([)" title="Previous group  [">${chev('M7.5 2.5 4 6l3.5 3.5')}</button><button class="pos" type="button" title="Open this group's menu"></button><button class="go next" type="button" aria-label="Next group (])" title="Next group  ]">${chev('M4.5 2.5 8 6l-3.5 3.5')}</button></div><output class="picks"></output><button class="copy" type="button">Copy choices</button><button class="hide" type="button"></button><button class="reset" type="button">Reset</button></div>`;
     [hl, ring, layer, pop, scr, knob] = ['.hl', '.ring', '.layer', '.pop', '.scroll', '.knob'].map((s) => sh.querySelector(s));
     bps = sh.querySelectorAll('.bp');
     count = sh.querySelector('output'); hideBtn = sh.querySelector('.hide'); copyBtn = sh.querySelector('.copy');
+    posBtn = sh.querySelector('.pos');
     copyBtn.onclick = copy;
+    sh.querySelector('.back').onclick = () => go(-1);
+    sh.querySelector('.next').onclick = () => go(1);
+    posBtn.onclick = () => { if (!curG) return go(1, true); open === curG ? close() : show(curG); };
     hideBtn.onclick = () => { st.hidden = !st.hidden; save(); if (st.hidden) close(); sync(); };
     sh.querySelector('.reset').onclick = () => { st.picks = {}; st.notes = {}; save(); close(); groups.forEach((g) => setVar(g, 1)); sync(); };
     scr.onscroll = flash;
@@ -209,6 +232,7 @@ textarea::placeholder { color: var(--muted); }
 
   function show(g) {
     open = g;
+    if (curG !== g) { curG = g; sync(); }
     scr.innerHTML = `<div class="head"><span class="dot">${g.n}</span>${esc(g.label)}</div><div class="list" role="listbox">${g.opts.map((o, k) =>
       `<button type="button" class="opt" role="option" data-i="${k + 1}" aria-selected="${pick(g) === k + 1}"><span class="ck">✓</span><span><span class="name">${esc(o.name)}</span>${o.note ? `<span class="note">${esc(o.note)}</span>` : ''}</span><span class="n">${k + 1}</span></button>`).join('')}</div><div class="sep"></div><textarea rows="1" placeholder="Comment"></textarea>`;
     const list = scr.querySelector('.list'), ta = scr.querySelector('textarea');
@@ -249,6 +273,35 @@ textarea::placeholder { color: var(--muted); }
     const n = groups.filter((g) => pick(g) !== 1).length;
     count.textContent = `${n} ${n === 1 ? 'pick' : 'picks'}`;
     hideBtn.textContent = st.hidden ? 'Show dots' : 'Hide dots';
+    const list = order(), k = list.indexOf(curG);
+    posBtn.textContent = `${k < 0 ? '–' : k + 1} / ${list.length}`;
+    schedule();
+  }
+
+  // Back and next walk the groups in page order and wrap at the ends. A group already on screen only
+  // flashes its highlight; one off screen scrolls to the middle first, then flashes. With a menu open,
+  // the menu follows to the new group.
+  const order = () => groups.map((g) => [g, sample(g).r]).filter(([, r]) => r && r.width > 0)
+    .sort((a, b) => a[1].top - b[1].top).map(([g]) => g);
+  function go(d, openMenu) {
+    const list = order(); if (!list.length) return;
+    const k = list.indexOf(curG), g = list[k < 0 ? (d > 0 ? 0 : list.length - 1) : (k + d + list.length) % list.length];
+    const reopen = openMenu || !!open;
+    close(); curG = g; sync();
+    const { t, r } = sample(g), vh = innerHeight, DOCK = 72, tall = r.height > vh - DOCK - 16;
+    const seen = tall ? r.top >= 0 && r.top < vh / 3 : r.top >= 8 && r.bottom <= vh - DOCK;
+    const n = ++goN, arrive = () => { if (n !== goN) return; spot(g); if (reopen) show(g); };
+    if (seen || !t) return arrive();
+    const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    t.scrollIntoView({ block: tall ? 'start' : 'center', inline: 'nearest', behavior: smooth ? 'smooth' : 'instant' });
+    if (!smooth) return requestAnimationFrame(arrive);
+    let done = false; const fin = () => { if (done) return; done = true; removeEventListener('scrollend', fin, true); arrive(); };
+    addEventListener('scrollend', fin, true); setTimeout(fin, 900); // 900 ms covers browsers without scrollend
+  }
+  function spot(g) {
+    flashG = g; clearTimeout(flashT);
+    if (g.el) { g.el.classList.remove('pulse'); void g.el.offsetWidth; g.el.classList.add('pulse'); }
+    flashT = setTimeout(() => { flashG = null; g.el && g.el.classList.remove('pulse'); schedule(); }, 1200);
     schedule();
   }
 
@@ -286,7 +339,8 @@ textarea::placeholder { color: var(--muted); }
   function place() {
     raf = 0;
     const vw = innerWidth, vh = innerHeight;
-    let lit = st.hidden ? null : hover;
+    let lit = (st.hidden ? null : hover) || flashG;
+    hl.classList.toggle('flash', !!flashG && lit === flashG);
     for (const g of groups) {
       const { t, r } = sample(g);
       const on = !st.hidden && r && inView(r);
@@ -368,7 +422,8 @@ textarea::placeholder { color: var(--muted); }
   addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && open) return close();
     const t = e.composedPath()[0];
-    if (e.key !== '.' || e.metaKey || e.ctrlKey || e.altKey || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))) return;
+    if (!['.', '[', ']'].includes(e.key) || e.metaKey || e.ctrlKey || e.altKey || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))) return;
+    if (e.key !== '.') return go(e.key === ']' ? 1 : -1);
     st.hidden = !st.hidden; save(); if (st.hidden) close(); sync();
   });
   addEventListener('pointerdown', (e) => {
@@ -410,6 +465,7 @@ textarea::placeholder { color: var(--muted); }
     },
     markdown: md,
     open: (id) => { const g = groups.find((x) => x.id === id); if (g) show(g); },
+    next: () => go(1), back: () => go(-1),
     groups: () => groups.map((g) => ({ id: g.id, label: g.label, target: g.target, options: g.opts.map((o) => o.name) })),
   };
 })();

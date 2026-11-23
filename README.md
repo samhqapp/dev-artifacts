@@ -11,7 +11,7 @@ Show design options live on your local site. Click a dot, try each look, copy yo
   |                              badge    | 3 Pill      | |
   |                                       +-------------+ |
   |                                            menu       |
-  |      [ 1 pick ] [ Copy choices ] [ Hide dots ] [ Reset ]
+  |  [ < 1 / 3 > ] [ 1 pick ] [ Copy choices ] [ Hide dots ] [ Reset ]
   +-------------------------------------------------------+
                           dock
 ```
@@ -52,6 +52,8 @@ The server only listens on your own computer. When you edit a file, the page rel
 - Hover the badge to see the section outlined. Click it to open the **menu** next to the section. On a phone it is a bottom sheet.
 - Hover an option to preview it. Click it to keep it. Type a comment if you like.
 - The **dock** at the bottom shows how many picks you made. It has **Copy choices**, **Hide dots**, and **Reset**.
+- The badges are small, so the dock also has **back** and **next** (keys `[` and `]`). They go to each group in page order.
+  A group off screen scrolls into the middle; a group already on screen flashes its outline and badge. Click the "1 / 3" count to open its menu.
 - Press the `.` key to hide or show the badges. Your picks stay in your browser, per page.
 
 **Copy choices** gives one line per group. Paste it to the person or coding agent who builds the site.
