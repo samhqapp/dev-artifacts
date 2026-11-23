@@ -1,6 +1,6 @@
 ---
 name: dev-artifacts
-description: Show design options live on a local website or web app with the dev-artifacts overlay (numbered badges, option menu, Copy choices) instead of building a separate options page. Use when asked to give options or variations for a local website, web app, landing page, or site section, or to preview looks on the dev server.
+description: Show design options live on a local website or web app with the dev-artifacts overlay (blue and green dots, option menu, Copy choices) instead of building a separate options page. Use when asked to give options or variations for a local website, web app, landing page, or site section, or to preview looks on the dev server.
 ---
 
 # dev-artifacts
@@ -48,12 +48,14 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 
 ## The overlay (already built; do not re-code it)
 
-- Badges float just outside the section, dim at rest; hover lights the section with a padded highlight.
-- The menu opens beside the section and never covers it; on a phone it is a bottom sheet.
-- Each group has a comment field that grows; the dock has Copy choices, Hide dots (`.` key), and Reset.
-- The dock's back and next (`[` and `]` keys) go to every group on the site, and move to its page when needed:
-  off screen it scrolls there, on screen it flashes the highlight and pulses the badge.
-- The "2 / 5" count is the site total. Clicking it lists every group by page with its pick; a row goes there.
+- Dots, popover, and dock come from `<repo>/dots.js`, the one shared overlay (the artifact kit uses it too). Edit only
+  that file, then run `node <repo>/dots-sync.mjs <file>` for each copy (devpanel.js and any other file with its markers).
+- A blue dot opens options to pick. A green dot opens only a comment field (`options: [], current: false`).
+- Dots float just outside the section; hover lights the section with a padded highlight.
+- The popover opens beside the section and never covers it; on a phone it is a bottom sheet.
+- The dock has back and next (`[` and `]` keys) over the blue dots only, a "Hide dots" switch (`.` key, kept after a
+  reload), Reset, and Copy choices. Back and next move to another page when needed and open the popover there.
+- The "2 / 5" count is the site total of blue dots. Clicking it lists every group by page with its pick; a row goes there.
 - Picks, comments, and Copy choices cover the whole site (one store per origin).
 
 ## Sites with several pages or routes

@@ -8,7 +8,7 @@ Show design options live on your local site. Click a dot, try each look, copy yo
   |  +----------------------------+  (1)  +-------------+ |
   |  |  Email field               |  ^    | 1 Current   | |
   |  +----------------------------+  |    | 2 Soft ring | |
-  |                              badge    | 3 Pill      | |
+  |                                dot    | 3 Pill      | |
   |                                       +-------------+ |
   |                                            menu       |
   |  [ < 1 / 3 > ] [ 1 pick ] [ Copy choices ] [ Hide dots ] [ Reset ]
@@ -48,16 +48,17 @@ The server only listens on your own computer. When you edit a file, the page rel
 
 ## How it works
 
-- Each section with options gets a small blue **badge** just outside its top-right corner.
-- Hover the badge to see the section outlined. Click it to open the **menu** next to the section. On a phone it is a bottom sheet.
+- Each section with options gets a small blue **dot** just outside its top-right corner. A group with only a comment
+  field (`options: [], current: false`) gets a green dot, so the blue dots are the ones that still need a pick.
+  Back and next step through the blue dots only. **Hide dots** is a switch, and a reload keeps it.
+- The dots, menu, and dock are `dots.js`, shared with other tools. Edit it there and run `node dots-sync.mjs devpanel.js`.
+- Hover a dot to see the section outlined. Click it to open the **menu** next to the section. On a phone it is a bottom sheet.
 - Hover an option to preview it. Click it to keep it. Type a comment if you like.
-- The **dock** at the bottom shows how many picks you made. It has **Copy choices**, **Hide dots**, and **Reset**.
-- The badges are small, so the dock also has **back** and **next** (keys `[` and `]`). They go to every group on the whole site.
-  A group on another page takes you to that page first. A group off screen scrolls into the middle; a group already on screen
-  flashes its outline and badge. If a group never shows up, the dock says so.
+- The **dock** at the bottom shows how many picks you made. It has **Copy choices**, **Hide dots** (key `.`), and **Reset**.
+- **Back** and **next** (keys `[` and `]`) go to every blue dot on the whole site and open its menu. A group on another
+  page takes you to that page first. If a group never shows up, the dock says so.
 - The "2 / 5" count is for the whole site. Click it to see **every group**, grouped by page, with each one's current pick.
-  Click a row to go there and open its menu. On a phone the list is a bottom sheet.
-- Press the `.` key to hide or show the badges. Your picks and comments stay in your browser, for the whole site.
+  Click a row to go there and open its menu. Your picks and comments stay in your browser, for the whole site.
 
 **Copy choices** gives one line per group, from every page. Paste it to the person or coding agent who builds the site.
 When the site has more than one page, each line names its page.
@@ -90,8 +91,8 @@ html[data-dv-input="3"] .hero input { border-radius: 999px; }
 
 Extra settings: `page: '/settings'` says which page the group is on (or a list, such as `['/a', '/b']`; the first one
 is where back and next go). Without it, the group belongs to the page where you first saw it, so set `page` for groups
-on pages you have not opened yet. `dot: 'tl'` puts the badge on the top-left corner. `current: false` removes the automatic "Current".
-When `target` matches many elements, such as every card, the badge and outline sit on one card: the first one you can see.
+on pages you have not opened yet. `dot: 'tl'` puts the dot on the top-left corner. `current: false` removes the automatic "Current".
+When `target` matches many elements, such as every card, the dot and outline sit on one card: the first one you can see.
 Your options still change every card. `sample: 'all'` outlines all of them in one box instead.
 `apply(i)` runs your own code for changes that CSS cannot do, such as new text. More ready examples are in `recipes.md`.
 
