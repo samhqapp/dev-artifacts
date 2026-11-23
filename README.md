@@ -136,6 +136,20 @@ if (import.meta.env.DEV) for (const s of ['devpanel.js', 'variants.js']) documen
 
 Load the CSS the same way, from `http://127.0.0.1:4799/__dev/variants.css`. The `--shot` command works on static sites only.
 
+## Quick pick pages
+
+For a one-time choice with no site behind it, such as which repos to move or which items to keep:
+
+```sh
+cp templates/quick-page.js /tmp/pick/page.js     # edit TITLE, LEAD, GROUPS
+node quick.mjs /tmp/pick/page.js /tmp/pick/pick.html && open /tmp/pick/pick.html
+```
+
+The result is one HTML file: Preact and htm (JSX-like templates) inlined, no build, no network. It has
+one-pick groups, tables of switches, a comment per group, Light and Dark, and a Copy choices dock.
+Picks are kept in the browser while you work. Preact (MIT) and htm (Apache-2.0) are vendored in
+`templates/preact-htm.js`.
+
 ## Why not a separate options page
 
 The options sit next to your real content, so nobody builds or publishes a second page.

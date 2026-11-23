@@ -11,6 +11,9 @@ Options shown on the real page, beside the real content. Cheaper than a separate
 ## Which way
 
 - Website or web app that runs locally: use this skill.
+- A quick one-time pick with no site behind it (which repos, which items, a short list of choices):
+  write a `page.js` like `<repo>/templates/quick-page.js`, run `node <repo>/quick.mjs page.js out.html`,
+  and open the file. One HTML file, Preact + htm (JSX-like) inlined, no build, no network, Copy choices included.
 - Native app (it can't run in a browser), or the user asks for a page: build a published options page instead.
 
 ## Before you start

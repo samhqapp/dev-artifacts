@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><!--TITLE--></title>
+<style>
+:root { --bg: #f5f5f7; --card: #fff; --line: rgba(0,0,0,.08); --text: #1d1d1f; --dim: #6e6e73; --zebra: rgba(0,0,0,.025);
+  --accent: #0a84ff; --accent-soft: rgba(10,132,255,.1); --field: rgba(0,0,0,.04); --dock: rgba(255,255,255,.72);
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 24px rgba(0,0,0,.06); color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { --bg: #161618; --card: #1f1f22; --line: rgba(255,255,255,.08); --text: #f5f5f7;
+  --dim: #98989d; --zebra: rgba(255,255,255,.025); --accent-soft: rgba(10,132,255,.18); --field: rgba(255,255,255,.05);
+  --dock: rgba(40,40,44,.72); --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.35); color-scheme: dark; } }
+* { box-sizing: border-box; }
+html { scrollbar-width: none; } html::-webkit-scrollbar { display: none; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; padding: 40px 32px 120px; }
+h1 { font-size: 34px; letter-spacing: -.02em; margin: 0 0 6px; }
+.lead { color: var(--dim); margin: 0 0 28px; max-width: 70ch; }
+.groups { display: grid; gap: 24px; }
+.g { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 20px; }
+.g h2 { font-size: 20px; margin: 0 0 4px; letter-spacing: -.01em; }
+.g .d { color: var(--dim); font-size: 15px; margin: 0 0 14px; }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.opt { all: unset; cursor: pointer; display: block; padding: 14px; border-radius: 12px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); }
+.opt.on { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.opt b { display: block; font-size: 16px; } .opt span { color: var(--dim); font-size: 14px; }
+.opt .rec { color: var(--accent); font-size: 12px; font-weight: 600; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th { text-align: left; font-weight: 600; color: var(--dim); font-size: 13px; padding: 6px 10px; }
+th.c, td.c { text-align: center; width: 120px; }
+td { padding: 9px 10px; border-top: 1px solid var(--line); vertical-align: middle; }
+tbody tr:nth-child(even) { background: var(--zebra); }
+td .n { font-weight: 600; } td .s { color: var(--dim); font-size: 13.5px; }
+.sw { all: unset; cursor: pointer; display: inline-block; width: 38px; height: 22px; border-radius: 11px; background: rgba(120,120,128,.32); position: relative; transition: background .2s; }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+.sw.on { background: #34c759; } .sw.on::after { transform: translateX(16px); }
+.na { color: var(--dim); font-size: 13px; cursor: help; }
+textarea { width: 100%; margin-top: 14px; min-height: 44px; resize: vertical; font: inherit; font-size: 15px; color: inherit; background: var(--field);
+  border: 0; border-radius: 10px; padding: 10px 12px; outline: none; field-sizing: content; max-height: 160px; }
+textarea:focus { box-shadow: inset 0 0 0 2px var(--accent-soft); }
+.dock { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 6px;
+  border-radius: 999px; background: var(--dock); backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6); box-shadow: var(--shadow), inset 0 0 0 1px var(--line); }
+.dock span { color: var(--dim); font-size: 14px; padding: 0 10px; }
+.dock button { all: unset; cursor: pointer; background: var(--accent); color: #fff; font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 999px; }
+button:focus, button:focus-visible { outline: none; }
+@media (max-width: 640px) { body { padding: 24px 16px 110px; } h1 { font-size: 28px; } th.c, td.c { width: 64px; } td .s { display: none; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>/*LIB*/</script>
+<script type="module">
+const { html, render, useState, useEffect } = window.preact;
+/*PAGE*/
+
+// Group shapes:
+//   { id, title, desc, options: [{ id, label, desc, rec }] }                    one pick
+//   { id, title, desc, cols: ['Move folder', ...], rows: [{ id, label, desc, on: [true, false|null] }] }
+//     one switch per row and column; null = not possible (row.why says why, shown on hover)
+const KEY = 'quick:' + location.pathname;
+const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
+const save = (s) => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} };
+const init = () => {
+  const s = load();
+  for (const g of GROUPS) if (!(g.id in s)) s[g.id] = {
+    pick: g.options ? (g.options.find((o) => o.rec) || g.options[0]).id : null,
+    rows: g.rows ? Object.fromEntries(g.rows.map((r) => [r.id, r.on.slice()])) : null, note: '' };
+  return s;
+};
+
+function copyText(s) {
+  return GROUPS.map((g) => {
+    const v = s[g.id], note = v.note.trim() ? ' - ' + v.note.trim().replace(/\n/g, '\n  ') : '';
+    if (g.options) return `- ${g.title}: ${g.options.find((o) => o.id === v.pick)?.label}${note}`;
+    const cols = g.cols.map((c, i) => `  - ${c}: ${g.rows.filter((r) => v.rows[r.id][i]).map((r) => r.label).join(', ') || 'none'}`);
+    return `- ${g.title}${note}\n${cols.join('\n')}`;
+  }).join('\n');
+}
+
+function App() {
+  const [s, set] = useState(init);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => save(s), [s]);
+  const upd = (g, f) => set({ ...s, [g]: f({ ...s[g] }) });
+  const count = GROUPS.reduce((n, g) => n + (g.rows ? Object.values(s[g.id].rows).flat().filter(Boolean).length : 1), 0);
+  return html`
+    <h1>${TITLE}</h1>
+    ${typeof LEAD !== 'undefined' && html`<p class="lead">${LEAD}</p>`}
+    <div class="groups">${GROUPS.map((g) => html`
+      <section class="g">
+        <h2>${g.title}</h2>${g.desc && html`<p class="d">${g.desc}</p>`}
+        ${g.options && html`<div class="opts">${g.options.map((o) => html`
+          <button class=${'opt' + (s[g.id].pick === o.id ? ' on' : '')} onClick=${() => upd(g.id, (v) => ({ ...v, pick: o.id }))}>
+            ${o.rec && html`<div class="rec">Recommended</div>`}<b>${o.label}</b><span>${o.desc}</span></button>`)}</div>`}
+        ${g.rows && html`<table><thead><tr><th>${g.rowHead || ''}</th>${g.cols.map((c) => html`<th class="c">${c}</th>`)}</tr></thead>
+          <tbody>${g.rows.map((r) => html`<tr><td><div class="n">${r.label}</div><div class="s">${r.desc}</div></td>
+            ${g.cols.map((_, i) => html`<td class="c">${s[g.id].rows[r.id][i] === null ? html`<span class="na" title=${r.why || ''}>N/A</span>`
+              : html`<button role="switch" aria-checked=${!!s[g.id].rows[r.id][i]} aria-label=${r.label + ' ' + g.cols[i]}
+                  class=${'sw' + (s[g.id].rows[r.id][i] ? ' on' : '')}
+                  onClick=${() => upd(g.id, (v) => { const rows = { ...v.rows, [r.id]: v.rows[r.id].slice() }; rows[r.id][i] = !rows[r.id][i]; return { ...v, rows }; })} />`}</td>`)}
+          </tr>`)}</tbody></table>`}
+        <textarea placeholder="Comment" value=${s[g.id].note} onInput=${(e) => upd(g.id, (v) => ({ ...v, note: e.target.value }))} />
+      </section>`)}
+    </div>
+    ${typeof Extra === 'function' && html`<${Extra} />`}
+    <div class="dock"><span>${count} picked</span>
+      <button onClick=${async () => { try { await navigator.clipboard.writeText(copyText(s)); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {} }}>
+        ${copied ? 'Copied' : 'Copy choices'}</button></div>`;
+}
+render(html`<${App} />`, document.getElementById('app'));
+</script>
+</body>
+</html>
