@@ -56,7 +56,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
 .hl.on .bp { opacity: .45; }
 
 .pop { position: absolute; display: flex; flex-direction: column; width: max-content; min-width: 240px;
-  max-width: min(360px, calc(100vw - 16px)); max-height: min(560px, calc(100vh - 16px)); pointer-events: auto;
+  max-width: min(360px, calc(100vw - 16px)); max-height: calc(100vh - 16px); pointer-events: auto;
   border-radius: 12px; background: var(--pop); border: 1px solid var(--line); box-shadow: var(--shadow); overflow: hidden;
   backdrop-filter: blur(40px) saturate(1.8); -webkit-backdrop-filter: blur(40px) saturate(1.8);
   animation: dv-in .14s ease-out; z-index: 2; } /* above the dock, so the phone sheet covers it */
@@ -257,14 +257,20 @@ textarea::placeholder { color: var(--muted); }
     if (!open || sheetMQ.matches) return;
     if (open.el.hidden) return close();
     // beside the target on the roomiest side (right, left, below, above), so the target stays in view
+    const keep = scr.scrollTop; // resetting the size below would otherwise jump the list back to the top
     pop.style.width = pop.style.maxHeight = '';
     let w = pop.offsetWidth, h = pop.offsetHeight, left, top;
     const r = open.r, M = 8, DOCK = 72, G = 12, GR = open.pos === 'tl' ? G : 32, GL = open.pos === 'tl' ? 32 : G; // 32 clears the badge
     const room = { right: vw - r.right - GR - M, left: r.left - GL - M, below: vh - r.bottom - G - DOCK, above: r.top - G - M };
     const low = h + M + DOCK <= vh ? vh - DOCK : vh - M; // stay above the dock when there is room
     const side = ['right', 'left'].find((s) => room[s] >= w) || ['right', 'left'].find((s) => room[s] >= 240)
-      || ['below', 'above'].find((s) => room[s] >= Math.min(h, 160)) || 'below';
-    if (side === 'right' || side === 'left') {
+      || ['below', 'above'].find((s) => room[s] >= Math.min(h, 320)) || 'inside';
+    if (side === 'inside') {
+      // the target fills the window (a whole layout): float at the window's top right, as tall as needed
+      const max = vh - 2 * M - DOCK;
+      if (h > max) { pop.style.maxHeight = max + 'px'; h = max; }
+      left = vw - w - M; top = M;
+    } else if (side === 'right' || side === 'left') {
       if (w > room[side]) { pop.style.width = room[side] + 'px'; w = pop.offsetWidth; h = pop.offsetHeight; }
       left = side === 'right' ? r.right + GR : r.left - GL - w;
       top = clamp(r.top, M, low - h);
@@ -275,6 +281,7 @@ textarea::placeholder { color: var(--muted); }
       left = clamp(r.left, M, vw - w - M);
     }
     Object.assign(pop.style, { left: left + 'px', top: top + 'px' });
+    scr.scrollTop = keep;
   }
   const schedule = () => { if (!raf) raf = requestAnimationFrame(place); };
 
