@@ -96,6 +96,15 @@ When `target` matches many elements, such as every card, the dot and outline sit
 Your options still change every card. `sample: 'all'` outlines all of them in one box instead.
 `apply(i)` runs your own code for changes that CSS cannot do, such as new text. More ready examples are in `recipes.md`.
 
+One server, several separate sites (such as `/memory/` and `/throttlecontrol/`): put this first in `variants.js`, so
+each site gets its own picks, count, back and next, and Copy choices. Groups whose `page` is on another site are skipped.
+
+```js
+DevPanel.config({ site: ['/memory/', '/throttlecontrol/'] });
+```
+
+Without `site`, the whole server is one site, and back and next move across all its pages.
+
 ## Screenshots
 
 Take a screenshot of every option, and then look at them. This needs Chrome or Chromium on your computer.

@@ -5,6 +5,8 @@
    A group with options gets a blue dot. `options: [], current: false` makes a comment-only group with a green dot.
    A group without `page` belongs to the page where its target first shows up. Picks, comments, and the list of
    groups are kept for the whole site (one localStorage key per origin), so the dock counts and walks every page.
+   DevPanel.config({ site: '/memory/' | ['/a/', '/b/'] }) splits one server into separate sites, each with its own store;
+   groups whose `page` is on another site are skipped. Call it before DevPanel.group.
    DevPanel.config({ navigate(path) }) lets an app route itself; otherwise an SPA gets pushState + popstate and a
    static site a normal page load. Everything lives in one shadow root, so no style leaks in or out. Never ship this file.
    The dots, popover, and dock come from the shared option-dots overlay (dots.js, copied in below).
@@ -374,21 +376,29 @@
   const me = document.currentScript, spa = !!me && new URL(me.src, location.href).origin !== location.origin;
   const forced = Object.fromEntries((Q.get('dv-pick') || '').split(',').map((s) => s.split(':')).filter((p) => p[1] > 0).map(([k, v]) => [k, +v]));
   const st = { picks: {}, notes: {}, groups: [] }, cfg = {};
-  try {
-    const saved = JSON.parse(localStorage.getItem(KEY));
-    if (saved) Object.assign(st, saved);
-    else for (let i = 0; i < localStorage.length; i++) { // picks from the old per-page keys
-      const k = localStorage.key(i), o = k.startsWith('devpanel:/') && JSON.parse(localStorage.getItem(k));
-      if (o) { Object.assign(st.picks, o.picks); Object.assign(st.notes, o.notes); }
-    }
-  } catch {}
-  delete st.hidden; // Hide dots lives in the shared overlay now
-  const save = () => { if (Q.has('dv-pick')) return; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch {} };
+  let key = KEY, base = ''; // base: the site this page belongs to (DevPanel.config({ site })), '' = the whole origin
+  function load() {
+    Object.assign(st, { picks: {}, notes: {}, groups: [] });
+    try {
+      const saved = JSON.parse(localStorage.getItem(key));
+      if (saved) Object.assign(st, saved);
+      else if (!base) for (let i = 0; i < localStorage.length; i++) { // picks from the old per-page keys
+        const k = localStorage.key(i), o = k.startsWith('devpanel:/') && JSON.parse(localStorage.getItem(k));
+        if (o) { Object.assign(st.picks, o.picks); Object.assign(st.notes, o.notes); }
+      }
+    } catch {}
+    delete st.hidden; // Hide dots lives in the shared overlay now
+  }
+  load();
+  const save = () => { if (Q.has('dv-pick')) return; try { localStorage.setItem(key, JSON.stringify(st)); } catch {} };
   const groups = []; // groups registered on this page; st.groups holds every group seen on the site
+  // Paths compare without index.html or a trailing slash, but navigation uses the path as written:
+  // /memory/ and /memory serve the same file, yet only /memory/ resolves its relative images and CSS.
   const norm = (p) => String(p || '/').replace(/\/index\.html?$/, '/').replace(/(.)\/+$/, '$1');
   const here = () => norm(location.pathname);
-  const home = (m) => m.page ? m.page[0] : null;
-  const isHere = (m) => !!m.page && m.page.includes(here());
+  const home = (m) => m.page ? norm(m.page[0]) : null;
+  const isHere = (m) => !!m.page && m.page.map(norm).includes(here());
+  const inBase = (p) => (norm(p) + '/').startsWith(base);
   const meta = (id) => st.groups.find((m) => m.id === id);
   // Site order: pages in the order they were first seen, groups in the order they were added; unknown page last.
   function site() {
@@ -592,7 +602,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     const m = meta(id); if (!m) return;
     od.close(); curId = id; sync();
     if (!m.page || isHere(m)) return arrive(id, reopen);
-    const path = home(m);
+    const path = m.page[0];
     try { sessionStorage.setItem(GO, JSON.stringify({ id, open: reopen, t: Date.now() })); } catch {}
     if (cfg.navigate) cfg.navigate(path);
     else if (!spa) return location.assign(path);
@@ -650,7 +660,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     let lit = (od.hidden ? null : hover) || flashG;
     for (const g of groups) {
       const { r } = sample(g), m = meta(g.id);
-      if (m && !m.page && r && r.width > 0) { m.page = [here()]; save(); sync(); }
+      if (m && !m.page && r && r.width > 0) { m.page = [location.pathname]; save(); sync(); }
       g.r = r;
       if (lit === g && !(r && inView(r))) lit = null;
     }
@@ -714,6 +724,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     group(cfg) {
       if (!cfg || !cfg.id || !cfg.target || !Array.isArray(cfg.options)) throw new Error('DevPanel.group needs id, target, options');
       if (!/^[a-z0-9-]+$/.test(cfg.id)) throw new Error('DevPanel id must be lowercase letters, digits, or dashes: ' + cfg.id);
+      if (base && cfg.page && ![].concat(cfg.page).some(inBase)) return null; // a group of another site on this server
       const g = { ...cfg, label: cfg.label || cfg.id, pos: cfg.dot || 'tr',
         opts: cfg.current === false ? cfg.options : [{ name: 'Current' }, ...cfg.options] };
       if (forced[g.id]) st.picks[g.id] = forced[g.id];
@@ -722,13 +733,22 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
       groups.push(g);
       let m = meta(g.id); if (!m) st.groups.push(m = { id: g.id, page: null });
       Object.assign(m, { label: g.label, opts: g.opts.map((o) => o.name) });
-      if (cfg.page) m.page = [].concat(cfg.page).map(norm);
+      if (cfg.page) m.page = [].concat(cfg.page);
       save();
       if (g.opts.length && pick(g) !== 1) setVar(g, pick(g));
       if (od) { addDot(g); sync(); }
       return g;
     },
-    config(c) { Object.assign(cfg, c); },
+    // site: a base path such as '/memory/', or a list of them: each base is its own site with its own store,
+    // count, back and next, and Copy choices. A page outside every base uses the whole-origin store.
+    config(c) {
+      Object.assign(cfg, c);
+      if (!('site' in c)) return;
+      if (groups.length) throw new Error('Call DevPanel.config({ site }) before DevPanel.group');
+      base = [].concat(c.site || []).map((b) => norm(b).replace(/\/?$/, '/')).filter((b) => (here() + '/').startsWith(b))
+        .sort((a, b) => b.length - a.length)[0] || '';
+      key = base ? KEY + '@' + base : KEY; load(); sync();
+    },
     markdown: md,
     open: (id) => { const g = groups.find((x) => x.id === id); if (g) show(g); },
     next: () => go(1), back: () => go(-1), list: () => showList(),

@@ -80,6 +80,10 @@ function handle(req, res) {
   if (url === '/__dev/version') { res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' }).end(String(version)); return; }
   const abs = DEV[url] || path.join(root, url);
   if (!DEV[url] && abs !== root && !abs.startsWith(root + path.sep)) { res.writeHead(403).end(); return; } // no ../ escapes
+  // a folder without its trailing slash: redirect, so the page's relative images and CSS resolve
+  if (!DEV[url] && !url.endsWith('/') && fs.statSync(abs, { throwIfNoEntry: false })?.isDirectory()) {
+    const u = new URL(req.url, 'http://x'); res.writeHead(301, { Location: u.pathname + '/' + u.search }).end(); return;
+  }
   const p = file(abs);
   if (!p) { res.writeHead(404, { 'Content-Type': 'text/plain' }).end('404'); return; }
   const type = TYPES[path.extname(p).toLowerCase()] || 'application/octet-stream';

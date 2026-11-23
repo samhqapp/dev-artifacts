@@ -56,11 +56,22 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 - The dock has back and next (`[` and `]` keys) over the blue dots only, an eye button that hides the dots (`.` key, kept after a
   reload), Reset, and Copy choices. Back and next move to another page when needed and open the popover there.
 - The "2 / 5" count is the site total of blue dots. Clicking it lists every group by page with its pick; a row goes there.
-- Picks, comments, and Copy choices cover the whole site (one store per origin).
+- Picks, comments, and Copy choices cover the whole site (one store per origin, or per `site`, see below).
 
-## Sites with several pages or routes
+## One site with routes, or several sites
 
-- Give each group a `page` (such as `page: '/settings'`) when its target is on another page or route.
+- One site with several pages or routes (a web app): back and next cross pages. This is the default.
+- Several separate sites on one server (such as `/memory/` and `/throttlecontrol/`): they must never share a count,
+  picks, or back and next. Give each site its own variants file with `DevPanel.config({ site: '/memory/' })`
+  first, and run one `serve.mjs` per site on its own port with `--page /memory/`. Open each site in its own browser tab.
+  One shared variants file works too: `DevPanel.config({ site: ['/memory/', '/throttlecontrol/'] })` plus a `page`
+  on every group.
+- An agent working on several separate sites does one site itself and hands each other site to its own agent tab
+  (a handoff with the site path, its variants file, and its port). Each agent asks for its own Copy choices.
+
+## Pages and routes
+
+- Give each group a `page` (such as `page: '/settings/'`, written as the browser shows it) when its target is on another page or route.
   Without it, a group belongs to the page where it was first seen, so unseen pages would be missing from the count.
 - SPA routes change with pushState + popstate (works with React Router and TanStack Router). For another router,
   add `DevPanel.config({ navigate: (path) => ... })` to `variants.js`. Static sites load the page.
