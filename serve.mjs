@@ -141,6 +141,8 @@ async function shoot(base) {
     };
 
     fs.mkdirSync(shotDir, { recursive: true });
+    // Reduced motion, so entrance animations don't leave parts of the page faded or missing in the shots.
+    await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     for (const size of sizes.split(',')) {
       const [w, h] = size.split('x').map(Number);
       await send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: w < 600 });
