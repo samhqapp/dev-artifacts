@@ -52,16 +52,20 @@ The server only listens on your own computer. When you edit a file, the page rel
 - Hover the badge to see the section outlined. Click it to open the **menu** next to the section. On a phone it is a bottom sheet.
 - Hover an option to preview it. Click it to keep it. Type a comment if you like.
 - The **dock** at the bottom shows how many picks you made. It has **Copy choices**, **Hide dots**, and **Reset**.
-- The badges are small, so the dock also has **back** and **next** (keys `[` and `]`). They go to each group in page order.
-  A group off screen scrolls into the middle; a group already on screen flashes its outline and badge. Click the "1 / 3" count to open its menu.
-- Press the `.` key to hide or show the badges. Your picks stay in your browser, per page.
+- The badges are small, so the dock also has **back** and **next** (keys `[` and `]`). They go to every group on the whole site.
+  A group on another page takes you to that page first. A group off screen scrolls into the middle; a group already on screen
+  flashes its outline and badge. If a group never shows up, the dock says so.
+- The "2 / 5" count is for the whole site. Click it to see **every group**, grouped by page, with each one's current pick.
+  Click a row to go there and open its menu. On a phone the list is a bottom sheet.
+- Press the `.` key to hide or show the badges. Your picks and comments stay in your browser, for the whole site.
 
-**Copy choices** gives one line per group. Paste it to the person or coding agent who builds the site.
+**Copy choices** gives one line per group, from every page. Paste it to the person or coding agent who builds the site.
+When the site has more than one page, each line names its page.
 
 ```text
-- Email field: 2 Soft ring - make the ring thinner
+- Email field (/): 2 Soft ring - make the ring thinner
   and a bit lighter
-- Main button: 1 Current
+- Main button (/settings): 1 Current
 ```
 
 Never ship the overlay or your variants files. They are for development only.
@@ -84,7 +88,9 @@ html[data-dv-input="2"] .hero input { box-shadow: 0 0 0 4px rgba(0,122,255,.25);
 html[data-dv-input="3"] .hero input { border-radius: 999px; }
 ```
 
-Extra settings: `dot: 'tl'` puts the badge on the top-left corner. `current: false` removes the automatic "Current".
+Extra settings: `page: '/settings'` says which page the group is on (or a list, such as `['/a', '/b']`; the first one
+is where back and next go). Without it, the group belongs to the page where you first saw it, so set `page` for groups
+on pages you have not opened yet. `dot: 'tl'` puts the badge on the top-left corner. `current: false` removes the automatic "Current".
 When `target` matches many elements, such as every card, the badge and outline sit on one card: the first one you can see.
 Your options still change every card. `sample: 'all'` outlines all of them in one box instead.
 `apply(i)` runs your own code for changes that CSS cannot do, such as new text. More ready examples are in `recipes.md`.
@@ -135,6 +141,16 @@ if (import.meta.env.DEV) for (const s of ['devpanel.js', 'variants.js']) documen
 ```
 
 Load the CSS the same way, from `http://127.0.0.1:4799/__dev/variants.css`. The `--shot` command works on static sites only.
+
+To go to a group on another route, the overlay changes the address with `history.pushState` and tells the app with a
+`popstate` event. React Router and TanStack Router follow that. If your router does not, give it your own navigate
+function in `variants.js`:
+
+```js
+DevPanel.config({ navigate: (path) => window.router.navigate({ to: path }) });
+```
+
+On a static site (served by `serve.mjs`), it just loads the other page.
 
 ## Quick pick pages
 

@@ -82,3 +82,15 @@ const h = document.querySelector('T'), was = h.textContent;
 DevPanel.group({ id: 'title', label: 'Title', target: 'T', options: [{ name: 'Shorter' }, { name: 'Question' }],
   apply(i) { h.textContent = [was, 'Short title.', 'Want a short title?'][i - 1]; } });
 ```
+
+## Groups on several pages
+
+Give each group its `page`, so the dock counts and walks every page, even ones you have not opened yet.
+Back and next move to the page by themselves. Your app keeps its own router; add `navigate` only when it
+does not follow `popstate`.
+
+```js
+DevPanel.group({ id: 'list', label: 'App list', target: '.app-list', page: '/all', options: [{ name: 'Tinted' }] });
+DevPanel.group({ id: 'apps', label: 'Apps settings', target: '#apps', page: '/settings', options: [{ name: 'Lifted' }] });
+// DevPanel.config({ navigate: (path) => router.navigate({ to: path }) }); // only if the router ignores popstate
+```

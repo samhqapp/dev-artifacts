@@ -1,18 +1,41 @@
 /* Dev artifacts (DevPanel): a dev-only overlay that shows design options live on a real site.
-   DevPanel.group({ id, label, target, options: [{ name, note? }], dot?: 'tr'|'tl', current?: false, sample?: 'first'|'all', apply?(i) })
+   DevPanel.group({ id, label, target, options: [{ name, note? }], page?: '/all' | ['/a', '/b'], dot?: 'tr'|'tl',
+     current?: false, sample?: 'first'|'all', apply?(i) })
    Option 1 is "Current" (no attribute) unless current: false. Picking option i > 1 sets data-dv-<id>="<i>" on <html>.
-   Everything lives in one shadow root, so no style leaks in or out. Never ship this file.
+   A group without `page` belongs to the page where its target first shows up. Picks, comments, and the list of
+   groups are kept for the whole site (one localStorage key per origin), so the dock counts and walks every page.
+   DevPanel.config({ navigate(path) }) lets an app route itself; otherwise an SPA gets pushState + popstate and a
+   static site a normal page load. Everything lives in one shadow root, so no style leaks in or out. Never ship this file.
    URL params: ?dv-open=<id> opens a popover, ?dv-hl=<id> shows the badge-hover highlight,
    ?dv-pick=<id>:<i>[,<id>:<i>] forces options (nothing is saved), ?dv-clean hides the whole overlay.
-   Keys: . hides the badges, ] and [ go to the next and previous group (also DevPanel.next() and .back()). */
+   Keys: . hides the badges, ] and [ go to the next and previous group on any page (also DevPanel.next() and .back()). */
 (() => {
   if (window.DevPanel) return;
-  const KEY = 'devpanel:' + location.pathname, Q = new URLSearchParams(location.search);
+  const KEY = 'devpanel', GO = 'devpanel:go', Q = new URLSearchParams(location.search);
+  // Loaded from another origin (serve.mjs on 4799 inside a Vite app): the page is an SPA that routes itself.
+  const me = document.currentScript, spa = !!me && new URL(me.src, location.href).origin !== location.origin;
   const forced = Object.fromEntries((Q.get('dv-pick') || '').split(',').map((s) => s.split(':')).filter((p) => p[1] > 0).map(([k, v]) => [k, +v]));
-  const st = { picks: {}, notes: {}, hidden: false };
-  try { Object.assign(st, JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
+  const st = { picks: {}, notes: {}, hidden: false, groups: [] }, cfg = {};
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY));
+    if (saved) Object.assign(st, saved);
+    else for (let i = 0; i < localStorage.length; i++) { // picks from the old per-page keys
+      const k = localStorage.key(i), o = k.startsWith('devpanel:/') && JSON.parse(localStorage.getItem(k));
+      if (o) { Object.assign(st.picks, o.picks); Object.assign(st.notes, o.notes); }
+    }
+  } catch {}
   const save = () => { if (Q.has('dv-pick')) return; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch {} };
-  const groups = [];
+  const groups = []; // groups registered on this page; st.groups holds every group seen on the site
+  const norm = (p) => String(p || '/').replace(/\/index\.html?$/, '/').replace(/(.)\/+$/, '$1');
+  const here = () => norm(location.pathname);
+  const home = (m) => m.page ? m.page[0] : null;
+  const isHere = (m) => !!m.page && m.page.includes(here());
+  const meta = (id) => st.groups.find((m) => m.id === id);
+  // Site order: pages in the order they were first seen, groups in the order they were added; unknown page last.
+  function site() {
+    const pages = [...new Set(st.groups.map(home))].sort((a, b) => (a === null) - (b === null));
+    return pages.flatMap((p) => st.groups.filter((m) => home(m) === p));
+  }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
   const sheetMQ = matchMedia('(max-width: 600px)'), darkMQ = matchMedia('(prefers-color-scheme: dark)');
@@ -20,7 +43,8 @@
   // The menu is placed once when it opens and stays put while previews change the page under it,
   // so the option under the pointer never changes by itself. It re-places on resize or a user scroll.
   let placePop = false, previewT = 0, hoverT = 0, busyN = 0;
-  let posBtn, curG = null, flashG = null, flashT = 0, goN = 0; // back/next: the current group and the one flashing
+  let posBtn, curId = null, flashG = null, flashT = 0, goN = 0, sayT = 0; // back/next: the current group and the one flashing
+  let listOpen = false; // the count button's list of every group on the site
   const chev = (d) => `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
   const CSS = `
@@ -122,6 +146,13 @@ textarea::placeholder { color: var(--muted); }
 @keyframes dv-pulse { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--blue) 60%, transparent); }
   to { box-shadow: 0 0 0 12px color-mix(in srgb, var(--blue) 0%, transparent); } }
 .hl.flash > * { transition-duration: .3s; }
+.dock .picks.say { color: var(--ink); white-space: normal; max-width: 260px; }
+/* the list of every group: page path heads, the group's label, its pick as the note */
+.row .n { min-width: 22px; text-align: right; }
+.row:disabled { cursor: default; opacity: .55; }
+.row:disabled:hover { background: none; color: inherit; }
+.row:disabled:hover .note, .row:disabled:hover .n { color: var(--muted); }
+.head .here { font-weight: 400; }
 
 @media (max-width: 600px) {
   .pop { position: fixed; left: 8px !important; right: 8px; top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom, 0px));
@@ -130,7 +161,7 @@ textarea::placeholder { color: var(--muted); }
   .scroll { padding: 6px; }
   .pop:not([hidden]) ~ .dock { visibility: hidden; } /* the sheet replaces the dock while open */
   .opt { padding: 9px 9px 9px 7px; }
-  .dock .picks { display: none; } /* room for back and next at phone width */
+  .dock .picks:not(.say) { display: none; } /* room for back and next at phone width */
   .dock button { padding: 7px 9px; }
   .dock .nav .pos { min-width: 40px; padding: 7px 2px; }
   textarea { font-size: 16px; } /* 16 px stops iOS zoom on focus */
@@ -146,7 +177,7 @@ textarea::placeholder { color: var(--muted); }
     document.head.append(Object.assign(document.createElement('style'), { textContent: '::view-transition { pointer-events: none; }' }));
     sh.innerHTML = `<style>${CSS}</style><div class="hl"><div class="ring"></div><div class="bp h"></div><div class="bp h"></div><div class="bp v"></div><div class="bp v"></div></div>
 <div class="layer"></div><div class="pop" role="dialog" aria-label="Dev artifacts" hidden><div class="scroll"></div><div class="knob"></div></div>
-<div class="dock" aria-label="Dev artifacts"><div class="nav"><button class="go back" type="button" aria-label="Previous group ([)" title="Previous group  [">${chev('M7.5 2.5 4 6l3.5 3.5')}</button><button class="pos" type="button" title="Open this group's menu"></button><button class="go next" type="button" aria-label="Next group (])" title="Next group  ]">${chev('M4.5 2.5 8 6l-3.5 3.5')}</button></div><output class="picks"></output><button class="copy" type="button">Copy choices</button><button class="hide" type="button"></button><button class="reset" type="button">Reset</button></div>`;
+<div class="dock" aria-label="Dev artifacts"><div class="nav"><button class="go back" type="button" aria-label="Previous group ([)" title="Previous group  [">${chev('M7.5 2.5 4 6l3.5 3.5')}</button><button class="pos" type="button" title="All groups on the site" aria-haspopup="dialog" aria-expanded="false"></button><button class="go next" type="button" aria-label="Next group (])" title="Next group  ]">${chev('M4.5 2.5 8 6l-3.5 3.5')}</button></div><output class="picks"></output><button class="copy" type="button">Copy choices</button><button class="hide" type="button"></button><button class="reset" type="button">Reset</button></div>`;
     [hl, ring, layer, pop, scr, knob] = ['.hl', '.ring', '.layer', '.pop', '.scroll', '.knob'].map((s) => sh.querySelector(s));
     bps = sh.querySelectorAll('.bp');
     count = sh.querySelector('output'); hideBtn = sh.querySelector('.hide'); copyBtn = sh.querySelector('.copy');
@@ -154,9 +185,13 @@ textarea::placeholder { color: var(--muted); }
     copyBtn.onclick = copy;
     sh.querySelector('.back').onclick = () => go(-1);
     sh.querySelector('.next').onclick = () => go(1);
-    posBtn.onclick = () => { if (!curG) return go(1, true); open === curG ? close() : show(curG); };
+    posBtn.onclick = () => (listOpen ? closeList() : showList());
     hideBtn.onclick = () => { st.hidden = !st.hidden; save(); if (st.hidden) close(); sync(); };
-    sh.querySelector('.reset').onclick = () => { st.picks = {}; st.notes = {}; save(); close(); groups.forEach((g) => setVar(g, 1)); sync(); };
+    // Reset also forgets the site's group list; groups on other pages come back when their page is opened.
+    sh.querySelector('.reset').onclick = () => {
+      st.picks = {}; st.notes = {}; st.groups = st.groups.filter((m) => groups.some((g) => g.id === m.id));
+      save(); close(); closeList(); groups.forEach((g) => setVar(g, 1)); sync();
+    };
     scr.onscroll = flash;
     pop.onpointermove = (e) => { if (e.clientX > pop.getBoundingClientRect().right - 16) flash(); };
     knob.onpointerdown = (e) => {
@@ -231,8 +266,9 @@ textarea::placeholder { color: var(--muted); }
   }
 
   function show(g) {
+    closeList();
     open = g;
-    if (curG !== g) { curG = g; sync(); }
+    if (curId !== g.id) { curId = g.id; sync(); }
     scr.innerHTML = `<div class="head"><span class="dot">${g.n}</span>${esc(g.label)}</div><div class="list" role="listbox">${g.opts.map((o, k) =>
       `<button type="button" class="opt" role="option" data-i="${k + 1}" aria-selected="${pick(g) === k + 1}"><span class="ck">✓</span><span><span class="name">${esc(o.name)}</span>${o.note ? `<span class="note">${esc(o.note)}</span>` : ''}</span><span class="n">${k + 1}</span></button>`).join('')}</div><div class="sep"></div><textarea rows="1" placeholder="Comment"></textarea>`;
     const list = scr.querySelector('.list'), ta = scr.querySelector('textarea');
@@ -268,34 +304,89 @@ textarea::placeholder { color: var(--muted); }
     schedule();
   }
 
-  function sync() {
-    if (!host) return;
-    const n = groups.filter((g) => pick(g) !== 1).length;
-    count.textContent = `${n} ${n === 1 ? 'pick' : 'picks'}`;
-    hideBtn.textContent = st.hidden ? 'Show dots' : 'Hide dots';
-    const list = order(), k = list.indexOf(curG);
-    posBtn.textContent = `${k < 0 ? '–' : k + 1} / ${list.length}`;
+  // The count button opens every group on the site, one head per page. A row goes to its group and opens its menu.
+  function showList() {
+    close(); listOpen = true;
+    const all = site(), pages = [...new Set(all.map(home))];
+    scr.innerHTML = pages.map((p) => `<div class="head">${p === null ? 'Page not seen yet' : esc(p)}${p !== null && p === here() ? '<span class="here">· this page</span>' : ''}</div>`
+      + all.filter((m) => home(m) === p).map((m) => {
+        const i = st.picks[m.id] || 1, name = m.opts && m.opts[i - 1];
+        return `<button type="button" class="opt row" data-id="${esc(m.id)}" aria-selected="${m.id === curId}"${p === null ? ' disabled title="Open its page once so the dock knows where it is"' : ''}><span class="ck">✓</span><span><span class="name">${esc(m.label)}</span><span class="note">${i} ${esc(name || '?')}</span></span><span class="n">${all.indexOf(m) + 1}</span></button>`;
+      }).join('')).join('<div class="sep"></div>');
+    scr.onclick = (e) => { const b = e.target.closest('.row'); if (b && !b.disabled) goTo(b.dataset.id, true); };
+    pop.hidden = false; pop.setAttribute('aria-label', 'All groups'); scr.scrollTop = 0; placePop = true;
+    posBtn.setAttribute('aria-expanded', 'true');
     schedule();
   }
+  function closeList() {
+    if (!listOpen) return;
+    listOpen = false; pop.hidden = true; scr.innerHTML = ''; scr.onclick = null; pop.setAttribute('aria-label', 'Dev artifacts');
+    posBtn.setAttribute('aria-expanded', 'false');
+  }
 
-  // Back and next walk the groups in page order and wrap at the ends. A group already on screen only
-  // flashes its highlight; one off screen scrolls to the middle first, then flashes. With a menu open,
-  // the menu follows to the new group.
-  const order = () => groups.map((g) => [g, sample(g).r]).filter(([, r]) => r && r.width > 0)
-    .sort((a, b) => a[1].top - b[1].top).map(([g]) => g);
+  function sync() {
+    if (!host) return;
+    const all = site(), n = all.filter((m) => (st.picks[m.id] || 1) !== 1).length, k = all.findIndex((m) => m.id === curId);
+    if (!sayT) { count.textContent = `${n} ${n === 1 ? 'pick' : 'picks'}`; count.classList.remove('say'); }
+    hideBtn.textContent = st.hidden ? 'Show dots' : 'Hide dots';
+    posBtn.textContent = `${k < 0 ? '–' : k + 1} / ${all.length}`;
+    for (const g of groups) { g.n = all.findIndex((m) => m.id === g.id) + 1; if (g.el) g.el.textContent = g.n; }
+    schedule();
+  }
+  // A short message in the dock's picks slot, such as a group that never showed up.
+  function say(text) {
+    clearTimeout(sayT); count.textContent = text; count.classList.add('say');
+    sayT = setTimeout(() => { sayT = 0; sync(); }, 4000);
+  }
+
+  // Back and next walk every group on the site in site order and wrap at the ends. A group on another page
+  // navigates there first. A group already on screen only flashes its highlight; one off screen scrolls to
+  // the middle first, then flashes. With a menu open, the menu follows to the new group.
   function go(d, openMenu) {
-    const list = order(); if (!list.length) return;
-    const k = list.indexOf(curG), g = list[k < 0 ? (d > 0 ? 0 : list.length - 1) : (k + d + list.length) % list.length];
-    const reopen = openMenu || !!open;
-    close(); curG = g; sync();
+    const list = site().filter((m) => m.page); if (!list.length) return;
+    let k = list.findIndex((m) => m.id === curId);
+    if (k < 0) { const f = list.findIndex(isHere); k = Math.max(f, 0) - d; } // start on this page
+    goTo(list[(k + d + list.length) % list.length].id, openMenu || !!open);
+  }
+  function goTo(id, reopen) {
+    const m = meta(id); if (!m) return;
+    close(); closeList(); curId = id; sync();
+    if (!m.page || isHere(m)) return arrive(id, reopen);
+    const path = home(m);
+    try { sessionStorage.setItem(GO, JSON.stringify({ id, open: reopen, t: Date.now() })); } catch {}
+    if (cfg.navigate) cfg.navigate(path);
+    else if (!spa) return location.assign(path);
+    else { history.pushState(null, '', path); dispatchEvent(new PopStateEvent('popstate', { state: null })); }
+    arrive(id, reopen, true);
+  }
+  // Wait for the group's target to render (an SPA route, a list after a fetch), at most 5 s.
+  // After a route change with no DOM change in 600 ms, the app did not route: load the page for real.
+  function arrive(id, reopen, routed) {
+    const n = ++goN, t0 = performance.now();
+    let moved = false;
+    const mo = new MutationObserver(() => { moved = true; });
+    const end = () => { clearInterval(iv); mo.disconnect(); try { sessionStorage.removeItem(GO); } catch {} };
+    const check = () => {
+      if (n !== goN) return end();
+      const g = groups.find((x) => x.id === id), s = g && sample(g);
+      if (s && s.r && s.r.width > 0) { end(); return land(g, reopen, n); }
+      const t = performance.now() - t0;
+      if (routed && !moved && !cfg.navigate && t > 600) { clearInterval(iv); mo.disconnect(); return location.reload(); }
+      if (t > 5000) { end(); const m = meta(id); say(`${m ? m.label : id} is not on ${here()}`); }
+    };
+    mo.observe(document.body, { childList: true, subtree: true });
+    const iv = setInterval(check, 100);
+    check();
+  }
+  function land(g, reopen, n) {
     const { t, r } = sample(g), vh = innerHeight, DOCK = 72, tall = r.height > vh - DOCK - 16;
     const seen = tall ? r.top >= 0 && r.top < vh / 3 : r.top >= 8 && r.bottom <= vh - DOCK;
-    const n = ++goN, arrive = () => { if (n !== goN) return; spot(g); if (reopen) show(g); };
-    if (seen || !t) return arrive();
+    const reach = () => { if (n !== goN) return; spot(g); if (reopen) show(g); };
+    if (seen || !t) return reach();
     const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
     t.scrollIntoView({ block: tall ? 'start' : 'center', inline: 'nearest', behavior: smooth ? 'smooth' : 'instant' });
-    if (!smooth) return requestAnimationFrame(arrive);
-    let done = false; const fin = () => { if (done) return; done = true; removeEventListener('scrollend', fin, true); arrive(); };
+    if (!smooth) return requestAnimationFrame(reach);
+    let done = false; const fin = () => { if (done) return; done = true; removeEventListener('scrollend', fin, true); reach(); };
     addEventListener('scrollend', fin, true); setTimeout(fin, 900); // 900 ms covers browsers without scrollend
   }
   function spot(g) {
@@ -343,6 +434,8 @@ textarea::placeholder { color: var(--muted); }
     hl.classList.toggle('flash', !!flashG && lit === flashG);
     for (const g of groups) {
       const { t, r } = sample(g);
+      const m = meta(g.id);
+      if (m && !m.page && r && r.width > 0) { m.page = [here()]; save(); sync(); } // first seen here: this is its page
       const on = !st.hidden && r && inView(r);
       g.el.hidden = !on;
       if (!on) { if (lit === g) lit = null; continue; }
@@ -360,6 +453,12 @@ textarea::placeholder { color: var(--muted); }
       box(bps[1], r.left - E, r.bottom - 1, r.width + 2 * E, 1);
       box(bps[2], r.left, r.top - E, 1, r.height + 2 * E);
       box(bps[3], r.right - 1, r.top - E, 1, r.height + 2 * E);
+    }
+    if (listOpen && !sheetMQ.matches && placePop) {
+      // the list floats centered just above the dock
+      placePop = false; pop.style.width = '';
+      pop.style.maxHeight = vh - 72 - 16 + 'px';
+      Object.assign(pop.style, { left: (vw - pop.offsetWidth) / 2 + 'px', top: vh - 72 - pop.offsetHeight + 'px' });
     }
     if (!open || sheetMQ.matches) return;
     if (open.el.hidden) return close();
@@ -395,9 +494,10 @@ textarea::placeholder { color: var(--muted); }
   const schedule = () => { if (!raf) raf = requestAnimationFrame(place); };
 
   function md() {
-    return groups.map((g) => {
-      const i = pick(g), note = (st.notes[g.id] || '').trim();
-      let s = `- ${g.label}: ${i} ${g.opts[i - 1] ? g.opts[i - 1].name : '?'}`;
+    const all = site(), many = new Set(all.map(home)).size > 1; // name the page only when there are several
+    return all.map((m) => {
+      const i = st.picks[m.id] || 1, note = (st.notes[m.id] || '').trim();
+      let s = `- ${m.label}${many && m.page ? ` (${home(m)})` : ''}: ${i} ${(m.opts && m.opts[i - 1]) || '?'}`;
       if (note) { const [first, ...rest] = note.split('\n'); s += ' - ' + first + rest.map((l) => '\n  ' + l).join(''); }
       return s;
     }).join('\n');
@@ -420,15 +520,16 @@ textarea::placeholder { color: var(--muted); }
   }, { passive: true, capture: true });
   addEventListener('resize', () => { placePop = true; schedule(); });
   addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && open) return close();
+    if (e.key === 'Escape' && (open || listOpen)) return open ? close() : closeList();
     const t = e.composedPath()[0];
     if (!['.', '[', ']'].includes(e.key) || e.metaKey || e.ctrlKey || e.altKey || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))) return;
     if (e.key !== '.') return go(e.key === ']' ? 1 : -1);
     st.hidden = !st.hidden; save(); if (st.hidden) close(); sync();
   });
   addEventListener('pointerdown', (e) => {
-    if (!open) return;
     const p = e.composedPath();
+    if (listOpen && !p.includes(pop) && !p.includes(posBtn)) closeList();
+    if (!open) return;
     if (!p.includes(pop) && !p.includes(open.el) && !inRect(pop, e) && !inRect(open.el, e)) close();
   }, true);
   // While a page view transition runs, Chrome sends every click to <html>. Hand it to the option or badge under the pointer.
@@ -446,7 +547,11 @@ textarea::placeholder { color: var(--muted); }
     const g = find(Q.get('dv-open')), h = find(Q.get('dv-hl'));
     if (g) setTimeout(() => show(g), 50);
     if (h) { hover = h; schedule(); }
+    // back or next loaded this page: finish the trip to its group
+    let go = null; try { go = JSON.parse(sessionStorage.getItem(GO)); } catch {}
+    if (go && Date.now() - go.t < 15000) { curId = go.id; sync(); arrive(go.id, go.open); }
   };
+  addEventListener('popstate', () => { placePop = true; sync(); }); // an SPA route change: "this page" moved
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else setTimeout(boot);
 
   window.DevPanel = {
@@ -459,13 +564,18 @@ textarea::placeholder { color: var(--muted); }
       if (pick(g) > g.opts.length) delete st.picks[g.id];
       g.cur = 1; // the page starts on option 1
       groups.push(g);
+      let m = meta(g.id); if (!m) st.groups.push(m = { id: g.id, page: null });
+      Object.assign(m, { label: g.label, opts: g.opts.map((o) => o.name) });
+      if (cfg.page) m.page = [].concat(cfg.page).map(norm);
+      save();
       if (pick(g) !== 1) setVar(g, pick(g));
       if (host) { addDot(g); sync(); }
       return g;
     },
+    config(c) { Object.assign(cfg, c); },
     markdown: md,
     open: (id) => { const g = groups.find((x) => x.id === id); if (g) show(g); },
-    next: () => go(1), back: () => go(-1),
-    groups: () => groups.map((g) => ({ id: g.id, label: g.label, target: g.target, options: g.opts.map((o) => o.name) })),
+    next: () => go(1), back: () => go(-1), list: () => showList(),
+    groups: () => groups.map((g) => ({ id: g.id, label: g.label, target: g.target, page: meta(g.id).page, options: g.opts.map((o) => o.name) })),
   };
 })();

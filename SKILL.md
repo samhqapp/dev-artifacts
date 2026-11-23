@@ -51,6 +51,15 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 - Badges float just outside the section, dim at rest; hover lights the section with a padded highlight.
 - The menu opens beside the section and never covers it; on a phone it is a bottom sheet.
 - Each group has a comment field that grows; the dock has Copy choices, Hide dots (`.` key), and Reset.
-- The dock's back and next (`[` and `]` keys) go to each group in page order: off screen it scrolls there,
-  on screen it flashes the highlight and pulses the badge. Click the "2 / 3" count to open that group's menu.
+- The dock's back and next (`[` and `]` keys) go to every group on the site, and move to its page when needed:
+  off screen it scrolls there, on screen it flashes the highlight and pulses the badge.
+- The "2 / 5" count is the site total. Clicking it lists every group by page with its pick; a row goes there.
+- Picks, comments, and Copy choices cover the whole site (one store per origin).
+
+## Sites with several pages or routes
+
+- Give each group a `page` (such as `page: '/settings'`) when its target is on another page or route.
+  Without it, a group belongs to the page where it was first seen, so unseen pages would be missing from the count.
+- SPA routes change with pushState + popstate (works with React Router and TanStack Router). For another router,
+  add `DevPanel.config({ navigate: (path) => ... })` to `variants.js`. Static sites load the page.
 - It follows the site's light or dark look and draws thin scroll bars that fade out.
