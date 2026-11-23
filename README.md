@@ -20,6 +20,12 @@ It needs Node 22 or newer. It has no npm packages and no build step. It adds not
 
 ## Quick start
 
+0. Get the code.
+
+   ```sh
+   git clone https://github.com/surajmandalcell/dev-artifacts.git
+   ```
+
 1. Copy the two template files into a new folder. Keep this folder outside your site.
 
    ```sh
