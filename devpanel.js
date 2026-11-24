@@ -471,8 +471,9 @@ const KIT_CSS = String.raw`
   // Groups the owner can use on this page right now: in the current view (Open or Archived) and with a target here.
   const onPage = (g) => { const m = meta(g.id); return m && m.page ? isHere(m) : !!document.querySelector(g.target); };
   const usable = () => groups.filter((g) => inSet(g) && onPage(g));
-  // Every dock count (pager, Open, Archived) counts this one set: blue groups on this page. Green comment dots never count.
-  const browsable = () => groups.filter((g) => g.opts.length && onPage(g));
+  // Every dock count, the pager, the list, back and next use this one set: blue groups the variants file defines now that
+  // the owner can reach (a known page, or a target on this page), in site order. Green comment dots never count.
+  const browsable = () => site().filter((m) => m.opts && m.opts.length && (m.page || document.querySelector(groups.find((g) => g.id === m.id).target)));
   // Drop stored picks, comments and Final marks of groups the variants file no longer has.
   function prune() {
     const ids = new Set(groups.map((g) => g.id)), keep = (o) => Object.fromEntries(Object.entries(o || {}).filter(([k]) => ids.has(k)));
@@ -719,7 +720,7 @@ svg { display: block; flex: none; }
   }
   function updX() {
     if (!sh) return;
-    const all = browsable(), n = all.filter((g) => fin(g.id)).length;
+    const all = browsable(), n = all.filter((m) => fin(m.id)).length;
     sh.querySelectorAll('.dv-arch').forEach((s) => {
       s.children[0].textContent = 'Open ' + (all.length - n); s.children[1].textContent = 'Archived ' + n;
       s.children[0].setAttribute('aria-pressed', String(!arch)); s.children[1].setAttribute('aria-pressed', String(arch));
@@ -967,7 +968,7 @@ svg { display: block; flex: none; }
     if (dockState !== 'open') setDock('open');
     od.pop.classList.remove('dv-wide');
     od.open({ label: 'Every group', anchor: od.count, onClose: () => { listOpen = false; }, render: (body) => {
-      const all = site(), pages = [...new Set(all.map(home))];
+      const all = browsable().filter(inSet), pages = [...new Set(all.map(home))];
       body.innerHTML = `<p class="k-hint">Click a group to go to it. Copy choices copies every pick and comment as a list to paste in chat.</p><div class="dv-list">${pages.map((p) => `<div class="dv-ghead">${p === null ? 'Page not seen yet' : esc(p)}${p !== null && p === here() ? '<i> · this page</i>' : ''}</div>`
         + all.filter((m) => home(m) === p).map((m) => {
           const i = st.picks[m.id] || 1, name = m.opts && m.opts[i - 1];
@@ -980,20 +981,19 @@ svg { display: block; flex: none; }
 
   function sync() {
     if (!od) return;
-    // the count and pager cover only the blue groups usable on this page now (see usable)
-    const here_ = usable(), blue = here_.filter((g) => g.opts.length);
-    if (curId !== null && !here_.some((g) => g.id === curId)) curId = null;
-    // the dock shows the current group; with none yet, the first usable group (a blue one first)
-    if (curId === null && here_.length) curId = (blue[0] || here_[0]).id;
-    const k = blue.findIndex((g) => g.id === curId);
+    // the count and pager cover the current view's part of browsable(); the dock's group is one usable on this page
+    const here_ = usable(), blue = browsable().filter(inSet);
+    if (curId !== null && !here_.some((g) => g.id === curId) && !blue.some((m) => m.id === curId)) curId = null;
+    if (curId === null && here_.length) curId = (here_.find((g) => g.opts.length) || here_[0]).id;
+    const k = blue.findIndex((m) => m.id === curId);
     posText = k < 0 ? `${blue.length}` : `${k + 1} / ${blue.length}`;
     od.controls.querySelector('.od-step').hidden = !blue.length; // no pager with nothing to page through
     pager.hidden = blue.length < 2;
     pager.innerHTML = blue.map((g) => `<button type="button" data-id="${esc(g.id)}" title="${esc(g.label)}" aria-label="${esc(g.label)}" aria-current="${g.id === curId}"></button>`).join('');
-    for (const g of groups) if (g.rec) g.rec.n = blue.indexOf(g) + 1;
+    for (const g of groups) if (g.rec) g.rec.n = blue.findIndex((m) => m.id === g.id) + 1;
     od.sync(); updX();
-    // nothing usable here: no dock, only the corner handle (not saved, so the dock comes back with groups)
-    const none = !here_.length && !site().some((m) => fin(m.id) !== arch);
+    // nothing to browse and nothing here: no dock, only the corner handle (not saved, so the dock comes back with groups)
+    const none = !here_.length && !browsable().length;
     if (none !== host.hasAttribute('data-empty')) { host.toggleAttribute('data-empty', none); setDock(none ? 'hide' : dockState, true, true); }
     handle.title = none ? 'No option groups on this page' : 'Show the dock  ( h )'; nUsable = here_.length;
     const g = groups.find((x) => x.id === curId);
@@ -1012,9 +1012,9 @@ svg { display: block; flex: none; }
   // navigates there first. On arrival the group becomes current, its popover opens, and the page scrolls the target
   // smoothly into the free part above the popover (only when it is not already in view there).
   function go(d) {
-    const list = site().filter((m) => m.page && m.opts && m.opts.length && inSet(m)); if (!list.length) return;
+    const list = browsable().filter(inSet); if (!list.length) return;
     let k = list.findIndex((m) => m.id === curId);
-    if (k < 0) { const f = list.findIndex(isHere); k = Math.max(f, 0) - d; } // start on this page
+    if (k < 0) { const f = list.findIndex((m) => !m.page || isHere(m)); k = Math.max(f, 0) - d; } // start on this page
     goTo(list[(k + d + list.length) % list.length].id, true);
   }
   function goTo(id, reopen) {
