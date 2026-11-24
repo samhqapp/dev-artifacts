@@ -15,6 +15,28 @@ Options shown on the real page, beside the real content. Cheaper than a separate
   write a `page.js` like `<repo>/templates/quick-page.js`, run `node <repo>/quick.mjs page.js out.html`,
   and open the file. One HTML file, Preact + htm (JSX-like) inlined, no build, no network, Copy choices included.
 - Native app (it can't run in a browser), or the user asks for a page: build a published options page instead.
+- Claude Code mod (a pane or band drawn in the terminal): see "Claude mod (terminal UI)" below.
+
+## Claude mod (terminal UI)
+
+The same picker, drawn inside a mod's pane: a dock row with back and next, the group's options as
+buttons, one comment per group, and Copy choices (the same `- Group: N Option - comment` list).
+The owner judges the real pane with real-looking data, not a mockup.
+
+1. Copy `<repo>/templates/mod-devpanel.tsx` into the mod's `hooks/` folder. Declare its state key as
+   `Shaped<DevState>` in the mod's `PluginState` (spell the type out there: a contract file imports nothing).
+2. Define the groups: `devPanel({ groups, heading })`, recommended option first, each with a one-line `note`.
+   A group with `options: []` is comment only. In the pane hook, branch the drawing on `dev.pick(state, id)`,
+   so every option really changes the tree, and draw `dev.dock(...)` at the bottom (the header comment shows the wiring).
+3. Add a demo mode (a command argument or an env variable) that loads a fixture of real-looking data and
+   shows the dock. No model calls in demo mode. Open the pane with `$.ui.open({ id, title, focus: true })`
+   from the command, or the hotkeys go to the prompt box. When a group changes one tab of the pane, show that
+   tab while the group is selected, so the user sees what they pick.
+4. Prove it: `claude plugin validate <mod>`, then a `claude plugin test` that presses each option and checks the tree changes.
+   Launch it for the user in a new terminal tab: `claude --plugin-dir <mod>`, then the demo command.
+5. Tell the user the keys: `n` and `p` move between groups, digits pick, Tab reaches the comment field
+   and Enter saves it. Ask them to press Copy choices (`y`) and paste the text. Keep a fallback command that prints the
+   same text, for when the terminal clipboard does not work. Then build only the picked options.
 
 ## Before you start
 
