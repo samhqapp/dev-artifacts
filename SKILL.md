@@ -10,7 +10,13 @@ Options shown on the real page, beside the real content. Cheaper than a separate
 
 ## Which way
 
-There are two modes:
+- **Default: a local options page.** Copy `<repo>/templates/choice-page.html` into `<scratch>/<name>/index.html`, put the
+  images beside it, run `node <repo>/serve.mjs <scratch>/<name> --port 0` in the background with a deadline, open the URL.
+  The server adds the kit (dock, comments, Final, Copy choices), dark only, and the tab title. Example: `<repo>/examples/choice`.
+- **Live overlay** (the steps below): only when the owner asks to see the options on the real site.
+- **Cloud artifact**: only when the owner asks for one.
+
+Other modes:
 
 - **Live mode** (the steps below): deciding about a website. The options sit on the real site in the dock.
 - **Options mode**: deciding about a component or tool, such as the dock itself. One kit panel per option, side by

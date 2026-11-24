@@ -1,0 +1,25 @@
+<!-- A local options page: write only this markup and put the images next to it.
+     node serve.mjs <this folder>  injects the artifact kit (dock, comments, Final switches, Open/Archived, focus
+     reading, Copy choices), dark only, and sets the tab title. data-keep adds "Keep as is" and
+     "Keep as is, show more options". List the recommended option first. Change data-round when the questions change. -->
+<main class="k-wrap" data-kit data-views="page" data-round="1">
+  <section class="k-part" data-part="Button color">
+    <p class="k-kicker">Options</p>
+    <h1 class="k-title">Which color should the Buy button use?</h1>
+    <p class="k-lead">Pick one, add a comment if you want a change, then press Copy choices and paste it into the chat.</p>
+    <div class="k-group" data-group="Button color" data-comment="What to change" data-keep>
+      <div class="k-options">
+        <div class="k-option" data-option="Option one" data-recommended data-sub="One line on what it is">
+          <img src="one.jpg" alt="The page with option one">
+        </div>
+        <div class="k-option" data-option="Option two" data-sub="One line on what it is">
+          <img src="two.jpg" alt="The page with option two">
+        </div>
+        <div class="k-option" data-option="Option three" data-sub="One line on what it is">
+          <img src="three.jpg" alt="The page with option three">
+        </div>
+      </div>
+    </div>
+    <p class="k-hint">Click an image to see it full size.</p>
+  </section>
+</main>

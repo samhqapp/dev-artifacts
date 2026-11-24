@@ -28,7 +28,11 @@ if (!fs.statSync(root, { throwIfNoEntry: false })?.isDirectory()) { console.erro
 const own = path.dirname(fileURLToPath(import.meta.url));
 const TITLE = tabTitle(); // '<project> > <Orca tab>', or the repo folder name
 
+// The artifact kit (kit.js fetches kit.css next to itself). A local options page (`<main data-kit>` markup only) gets it injected.
+const kit = process.env.KIT_DIR || path.join(os.homedir(), '.agents/artifact-kit');
+const hasKit = fs.existsSync(path.join(kit, 'kit.js'));
 const DEV = {
+  ...(hasKit && { '/__dev/kit.js': path.join(kit, 'kit.js'), '/__dev/kit.css': path.join(kit, 'kit.css') }),
   '/__dev/devpanel.js': path.join(own, 'devpanel.js'),
   ...(variants && { '/__dev/variants.js': path.resolve(variants) }),
   ...(css && { '/__dev/variants.css': path.resolve(css) }),
@@ -38,13 +42,27 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
   '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.avif': 'image/avif', '.gif': 'image/gif', '.ico': 'image/x-icon',
   '.woff2': 'font/woff2', '.woff': 'font/woff', '.mp4': 'video/mp4', '.webm': 'video/webm', '.txt': 'text/plain; charset=utf-8' };
 
+// polling, not SSE: an open stream never lets headless screenshots finish loading
+const RELOAD = '<script>(v=>setInterval(()=>fetch("/__dev/version").then(r=>r.text()).then(n=>{if(v===undefined)v=n;else if(n!==v)location.reload()}).catch(()=>{}),800))()</script>';
 const INJECT = [
   css && '<link rel="stylesheet" href="/__dev/variants.css">',
   '<script src="/__dev/devpanel.js"></script>',
   variants && '<script src="/__dev/variants.js"></script>',
-  // polling, not SSE: an open stream never lets headless screenshots finish loading
-  '<script>(v=>setInterval(()=>fetch("/__dev/version").then(r=>r.text()).then(n=>{if(v===undefined)v=n;else if(n!==v)location.reload()}).catch(()=>{}),800))()</script>',
+  RELOAD,
 ].filter(Boolean).join('\n');
+const htmlEsc = (s) => s.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
+// A local options page: the author writes only the kit markup. It gets kit.js (its dock, comments, Final switches,
+// Open/Archived, focus reading), dark only, and the tab title. A page that loads kit.js itself (options.mjs) is left alone.
+function kitPage(html) {
+  if (/<script[^>]*\bkit\.js\b/.test(html)) return html;
+  const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${htmlEsc(TITLE)}</title>\n<script src="/__dev/kit.js"></script>`;
+  html = html.replace(/<title>[\s\S]*?<\/title>/i, '');
+  html = /<html[^>]*>/i.test(html) ? html.replace(/<html([^>]*)>/i, (m, a) => `<html${a.replace(/\sdata-theme="[^"]*"/, '')} data-theme="dark">`)
+    : `<!doctype html>\n<html lang="en" data-theme="dark">\n` + html;
+  html = /<head[^>]*>/i.test(html) ? html.replace(/<head([^>]*)>/i, (m) => m + '\n' + head) : html.replace(/<html[^>]*>/i, (m) => `${m}\n<head>${head}</head>`);
+  const at = html.toLowerCase().lastIndexOf('</body>');
+  return at < 0 ? html + RELOAD : html.slice(0, at) + RELOAD + '\n' + html.slice(at);
+}
 
 let version = Date.now();
 const reload = () => { version = Date.now(); };
@@ -91,10 +109,11 @@ function handle(req, res) {
   const type = TYPES[path.extname(p).toLowerCase()] || 'application/octet-stream';
   let body = fs.readFileSync(p);
   if (url === '/__dev/devpanel.js') body = `window.__dvTitle=${JSON.stringify(TITLE)};\n` + body; // the overlay's tab title
-  // a kit page (options.mjs) has its own dock, so it gets no overlay
-  if (type.startsWith('text/html') && !/<main[^>]*\bdata-kit\b/.test(body.toString('utf8'))) {
+  // a kit page has the kit's own dock, so it gets no overlay
+  if (type.startsWith('text/html')) {
     const html = body.toString('utf8'), at = html.toLowerCase().lastIndexOf('</body>');
-    body = at < 0 ? html + INJECT : html.slice(0, at) + INJECT + '\n' + html.slice(at);
+    if (/<main[^>]*\bdata-kit\b/.test(html)) { if (hasKit) body = kitPage(html); }
+    else body = at < 0 ? html + INJECT : html.slice(0, at) + INJECT + '\n' + html.slice(at);
   }
   res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' }).end(body);
 }
