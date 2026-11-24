@@ -5,10 +5,11 @@
    This file is the one source. Other files hold copies between the option-dots markers: edit here, then run
    `node dots-sync.mjs <file>...`. Never write a closing script tag in this file (the kit inlines it).
 
-   const od = OptionDots({ root, theme, key, step, list })
+   const od = OptionDots({ root, theme, key, step, list, select })
      root: where the dots, popover and dock go (default document.body; a shadow root works).
      theme: the element that gets data-od-dark (default <html>, or the shadow host). key: localStorage key for Hide dots.
      step(d), list(): replace the in-page back and next, and make the count a button (dev-artifacts walks a whole site).
+     select(rec): a dot click calls it instead of opening the popover (dev-artifacts shows the group in the dock).
    od.add({ target, label, pick, render(body, rec), onClose(), pos: 'tr'|'tl', n }) -> rec
      target: an element, or a function that returns { t: element, r: rect }. pick: true blue, false green.
      render fills the popover body each time it opens. n: the number on a blue dot (default: its place on the page).
@@ -40,7 +41,7 @@
 .od-dot svg { width: 11px; height: 11px; display: block; }
 .od-dot::before { content: ""; position: absolute; inset: -9px; border-radius: 50%; } /* 40 px hit area for touch */
 .od-dot::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; pointer-events: none; }
-.od-dot:hover, .od-dot:focus-visible, .od-dot[aria-expanded="true"] { scale: 1.14; transition: scale var(--od-open) var(--od-ease); }
+.od-dot:hover, .od-dot:focus-visible, .od-dot[aria-expanded="true"], .od-dot[aria-current="true"] { scale: 1.14; transition: scale var(--od-open) var(--od-ease); }
 .od-dot.od-pulse::after { animation: od-pulse .7s var(--od-out) 2; }
 @keyframes od-pulse { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--od-c) 55%, transparent); } to { box-shadow: 0 0 0 14px transparent; } }
 .od-mini { position: static; width: 18px; height: 18px; border: 0; font-size: 10px; box-shadow: none; pointer-events: none; flex: none; }
@@ -180,7 +181,7 @@
 
     function add(c) {
       const r = { pos: 'tr', ...c, el: btn('od-dot') };
-      r.el.onclick = () => (shown === r ? close() : open(r));
+      r.el.onclick = () => (o.select ? o.select(r) : shown === r ? close() : open(r));
       layer.append(r.el); recs.push(r); sync();
       return r;
     }

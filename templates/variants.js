@@ -8,7 +8,7 @@ DevPanel.config({ title: 'my-site > email field' });
 
 DevPanel.group({
   id: 'input',                // lowercase letters, digits, dashes; used in data-dv-input and in --open input
-  label: 'Email field',        // shown in the menu and in Copy choices
+  label: 'Email field',        // shown in the dock and in Copy choices
   target: '.hero input',       // the element the badge sits on; scrolled into view by --shot
   options: [
     { name: 'Soft ring', note: 'Light gray fill, blue ring on focus' },

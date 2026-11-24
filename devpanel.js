@@ -11,8 +11,10 @@
    'samhq_backend > buy dialog'. Without it the title stays and the console warns once.
    DevPanel.config({ navigate(path) }) lets an app route itself; otherwise an SPA gets pushState + popstate and a
    static site a normal page load. Everything lives in one shadow root, so no style leaks in or out. Never ship this file.
-   The dots, popover, and dock come from the shared option-dots overlay (dots.js, copied in below).
-   URL params: ?dv-open=<id> opens a popover, ?dv-hl=<id> shows the dot-hover highlight,
+   The dots and dock come from the shared option-dots overlay (dots.js, copied in below). The current group lives in
+   the dock: its name, its options as a segmented control (a compact list when they do not fit), and its comment field.
+   A dot click makes its group current. Hovering a dock option or a dot pulses a faint red glow line on the target once.
+   URL params: ?dv-open=<id> makes a group current, ?dv-hl=<id> holds the glow at its peak (for screenshots),
    ?dv-pick=<id>:<i>[,<id>:<i>] forces options (nothing is saved), ?dv-clean hides the whole overlay.
    Keys: . hides the dots, ] and [ go to the next and previous blue dot on any page (also DevPanel.next() and .back()). */
 /* option-dots:start: a copy of dev-artifacts/dots.js. Edit that file, then run dots-sync.mjs. */
@@ -23,10 +25,11 @@
    This file is the one source. Other files hold copies between the option-dots markers: edit here, then run
    `node dots-sync.mjs <file>...`. Never write a closing script tag in this file (the kit inlines it).
 
-   const od = OptionDots({ root, theme, key, step, list })
+   const od = OptionDots({ root, theme, key, step, list, select })
      root: where the dots, popover and dock go (default document.body; a shadow root works).
      theme: the element that gets data-od-dark (default <html>, or the shadow host). key: localStorage key for Hide dots.
      step(d), list(): replace the in-page back and next, and make the count a button (dev-artifacts walks a whole site).
+     select(rec): a dot click calls it instead of opening the popover (dev-artifacts shows the group in the dock).
    od.add({ target, label, pick, render(body, rec), onClose(), pos: 'tr'|'tl', n }) -> rec
      target: an element, or a function that returns { t: element, r: rect }. pick: true blue, false green.
      render fills the popover body each time it opens. n: the number on a blue dot (default: its place on the page).
@@ -58,7 +61,7 @@
 .od-dot svg { width: 11px; height: 11px; display: block; }
 .od-dot::before { content: ""; position: absolute; inset: -9px; border-radius: 50%; } /* 40 px hit area for touch */
 .od-dot::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; pointer-events: none; }
-.od-dot:hover, .od-dot:focus-visible, .od-dot[aria-expanded="true"] { scale: 1.14; transition: scale var(--od-open) var(--od-ease); }
+.od-dot:hover, .od-dot:focus-visible, .od-dot[aria-expanded="true"], .od-dot[aria-current="true"] { scale: 1.14; transition: scale var(--od-open) var(--od-ease); }
 .od-dot.od-pulse::after { animation: od-pulse .7s var(--od-out) 2; }
 @keyframes od-pulse { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--od-c) 55%, transparent); } to { box-shadow: 0 0 0 14px transparent; } }
 .od-mini { position: static; width: 18px; height: 18px; border: 0; font-size: 10px; box-shadow: none; pointer-events: none; flex: none; }
@@ -198,7 +201,7 @@
 
     function add(c) {
       const r = { pos: 'tr', ...c, el: btn('od-dot') };
-      r.el.onclick = () => (shown === r ? close() : open(r));
+      r.el.onclick = () => (o.select ? o.select(r) : shown === r ? close() : open(r));
       layer.append(r.el); recs.push(r); sync();
       return r;
     }
@@ -408,9 +411,9 @@
     return pages.flatMap((p) => st.groups.filter((m) => home(m) === p));
   }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-  let host, sh, od, hl, ring, bps, picksOut, copyBtn, open = null, hover = null, raf = 0;
+  let host, sh, od, hl, gls, panel, picksOut, copyBtn, open = null, lit = null, glowA = null, raf = 0;
   let previewT = 0, hoverT = 0, busyN = 0;
-  let curId = null, flashG = null, flashT = 0, goN = 0, sayT = 0, posText = ''; // back/next: the current group and the one flashing
+  let curId = null, goN = 0, sayT = 0, posText = ''; // back/next: the current group
   let listOpen = false; // the count button's list of every group on the site
 
   const CSS = `
@@ -424,22 +427,45 @@ button, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; border: 0; background: none; padding: 0; }
 [hidden] { display: none !important; }
 
-/* dot-hover highlight: padded ring plus blueprint guides on the target's exact edges */
-.hl > * { position: absolute; left: 0; top: 0; opacity: 0; transition: opacity .15s ease; }
-.ring { border-radius: 10px; border: 1px solid color-mix(in srgb, var(--blue) 50%, transparent);
-  background: color-mix(in srgb, var(--blue) 5%, transparent); }
-.bp { background: var(--blue); }
-.bp.h { height: 1px; -webkit-mask: linear-gradient(90deg, transparent, #000 48px, #000 calc(100% - 48px), transparent);
-  mask: linear-gradient(90deg, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
-.bp.v { width: 1px; -webkit-mask: linear-gradient(180deg, transparent, #000 48px, #000 calc(100% - 48px), transparent);
-  mask: linear-gradient(180deg, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
-.hl.on .ring { opacity: 1; }
-.hl.on .bp { opacity: .45; }
-.hl.flash > * { transition-duration: .3s; }
+/* changed-element glow: four thin red lines on the target's edges, a soft glow, ends that fade out. No fill.
+   It pulses once (fade in, then out) per hover of a dock option or a dot; paint only, so the page never moves. */
+.hl { position: absolute; inset: 0; opacity: 0; --red: #ff3b30; }
+:host([data-od-dark]) .hl { --red: #ff453a; }
+.gl { position: absolute; left: 0; top: 0; background: var(--red); box-shadow: 0 0 6px 1px var(--red); }
+.gl.h { height: 1px; -webkit-mask: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+  mask: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
+.gl.v { width: 1px; -webkit-mask: linear-gradient(180deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+  mask: linear-gradient(180deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
+.hl.hold { opacity: .4; }
 
-/* options use the shared .od-opt rows; loading state: a sweep across the hovered option while a preview settles.
-   .opt rows below are the compact list of every group. */
-.od-opt.loading::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 60%; pointer-events: none;
+/* the current group in the dock: name and note, options as a segmented control, comment field */
+.od-dock.dv-has { width: min(720px, calc(100vw - 24px)); border-radius: 24px; justify-content: flex-start; gap: 6px 8px; }
+.od-dock.dv-has > .od-ctl { margin-right: auto; }
+.dv-panel { order: -1; flex: 1 0 100%; min-width: 0; display: grid; gap: 8px; padding: 8px 8px 4px; }
+.dv-panel[hidden] { display: none; }
+.dv-head { display: flex; align-items: center; gap: 8px 12px; min-width: 0; }
+.dv-label { flex: 1 1 140px; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.dv-label > span:last-child { min-width: 0; }
+.dv-label b { display: block; font: 600 14px/1.25 var(--od-font); color: var(--od-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dv-note { display: block; min-height: 16px; font: 500 12px/16px var(--od-font); color: var(--od-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dv-seg { flex: 0 1 auto; min-width: 0; overflow: hidden; display: flex; padding: 2px; gap: 2px; border-radius: 999px; background: var(--od-fill); }
+.dv-seg button { position: relative; overflow: hidden; flex: 1 0 auto; height: 30px; padding: 0 12px; border-radius: 999px; white-space: nowrap;
+  font: 600 13px/1 var(--od-font); color: var(--od-ink); transition: background-color .18s ease, color .18s ease; }
+.dv-seg button:hover, .dv-seg button:focus-visible { background: color-mix(in srgb, var(--od-ink) 8%, transparent); }
+.dv-seg button[aria-checked="true"] { background: var(--od-blue); color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.dv-seg button .n { color: inherit; opacity: .55; font-variant-numeric: tabular-nums; margin-right: 5px; }
+/* many options: a compact list of rounded rows instead of one row of segments */
+.dv-seg.dv-list { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 30vh;
+  overflow-y: auto; border-radius: 14px; scrollbar-width: none; }
+.dv-head:has(.dv-list) { flex-wrap: wrap; }
+.dv-seg.dv-list button { border-radius: 12px; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+.dv-panel textarea { display: block; width: 100%; min-height: 38px; padding: 9px 12px; resize: none; overflow: hidden;
+  font: 14px/1.4 var(--od-font); color: var(--od-ink); background: var(--od-card); border: .5px solid var(--od-line); border-radius: 12px; }
+.dv-panel textarea:focus { border-color: var(--od-blue); }
+.dv-panel textarea::placeholder { color: var(--od-muted); }
+
+/* loading state: a sweep across the hovered option while a preview settles. .opt rows are the list of every group. */
+.dv-seg button.loading::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 60%; pointer-events: none;
   animation: dv-sweep .8s linear infinite; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--blue) 16%, transparent), transparent); }
 .opt { position: relative; overflow: hidden; display: grid; grid-template-columns: 12px 1fr auto; align-items: start; column-gap: 7px;
   width: 100%; text-align: left; padding: 5px 9px 6px 7px; border-radius: 8px; }
@@ -464,9 +490,13 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   .opt { padding: 9px 9px 9px 7px; }
   .od-dock > .picks:not(.say) { display: none; } /* room for back and next at phone width */
   .od-dock > button { padding: 8px 10px; }
+  .dv-head { flex-wrap: wrap; }
+  .dv-label { flex-basis: 100%; }
+  .dv-seg { flex: 1 1 100%; }
+  .dv-panel textarea { font-size: 16px; } /* 16 px stops iOS zoom on focus */
 }
-@media (prefers-reduced-motion: reduce) { .od-opt.loading::after { animation: none; left: 0; width: 100%; background: color-mix(in srgb, var(--blue) 8%, transparent); }
-  .hl > * { transition: none; } }`;
+@media (prefers-reduced-motion: reduce) { .dv-seg button.loading::after { animation: none; left: 0; width: 100%; background: color-mix(in srgb, var(--blue) 8%, transparent); }
+  .dv-seg button { transition: none; } }`;
 
   function mount() {
     if (host || !document.body) return;
@@ -475,13 +505,12 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     // A page view transition lays a snapshot over everything and takes the pointer (the cursor flips to an
     // arrow and clicks hit <html>) until it ends. Let the pointer pass through to the real page and menu.
     document.head.append(Object.assign(document.createElement('style'), { textContent: '::view-transition { pointer-events: none; }' }));
-    sh.innerHTML = `<style>${CSS}</style><div class="hl"><div class="ring"></div><div class="bp h"></div><div class="bp h"></div><div class="bp v"></div><div class="bp v"></div></div>`;
-    [hl, ring] = ['.hl', '.ring'].map((s) => sh.querySelector(s));
-    bps = sh.querySelectorAll('.bp');
+    sh.innerHTML = `<style>${CSS}</style><div class="hl"><div class="gl h"></div><div class="gl h"></div><div class="gl v"></div><div class="gl v"></div></div>`;
+    hl = sh.querySelector('.hl'); gls = sh.querySelectorAll('.gl');
     if (Q.has('dv-clean')) host.style.display = 'none';
     document.body.appendChild(host);
     od = window.OptionDots({ root: sh, key: 'devpanel:hidden', step: go, count: () => posText,
-      list: () => (listOpen ? od.close() : showList()) });
+      list: () => (listOpen ? od.close() : showList()), select: (r) => { const g = groups.find((x) => x.rec === r); if (g) show(g); } });
     od.count.setAttribute('aria-haspopup', 'dialog'); od.count.title = 'All groups on the site';
     const b = (cls, text, fn) => { const n = document.createElement('button'); n.type = 'button'; n.className = cls; n.textContent = text; n.onclick = fn; return n; };
     picksOut = document.createElement('output'); picksOut.className = 'picks';
@@ -489,21 +518,33 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     // Reset also forgets the site's group list; groups on other pages come back when their page is opened.
     const reset = b('', 'Reset', () => {
       st.picks = {}; st.notes = {}; st.groups = st.groups.filter((m) => groups.some((g) => g.id === m.id));
-      save(); od.close(); groups.forEach((g) => setVar(g, 1)); sync();
+      save(); od.close(); groups.forEach((g) => setVar(g, 1)); open = null; sync();
     });
-    od.dock(picksOut, reset, copyBtn);
+    panel = document.createElement('div'); panel.className = 'dv-panel'; panel.hidden = true;
+    od.dock(panel, picksOut, reset, copyBtn);
     for (const g of groups) addDot(g);
     sync();
   }
 
   function addDot(g) {
-    g.rec = od.add({ target: () => sample(g), label: g.label, pick: g.opts.length > 0, pos: g.pos,
-      render: (body) => fill(g, body), onClose: () => { clearTimeout(hoverT); setVar(g, pick(g), true); open = null; schedule(); } });
+    g.rec = od.add({ target: () => sample(g), label: g.label, pick: g.opts.length > 0, pos: g.pos });
     g.el = g.rec.el;
-    g.el.addEventListener('click', () => { closeListFlag(); if (curId !== g.id) { curId = g.id; sync(); } });
-    g.el.onpointerenter = (e) => { if (e.pointerType !== 'touch') { hover = g; schedule(); } };
-    g.el.onpointerleave = () => { hover = null; schedule(); };
+    g.el.onpointerenter = (e) => { if (e.pointerType !== 'touch') glow(g); };
+    g.el.onpointerleave = unglow;
   }
+
+  // One pulse of the red glow on a group's target per hover: fade in, then out, never looping, never staying on.
+  // Reduced motion: a static faint glow while the pointer stays, then gone.
+  const still = matchMedia('(prefers-reduced-motion: reduce)');
+  function glow(g, hold) {
+    if (glowA) glowA.cancel();
+    lit = g; place();
+    hl.classList.toggle('hold', !!hold || still.matches);
+    if (hold || still.matches) return;
+    glowA = hl.animate([{ opacity: 0 }, { opacity: 0.45, offset: 0.4 }, { opacity: 0 }], { duration: 800, easing: 'ease-in-out' });
+    const a = glowA; a.onfinish = () => { if (glowA === a) { glowA = null; lit = null; } };
+  }
+  function unglow() { if (still.matches) { hl.classList.remove('hold'); lit = null; } }
 
   const pick = (g) => st.picks[g.id] || 1;
   function setVar(g, i, force) {
@@ -522,8 +563,8 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   // transitions (and a page view transition) finished, at most 600 ms.
   function settle(g, i) {
     ++busyN;
-    const el = open === g && od.body.querySelector(`.od-opt[data-i="${i}"]`);
-    if (od) od.body.querySelectorAll('.od-opt.loading').forEach((o) => o.classList.remove('loading'));
+    const el = open === g && panel.querySelector(`[data-i="${i}"]`);
+    if (panel) panel.querySelectorAll('.loading').forEach((o) => o.classList.remove('loading'));
     if (el) el.classList.add('loading');
     const t = sample(g).t;
     const frames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -535,31 +576,46 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
       .then(() => { if (el) el.classList.remove('loading'); });
   }
 
-  // The popover body of one group: its options (hover previews, click keeps), then the comment field.
-  function fill(g, body) {
+  // The dock panel of the current group: name and note, options (hover previews and pulses the glow, click keeps),
+  // then the comment field. A green-dot group has only the comment field.
+  function fill(g) {
+    if (open !== g && open) { clearTimeout(hoverT); setVar(open, pick(open), true); } // drop the last group's preview
     open = g;
-    body.innerHTML = (g.opts.length ? `<div class="list od-opts" role="listbox">${g.opts.map((o, k) =>
-      `<button type="button" class="od-opt" role="option" data-i="${k + 1}" aria-selected="${pick(g) === k + 1}"><span class="od-radio"></span><span class="od-name"><span class="od-num">${k + 1}</span>${esc(o.name)}${o.note ? `<small>${esc(o.note)}</small>` : ''}</span></button>`).join('')}</div>` : '')
-      + '<textarea rows="1" placeholder="Comment"></textarea>';
-    const list = body.querySelector('.list'), ta = body.querySelector('textarea');
-    if (list) {
-      list.onmouseover = (e) => { const b = e.target.closest('.od-opt'); if (b) preview(g, +b.dataset.i); };
-      list.onmouseleave = (e) => { if (!inRect(list, e)) preview(g, pick(g)); }; // a leave with the pointer still inside is not real
-      list.onclick = (e) => {
-        const b = e.target.closest('.od-opt'); if (!b) return;
+    const note = (i) => (g.opts[i - 1] && g.opts[i - 1].note) || (i === 1 && g.current !== false ? 'The site as it is now' : '');
+    panel.innerHTML = `<div class="dv-head"><span class="dv-label"><span class="od-dot od-mini" data-kind="${g.opts.length ? 'pick' : 'note'}"></span>`
+      + `<span><b>${esc(g.label)}</b><small class="dv-note"></small></span></span>`
+      + (g.opts.length ? `<div class="dv-seg" role="radiogroup" aria-label="${esc(g.label)}">${g.opts.map((o, k) =>
+        `<button type="button" role="radio" data-i="${k + 1}" aria-checked="${pick(g) === k + 1}" title="${esc(o.note || o.name)}"><span class="n">${k + 1}</span>${esc(o.name)}</button>`).join('')}</div>` : '')
+      + `</div><textarea rows="1" placeholder="Comment on ${esc(g.label)}"></textarea>`;
+    panel.hidden = false; panel.parentElement.classList.add('dv-has');
+    const mini = panel.querySelector('.od-mini'), noteEl = panel.querySelector('.dv-note');
+    mini.innerHTML = g.el ? g.el.innerHTML : '';
+    const say = (i) => { noteEl.textContent = g.opts.length ? note(i) : 'Comment only'; };
+    say(pick(g));
+    const seg = panel.querySelector('.dv-seg'), ta = panel.querySelector('textarea');
+    if (seg) {
+      seg.onpointerover = (e) => {
+        const b = e.target.closest('button'); if (!b || b.contains(e.relatedTarget)) return;
+        say(+b.dataset.i); preview(g, +b.dataset.i); if (e.pointerType !== 'touch') glow(g);
+      };
+      seg.onpointerleave = (e) => { if (!inRect(seg, e)) { say(pick(g)); preview(g, pick(g)); unglow(); } }; // a leave with the pointer still inside is not real
+      seg.onclick = (e) => {
+        const b = e.target.closest('button'); if (!b) return;
         clearTimeout(hoverT);
         const i = +b.dataset.i; if (i === 1) delete st.picks[g.id]; else st.picks[g.id] = i;
-        save(); setVar(g, i, true);
-        list.querySelectorAll('.od-opt').forEach((o) => o.setAttribute('aria-selected', o === b));
+        save(); setVar(g, i, true); say(i);
+        seg.querySelectorAll('button').forEach((o) => o.setAttribute('aria-checked', o === b));
         sync();
       };
+      // segments that do not fit in one row become a compact list
+      requestAnimationFrame(() => seg.classList.toggle('dv-list', g.opts.length > 6 || seg.scrollWidth > seg.clientWidth + 1));
     }
     ta.value = st.notes[g.id] || '';
     const grow = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
     ta.oninput = () => { const v = ta.value; if (v.trim()) st.notes[g.id] = v; else delete st.notes[g.id]; save(); grow(); };
     requestAnimationFrame(grow);
   }
-  function show(g) { closeListFlag(); curId = g.id; sync(); od.open(g.rec); }
+  function show(g) { closeListFlag(); curId = g.id; sync(); }
   const closeListFlag = () => { if (listOpen) od.close(); };
 
   // The count button opens every group on the site, one head per page. A row goes to its group and opens its menu.
@@ -584,6 +640,13 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     posText = `${k < 0 ? '–' : k + 1} / ${blue.length}`;
     for (const g of groups) if (g.rec) g.rec.n = blue.findIndex((m) => m.id === g.id) + 1;
     od.sync();
+    // the dock shows the current group; with none yet, the first group on this page (a blue one first)
+    if (curId === null && groups.length) curId = (groups.find((x) => x.opts.length) || groups[0]).id;
+    const g = groups.find((x) => x.id === curId);
+    for (const x of groups) if (x.el) x.el.setAttribute('aria-current', String(x === g));
+    if (!g) { panel.hidden = true; panel.parentElement.classList.remove('dv-has'); open = null; }
+    else if (open !== g) fill(g);
+    else panel.querySelector('.od-mini').innerHTML = g.el ? g.el.innerHTML : '';
   }
   // A short message in the dock's picks slot, such as a group that never showed up.
   function say(text) {
@@ -630,11 +693,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     const iv = setInterval(check, 100);
     check();
   }
-  function spot(g) {
-    flashG = g; clearTimeout(flashT);
-    flashT = setTimeout(() => { flashG = null; schedule(); }, 1200);
-    schedule();
-  }
+  const spot = (g) => glow(g);
 
   // A target that matches many elements (every card) gets its dot, outline, and menu on one sample:
   // the first match in view, picked again on every frame. The options still style every match.
@@ -656,26 +715,22 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   const box = (el, x, y, w, h) => { el.style.transform = `translate(${x}px, ${y}px)`; el.style.width = w + 'px'; el.style.height = h + 'px'; };
   const inRect = (el, e) => { const r = el.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
 
-  // The highlight ring follows the hovered or flashing group; a group's page is the first page its target shows on.
+  // The glow lines follow the pulsing group's target; a group's page is the first page its target shows on.
   function place() {
     raf = 0;
-    let lit = (od.hidden ? null : hover) || flashG;
     for (const g of groups) {
       const { r } = sample(g), m = meta(g.id);
       if (m && !m.page && r && r.width > 0) { m.page = [location.pathname]; save(); sync(); }
       g.r = r;
-      if (lit === g && !(r && inView(r))) lit = null;
     }
-    hl.classList.toggle('flash', !!flashG && lit === flashG);
-    hl.classList.toggle('on', !!lit);
-    if (lit) {
-      const r = lit.r, P = 8, E = 48;
-      box(ring, r.left - P, r.top - P, r.width + 2 * P, r.height + 2 * P);
-      box(bps[0], r.left - E, r.top, r.width + 2 * E, 1);
-      box(bps[1], r.left - E, r.bottom - 1, r.width + 2 * E, 1);
-      box(bps[2], r.left, r.top - E, 1, r.height + 2 * E);
-      box(bps[3], r.right - 1, r.top - E, 1, r.height + 2 * E);
-    }
+    const r = lit && lit.r;
+    hl.hidden = !(r && r.width > 0);
+    if (hl.hidden) return;
+    const P = 4, E = 24; // lines sit 4 px outside the edges and run 24 px past the corners, fading at the ends
+    box(gls[0], r.left - P - E, r.top - P, r.width + 2 * (P + E), 1);
+    box(gls[1], r.left - P - E, r.bottom + P - 1, r.width + 2 * (P + E), 1);
+    box(gls[2], r.left - P, r.top - P - E, 1, r.height + 2 * (P + E));
+    box(gls[3], r.right + P - 1, r.top - P - E, 1, r.height + 2 * (P + E));
   }
   const schedule = () => { if (!raf && od) raf = requestAnimationFrame(place); };
 
@@ -703,7 +758,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   // While a page view transition runs, Chrome sends every click to <html>. Hand it to the option or dot under the pointer.
   addEventListener('click', (e) => {
     if (!open || e.composedPath()[0] !== document.documentElement) return;
-    const b = [...od.body.querySelectorAll('.od-opt, .opt'), ...od.layer.children].find((el) => !el.hidden && inRect(el, e));
+    const b = [...panel.querySelectorAll('[data-i]'), ...od.body.querySelectorAll('.opt'), ...od.layer.children].find((el) => !el.hidden && inRect(el, e));
     if (b) b.click();
   }, true);
   const boot = () => {
@@ -714,7 +769,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     const find = (id) => id && groups.find((x) => x.id === id);
     const g = find(Q.get('dv-open')), h = find(Q.get('dv-hl'));
     if (g) setTimeout(() => show(g), 50);
-    if (h) { hover = h; schedule(); }
+    if (h) setTimeout(() => glow(h, true), 50);
     // back or next loaded this page: finish the trip to its group
     let go = null; try { go = JSON.parse(sessionStorage.getItem(GO)); } catch {}
     if (go && Date.now() - go.t < 15000) { curId = go.id; sync(); arrive(go.id, go.open); }

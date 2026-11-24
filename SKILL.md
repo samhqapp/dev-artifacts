@@ -1,6 +1,6 @@
 ---
 name: dev-artifacts
-description: Show design options live on a local website or web app with the dev-artifacts overlay (blue and green dots, option menu, Copy choices) instead of building a separate options page. Use when asked to give options or variations for a local website, web app, landing page, or site section, or to preview looks on the dev server.
+description: Show design options live on a local website or web app with the dev-artifacts overlay (blue and green dots, options in the dock, Copy choices) instead of building a separate options page. Use when asked to give options or variations for a local website, web app, landing page, or site section, or to preview looks on the dev server.
 ---
 
 # dev-artifacts
@@ -29,7 +29,7 @@ the overlay. Generic improvements go into this repo; user-specific notes stay in
    (`<repo folder name> > <topic of 1-3 words>`, never a bare "ui", "site", or "options").
 3. Check every option in one call, then look at every shot:
    `node <repo>/serve.mjs <site dir> --variants v.js --css v.css --shot <scratch>/shots --each --sizes 1440x900,390x844`
-   Add `--open <group>` to check one group's menu. Fix what looks wrong and shoot again only after a change.
+   Add `--open <group>` to check one group in the dock. Fix what looks wrong and shoot again only after a change.
 4. Start the server for the user: `node <repo>/serve.mjs <site dir> --variants v.js --css v.css`
    (run it in the background with a deadline). Open the printed URL in the default browser.
 5. Ask the user to paste the text from **Copy choices**, and wait for it.
@@ -50,13 +50,14 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 
 ## The overlay (already built; do not re-code it)
 
-- Dots, popover, and dock come from `<repo>/dots.js`, the one shared overlay (the artifact kit uses it too). Edit only
+- Dots and dock come from `<repo>/dots.js`, the one shared overlay (the artifact kit uses it too). Edit only
   that file, then run `node <repo>/dots-sync.mjs <file>` for each copy (devpanel.js and any other file with its markers).
-- A blue dot opens options to pick. A green dot opens only a comment field (`options: [], current: false`).
-- Dots float just outside the section; hover lights the section with a padded highlight.
-- The popover opens beside the section and never covers it; on a phone it is a bottom sheet.
-- The dock has back and next (`[` and `]` keys) over the blue dots only, an eye button that hides the dots (`.` key, kept after a
-  reload), Reset, and Copy choices. Back and next move to another page when needed and open the popover there.
+- The options live in the dock, like the kit's dock: the current group's name and note, its options as a segmented
+  control (a compact list when they do not fit), and its comment field. A dot click makes its group current.
+  A blue dot is a group to pick; a green dot is a comment-only group (`options: [], current: false`).
+- Hovering a dock option or a dot pulses a faint red glow line on the section once (no fill, no loop, no layout change).
+- The dock also has back and next (`[` and `]` keys) over the blue dots only, an eye button that hides the dots (`.` key,
+  kept after a reload), Reset, and Copy choices. Back and next move to another page when needed.
 - The "2 / 5" count is the site total of blue dots. Clicking it lists every group by page with its pick; a row goes there.
 - Picks, comments, and Copy choices cover the whole site (one store per origin, or per `site`, see below).
 

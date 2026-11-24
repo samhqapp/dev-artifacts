@@ -3,17 +3,17 @@
 Show design options live on your local site. Click a dot, try each look, copy your picks.
 
 ```text
-  +-------------------------------------------------------+
-  |  Your site                                            |
-  |  +----------------------------+  (1)  +-------------+ |
-  |  |  Email field               |  ^    | 1 Current   | |
-  |  +----------------------------+  |    | 2 Soft ring | |
-  |                                dot    | 3 Pill      | |
-  |                                       +-------------+ |
-  |                                            menu       |
-  |  [ < 1 / 3 > ] [ eye ] [ 1 pick ] [ Reset ] [ Copy choices ]
-  +-------------------------------------------------------+
-                          dock
+  +-------------------------------------------------------------+
+  |  Your site                                                  |
+  |  +----------------------------+ (1)                         |
+  |  |  Email field               |  ^ dot                      |
+  |  +----------------------------+                             |
+  |                                                             |
+  |  ( (1) Email field          [1 Current|2 Soft ring|3 Pill] )|
+  |  ( [ Comment on Email field                              ] )|
+  |  ( [< 1 / 3 >] [eye]          1 pick  Reset  [Copy choices]) |
+  +-------------------------------------------------------------+
+                               dock
 ```
 
 It needs Node 22 or newer. It has no npm packages and no build step. It adds nothing to your site.
@@ -51,14 +51,17 @@ The server only listens on your own computer. When you edit a file, the page rel
 - Each section with options gets a small blue **dot** just outside its top-right corner. A group with only a comment
   field (`options: [], current: false`) gets a green dot, so the blue dots are the ones that still need a pick.
   Back and next step through the blue dots only. The eye button hides the dots, and a reload keeps it.
-- The dots, menu, and dock are `dots.js`, shared with other tools. Edit it there and run `node dots-sync.mjs devpanel.js`.
-- Hover a dot to see the section outlined. Click it to open the **menu** next to the section. On a phone it is a bottom sheet.
-- Hover an option to preview it. Click it to keep it. Type a comment if you like.
-- The **dock** at the bottom shows how many picks you made. It has the eye button (hide dots, key `.`), **Reset**, and **Copy choices**.
-- **Back** and **next** (keys `[` and `]`) go to every blue dot on the whole site and open its menu. A group on another
+- The dots and dock are `dots.js`, shared with other tools. Edit it there and run `node dots-sync.mjs devpanel.js`.
+- The **dock** at the bottom holds the current group: its name, the hovered or picked option's note, the options as a
+  segmented control (a compact list when they do not fit), and a comment field. Click a dot to make its group current.
+- Hover an option to preview it. Click it to keep it; the page changes at once.
+- Hovering an option or a dot pulses a faint red glow line around the section once: no fill, never looping, and the page
+  never moves. With reduced motion, a still faint glow shows while you hover.
+- The dock also has the eye button (hide dots, key `.`), the pick count, **Reset**, and **Copy choices**.
+- **Back** and **next** (keys `[` and `]`) go to every blue dot on the whole site and make it current. A group on another
   page takes you to that page first. If a group never shows up, the dock says so.
 - The "2 / 5" count is for the whole site. Click it to see **every group**, grouped by page, with each one's current pick.
-  Click a row to go there and open its menu. Your picks and comments stay in your browser, for the whole site.
+  Click a row to go there. Your picks and comments stay in your browser, for the whole site.
 
 **Copy choices** gives one line per group, from every page. Paste it to the person or coding agent who builds the site.
 When the site has more than one page, each line names its page.
@@ -124,7 +127,7 @@ It starts the server, saves the images, prints their paths, and stops. A file na
 |---|---|
 | `--shot <folder>` | Take screenshots into this folder, then exit. Alone, it shoots the top of the page. |
 | `--sizes 1440x900,390x844` | Window sizes to use. The default is a desktop and a phone. |
-| `--open <group id>` | Show that group's menu open. |
+| `--open <group id>` | Show that group in the dock. |
 | `--each` | One image for every option, with the overlay hidden. |
 | `--page /path` | Which page of your site to open. |
 | `--port 4799` | Use a fixed port. The default picks a free one. |
@@ -134,8 +137,8 @@ It starts the server, saves the images, prints their paths, and stops. A file na
 
 It warns you when a page scrolls sideways at one of the sizes. It finds Chrome by itself. To choose one, set `CHROME_PATH`.
 
-You can also add these to any page address: `?dv-pick=<id>:<number>` forces an option, `?dv-open=<id>` opens a menu,
-`?dv-clean` hides the overlay.
+You can also add these to any page address: `?dv-pick=<id>:<number>` forces an option, `?dv-open=<id>` puts a group in the dock,
+`?dv-hl=<id>` holds the glow on, `?dv-clean` hides the overlay.
 
 ## Use with Vite or Next
 
