@@ -17,6 +17,7 @@ const TAKE = /^\.k-(dock|seg|comment|hint|copy|nav|dots|final|clear)\b/;
 function kitCss() {
   if (!existsSync(KIT)) return null;
   const css = readFileSync(KIT, 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''), out = [];
+  let dark = '';
   let i = 0;
   while (i < css.length) {
     const open = css.indexOf('{', i); if (open < 0) break;
@@ -24,10 +25,14 @@ function kitCss() {
     while (depth && j < css.length) { if (css[j] === '{') depth++; else if (css[j] === '}') depth--; j++; }
     const sel = css.slice(i, open).trim(), body = css.slice(open + 1, j - 1).trim().replace(/\s*\n\s*/g, ' ');
     i = j;
-    if (sel === ':root') out.push(`:host { ${body} }`);
-    else if (sel === ':root[data-theme="dark"]') out.push(`:host([data-od-dark]) { ${body.replace(/\s*color-scheme: dark\s*/, ' ')} }`);
+    // dev-artifacts is dark only: the kit's dark tokens replace its light ones in one :host rule
+    if (sel === ':root') out.unshift(body);
+    else if (sel === ':root[data-theme="dark"]') dark = body;
     else if (!sel.startsWith('@') && sel.split(',').every((s) => TAKE.test(s.trim()))) out.push(`${sel} { ${body} }`);
   }
+  const decl = (b) => b.split(';').map((d) => d.trim()).filter(Boolean).map((d) => [d.slice(0, d.indexOf(':')).trim(), d]);
+  const tokens = new Map([...decl(out.shift() || ''), ...decl(dark)]);
+  out.unshift(`:host { ${[...tokens.values()].join('; ')}; }`);
   if (out.join('').includes('`')) throw new Error('kit.css has a backtick; it cannot go in String.raw');
   return out.join('\n');
 }

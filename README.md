@@ -55,8 +55,12 @@ To see every kind of group on a demo page: `node serve.mjs examples/demo --varia
 - The dots and dock are `dots.js`, shared with other tools. Edit it there and run `node dots-sync.mjs devpanel.js`.
 - The dock, popovers, comment fields and hints use the artifact kit's own classes and tokens (`k-dock`, `k-seg`,
   `k-comment`, `k-hint`), copied in by `dots-sync.mjs` from `kit.css` (`$KIT_CSS`, else `~/.agents/artifact-kit/kit.css`).
-- The **dock** spans the window with 16 px gutters. Row 1 is fixed: the eye, back / count / next, an **overall
-  comment** on the whole page, Open / Archived, Focus, Clear, "…" and Copy choices at the right. Below it
+- The **dock** spans the window with 16 px gutters. Row 1 is fixed: back / count / next, an **overall
+  comment** on the whole page, Open / Archived, Focus, the eye, Clear, "…" and Copy choices at the right. Nothing in
+  row 1 ever moves: every changing text (the count, Open / Archived, Clear, Copy choices) keeps the width of its widest
+  value, so you can click › again and again in one place. The current group's name is bolder and white; the other
+  groups dim to 60%. dev-artifacts is dark only: the dock, the demo and the options pages are always dark, whatever
+  the site or the system uses. There are no light styles and no light checks. Below it
   sits every group of the page at once: its name and its first 3 options as a segmented control (hover one for its
   note). With more options, a 4th item "…" (it shows the pick when the pick is further down) opens the popover with
   the full list; a click on the group's name opens it too. The groups wrap onto more rows; past 40% of the window
@@ -211,14 +215,14 @@ node quick.mjs /tmp/pick/page.js /tmp/pick/pick.html && open /tmp/pick/pick.html
 ```
 
 The result is one HTML file: Preact and htm (JSX-like templates) inlined, no build, no network. It has
-one-pick groups, tables of switches, a comment per group, Light and Dark, and a Copy choices dock.
+one-pick groups, tables of switches, a comment per group, dark only, and a Copy choices dock.
 Picks are kept in the browser while you work. Preact (MIT) and htm (Apache-2.0) are vendored in
 `templates/preact-htm.js`.
 
 ## Options mode
 
 Live mode decides about a website. Options mode decides about a component or tool: a kit page with one panel per
-option, side by side, recommended first, and each panel holds the real page in two frames (Light and Dark) running
+option, side by side, recommended first, and each panel holds the real page in one dark frame running
 the real `devpanel.js` with that option's setting. Each group has a comment field and a Final switch; the dock has
 Copy choices and Focus.
 

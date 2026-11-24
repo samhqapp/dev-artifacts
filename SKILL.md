@@ -14,7 +14,7 @@ There are two modes:
 
 - **Live mode** (the steps below): deciding about a website. The options sit on the real site in the dock.
 - **Options mode**: deciding about a component or tool, such as the dock itself. One kit panel per option, side by
-  side, recommended first, each with the real page in a frame (Light and Dark) set to that option. Write a spec like
+  side, recommended first, each with the real page in one dark frame set to that option. Write a spec like
   `<repo>/examples/accent-options.mjs`, run `node <repo>/options.mjs spec.mjs --out <scratch>/opts --port 0` in the
   background with a deadline, and open the printed URL. Each option sets `DevPanel.config` values (`set`), URL
   params (`params`), and an optional starting store (`seed`). Frames are real renders, never drawn copies.
@@ -74,7 +74,9 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 
 - Put the recommended option first (option 2). Name it plainly and give a one-line `note` that says
   what it looks like, such as "Gray fill, no border, blue ring on focus".
-- Every option works in light and dark, and at phone width with no sideways scroll (`--shot` warns).
+- Every option works at phone width with no sideways scroll (`--shot` warns).
+- dev-artifacts is dark only, with no light styling and no light checks. The dock, the demo and the options pages are
+  always dark. Take shots and run checks in Dark only (`--scheme dark`).
 - No browser focus rings. A custom focus look uses a fill or ring, never the default outline.
 - Borders show on all four sides, at an even width, in every state.
 - Use the site's own colors, fonts, and tokens, so the option looks like it belongs.
@@ -85,8 +87,9 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 - Dots and dock come from `<repo>/dots.js`, the one shared overlay (the artifact kit uses it too). Edit only
   that file, then run `node <repo>/dots-sync.mjs <file>` for each copy (devpanel.js and any other file with its markers).
 - It is built from the artifact kit's classes and hints (`dots-sync.mjs` copies the kit.css rules in). Do not restyle it per site.
-- The dock spans the window (16 px gutters). Row 1 is fixed: the eye, back / count / next, the overall comment,
-  Open/Archived, Focus, Clear, "…", Copy choices. Below it every group of the
+- The dock spans the window (16 px gutters). Row 1 is fixed: back / count / next, the overall comment,
+  Open/Archived, Focus, the eye, Clear, "…", Copy choices. Nothing in row 1 ever moves (each changing text keeps its
+  widest width). The current group's name is bolder and white, and the other groups dim to 60%. Below it every group of the
   page sits at once, "Name  opt opt opt …", wrapping; past 40% of the window the rows scroll. On a phone row 1 keeps
   back, next, "…" and Copy choices; the rest is in "…". "…" in a row, or the group's name, opens the popover with
   the full list (a list, a list with a filter at 8+, or a picture grid when options have `img`). Options never
@@ -120,4 +123,4 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
   Without it, a group belongs to the page where it was first seen, so unseen pages would be missing from the count.
 - SPA routes change with pushState + popstate (works with React Router and TanStack Router). For another router,
   add `DevPanel.config({ navigate: (path) => ... })` to `variants.js`. Static sites load the page.
-- It follows the site's light or dark look and draws thin scroll bars that fade out.
+- It is always dark and draws thin scroll bars that fade out.

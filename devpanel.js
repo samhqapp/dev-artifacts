@@ -17,8 +17,8 @@
    each with its own store; groups whose `page` is on another site are skipped. Call it before DevPanel.group.
    DevPanel.config({ navigate(path) }) lets an app route itself; otherwise an SPA gets pushState + popstate and a
    static site a normal page load. Everything lives in one shadow root, so no style leaks in or out. Never ship this file.
-   The dock comes from the shared option-dots overlay (dots.js, copied in below). Row 1: the eye, back, count, next,
-   the overall comment, Open/Archived, Focus, Clear, "…", Copy choices; then one row per group. The eye (or key h)
+   The dock comes from the shared option-dots overlay (dots.js, copied in below). Row 1: back, count, next,
+   the overall comment, Open/Archived, Focus, the eye, Clear, "…", Copy choices (nothing in it ever moves); then one row per group. The eye (or key h)
    morphs the dock into a round glass eye button at the bottom right; a click on it morphs it back. An empty spacer the dock's height ends the page, so
    its footer can scroll above the dock. Hovering a dock row, or arriving at a group, shows faint red guide lines once.
    A group whose options changed, or that is gone, moves its old pick and comment to Archived.
@@ -407,8 +407,7 @@
   if (window.DevPanel) return;
 /* kit-css:start: cut from the artifact kit's kit.css by dots-sync.mjs. Do not edit. */
 const KIT_CSS = String.raw`
-:host { --page: #f2f2f7; --card: #ffffff; --inset: #f2f2f7; --ink: #1c1c1e; --muted: rgba(60,60,67,.62); --line: rgba(60,60,67,.16); --blue: #007aff; --blue-ink: #0062cc; --blue-bg: rgba(0,122,255,.09); --red: #d70015; --red-bg: rgba(255,59,48,.09); --amb: #b25000; --amb-bg: rgba(255,159,10,.13); --grn: #248a3d; --grn-bg: rgba(52,199,89,.12); --gry: rgba(60,60,67,.62); --gry-bg: rgba(120,120,128,.13); --dock: rgba(255,255,255,.66); --dock-hi: rgba(255,255,255,.7); --seg: rgba(120,120,128,.16); --seg-on: #ffffff; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06); --zebra: rgba(120,120,128,.06); --sep: rgba(60,60,67,.1); --soft: rgba(120,120,128,.09); --sw-off: rgba(120,120,128,.24); --ref-open: #1a7f37; --ref-merged: #8250df; --ref-draft: #6e7781; --ref-closed: #cf222e; --ref-mine: #e8590c; --pop: rgba(255,255,255,.94); --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; --fs-title: 44px; --fs-h2: 28px; --fs-slide: 34px; --fs-body: 17px; --fs-sm: 15px; --fs-kicker: 13px; --k-ease: linear(0, 0.022, 0.075, 0.147, 0.228, 0.31, 0.391, 0.467, 0.537, 0.601, 0.657, 0.708, 0.751, 0.789, 0.822, 0.85, 0.874, 0.895, 0.912, 0.927, 0.939, 0.949, 0.958, 0.965, 0.971, 0.976, 0.98, 0.984, 0.987, 0.989, 0.991, 0.993, 0.994, 0.995, 0.996, 0.997, 0.997, 0.998, 0.998, 0.998, 1); --k-ease-close: cubic-bezier(.22, 1, .36, 1); --k-open: 380ms; --k-close: 220ms; --k-fade: 100ms; --k-morph-in: 150ms; --k-morph-out: 100ms; --k-words-at: 40ms; --k-stagger: 12ms; --gutter-l: max(16px, env(safe-area-inset-left, 0px)); --gutter-r: max(16px, env(safe-area-inset-right, 0px)); --m-canvas: #09090b; --m-text: #f4f4f7; --m-sec: rgba(244,244,247,.66); --m-tile: #18181c; --m-line: rgba(255,255,255,.14); --m-glass: rgba(20,20,25,.78); --m-on: #34c759; --m-red: #f14c35; --m-knob: #ffffff; }
-:host([data-od-dark]) { --page: #000000; --card: #1c1c1e; --inset: #000000; --ink: #f2f2f7; --muted: rgba(235,235,245,.6); --line: rgba(84,84,88,.6); --blue: #0a84ff; --blue-ink: #4da3ff; --blue-bg: rgba(10,132,255,.16); --red: #ff6961; --red-bg: rgba(255,69,58,.16); --amb: #ff9f0a; --amb-bg: rgba(255,159,10,.16); --grn: #30d158; --grn-bg: rgba(48,209,88,.14); --gry: rgba(235,235,245,.6); --gry-bg: rgba(142,142,147,.18); --dock: rgba(40,40,44,.6); --dock-hi: rgba(255,255,255,.14); --seg: rgba(118,118,128,.32); --seg-on: #636366; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3); --zebra: rgba(255,255,255,.035); --sep: rgba(84,84,88,.42); --soft: rgba(255,255,255,.06); --sw-off: rgba(120,120,128,.4); --ref-open: #3fb950; --ref-merged: #a371f7; --ref-draft: #8b949e; --ref-closed: #f85149; --ref-mine: #ff922b; --pop: rgba(44,44,48,.94);  }
+:host { --page: #000000; --card: #1c1c1e; --inset: #000000; --ink: #f2f2f7; --muted: rgba(235,235,245,.6); --line: rgba(84,84,88,.6); --blue: #0a84ff; --blue-ink: #4da3ff; --blue-bg: rgba(10,132,255,.16); --red: #ff6961; --red-bg: rgba(255,69,58,.16); --amb: #ff9f0a; --amb-bg: rgba(255,159,10,.16); --grn: #30d158; --grn-bg: rgba(48,209,88,.14); --gry: rgba(235,235,245,.6); --gry-bg: rgba(142,142,147,.18); --dock: rgba(40,40,44,.6); --dock-hi: rgba(255,255,255,.14); --seg: rgba(118,118,128,.32); --seg-on: #636366; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3); --zebra: rgba(255,255,255,.035); --sep: rgba(84,84,88,.42); --soft: rgba(255,255,255,.06); --sw-off: rgba(120,120,128,.4); --ref-open: #3fb950; --ref-merged: #a371f7; --ref-draft: #8b949e; --ref-closed: #f85149; --ref-mine: #ff922b; --pop: rgba(44,44,48,.94); --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; --fs-title: 44px; --fs-h2: 28px; --fs-slide: 34px; --fs-body: 17px; --fs-sm: 15px; --fs-kicker: 13px; --k-ease: linear(0, 0.022, 0.075, 0.147, 0.228, 0.31, 0.391, 0.467, 0.537, 0.601, 0.657, 0.708, 0.751, 0.789, 0.822, 0.85, 0.874, 0.895, 0.912, 0.927, 0.939, 0.949, 0.958, 0.965, 0.971, 0.976, 0.98, 0.984, 0.987, 0.989, 0.991, 0.993, 0.994, 0.995, 0.996, 0.997, 0.997, 0.998, 0.998, 0.998, 1); --k-ease-close: cubic-bezier(.22, 1, .36, 1); --k-open: 380ms; --k-close: 220ms; --k-fade: 100ms; --k-morph-in: 150ms; --k-morph-out: 100ms; --k-words-at: 40ms; --k-stagger: 12ms; --gutter-l: max(16px, env(safe-area-inset-left, 0px)); --gutter-r: max(16px, env(safe-area-inset-right, 0px)); --m-canvas: #09090b; --m-text: #f4f4f7; --m-sec: rgba(244,244,247,.66); --m-tile: #18181c; --m-line: rgba(255,255,255,.14); --m-glass: rgba(20,20,25,.78); --m-on: #34c759; --m-red: #f14c35; --m-knob: #ffffff; color-scheme: dark; }
 .k-hint { font-size: 16px; color: var(--muted); margin: 0 0 16px; max-width: 80ch; text-wrap: pretty; }
 .k-comment { display: block; width: 100%; margin-top: 12px; font: inherit; font-size: 16px; line-height: 1.4; color: var(--ink); background: var(--card); border: .5px solid var(--line); border-radius: 12px; padding: 11px 14px; min-height: 46px; resize: none; overflow: hidden; outline: none; box-shadow: var(--shadow); field-sizing: content; }
 .k-comment::placeholder { color: var(--muted); }
@@ -533,9 +532,8 @@ const KIT_CSS = String.raw`
   const DOTS = '<svg class="dv-dots" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="13" cy="8" r="1.4" fill="currentColor"/></svg>';
 
   const CSS = `
-:host { all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; color-scheme: light; --dv-red: #ff3b30;
+:host { all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; color-scheme: dark; --dv-red: #ff453a;
   font: 14px/1.35 var(--od-font); color: var(--od-ink); -webkit-font-smoothing: antialiased; }
-:host([data-od-dark]) { color-scheme: dark; --dv-red: #ff453a; }
 * { box-sizing: border-box; outline: none !important; -webkit-tap-highlight-color: transparent; }
 button, textarea, input { font: inherit; color: inherit; }
 button { cursor: pointer; border: 0; background: none; padding: 0; }
@@ -558,17 +556,18 @@ svg { display: block; flex: none; }
 .fz { position: absolute; left: 0; top: 0; border-radius: 10px; box-shadow: 0 0 0 200vmax var(--fz); opacity: 0; transition: opacity 160ms ease; }
 .fz.on { opacity: 1; }
 
-/* the dock: almost the full width (16 px gutters). Row 1 is fixed: the eye (hides the dock), pager (back, count,
-   dots, next), the overall comment, Open/Archived, Focus, Clear, "…", Copy choices at the right. Below it every group of the page, "Name  opt opt opt …", wrapping; past 40% of the window they scroll.
+/* the dock: almost the full width (16 px gutters). Row 1 is fixed: pager (back, count, dots, next), the overall
+   comment, Open/Archived, Focus, the eye (hides the dock), Clear, "…", Copy choices at the right. Dark only. Below it every group of the page, "Name  opt opt opt …", wrapping; past 40% of the window they scroll.
    On a phone row 1 keeps back and next, "…" and Copy choices; the comment takes its own line. */
 .od-dock.k-dock { left: var(--gutter-l); right: var(--gutter-r); width: auto; max-width: none; margin: 0; border-radius: 22px;
   justify-content: flex-start; gap: 6px; }
 .od-ctl { display: contents; }
 /* two classes each: the shared overlay's ".od-ctl button { all: unset }" would reset a one-class order */
 .od-dock .od-eye { display: none !important; } /* no dots on the page: the dock's own eye (dv-eye) hides the dock */
-.od-dock .dv-eye { order: 0; } .od-dock .od-step { order: 1; } .od-dock .dv-overall { order: 2; } .od-dock .dv-arch { order: 3; }
-.od-dock .dv-focus { order: 4; } .od-dock .dv-clear { order: 6; } .od-dock .dv-more { order: 7; }
-.od-dock .dv-say { order: 8; } .od-dock .od-primary { order: 9; } .od-dock .dv-rows { order: 10; }
+.od-dock .od-step { order: 1; } .od-dock .dv-overall { order: 2; } .od-dock .dv-arch { order: 3; } .od-dock .dv-focus { order: 4; }
+.od-dock .dv-eye { order: 5; } .od-dock .dv-clear { order: 6; } .od-dock .dv-more { order: 7; } .od-dock .od-primary { order: 9; }
+.od-dock .dv-rows { order: 10; }
+.od-dock .od-count, .od-dock .dv-arch button, .od-dock .dv-clear { font-variant-numeric: tabular-nums; justify-content: center; text-align: center; }
 /* no dots on the page: the guide lines point at each group */
 .od-dot.od-plain { display: none !important; }
 .od-dock .dv-overall { flex: 1 1 220px; min-width: 160px; margin: 0; min-height: 32px; max-height: 108px; overflow-y: auto; padding: 5px 12px;
@@ -588,7 +587,10 @@ svg { display: block; flex: none; }
 .od-dock .dv-g > .dv-lab { flex-shrink: 2; min-width: 48px; }
 .od-dock .dv-g > .dv-o { min-width: 36px; text-overflow: ellipsis; white-space: nowrap; }
 .od-dock .dv-g > .dv-moreo, .od-dock .dv-g.dv-fit > * { flex: none; } /* dv-fit: measuring the row's full width */
-.od-dock .dv-g[aria-current="true"] { box-shadow: inset 0 0 0 1px var(--od-blue); }
+/* the current group: its name bolder and full white (a text stroke, so the width never changes), the other groups at 60% */
+.od-dock .dv-g { transition: opacity 160ms ease; }
+.od-dock .dv-g:not([aria-current="true"]) { opacity: .6; }
+.od-dock .dv-g[aria-current="true"] .dv-lab { color: var(--od-ink); -webkit-text-stroke: .4px currentColor; }
 .dv-lab[data-note]::after { content: ""; flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--od-blue); }
 .dv-oldt { padding: 0 8px; font: 500 13px/1.3 var(--od-font); max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .od-dock .dv-unarch { background: var(--seg-on); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
@@ -625,7 +627,9 @@ svg { display: block; flex: none; }
 .od-ctl .od-count[aria-expanded="true"] { color: var(--od-blue); }
 .od-dock > .od-primary:hover { background: var(--od-blue); filter: brightness(1.08); }
 .dv-ib[data-on="true"] { color: var(--od-blue); }
-.dv-say { color: var(--od-ink); font: 500 13px/1.3 var(--od-font); max-width: 240px; padding: 0 6px; }
+/* a short message floats above the dock's right end, so row 1 never moves for it */
+.dv-say { position: absolute; right: 12px; bottom: calc(100% + 8px); max-width: 320px; padding: 7px 10px; border-radius: 10px;
+  background: var(--od-pop); color: var(--od-ink); border: .5px solid var(--od-line); box-shadow: var(--od-shadow); font: 500 13px/1.3 var(--od-font); }
 
 /* each group: the kit's segmented control (k-seg). Its label (k-seg-label), then the first options, "…" for the rest,
    or a select button with the comment (a comment group). The pick sits on the kit's raised thumb. */
@@ -699,7 +703,7 @@ svg { display: block; flex: none; }
 @keyframes dv-sweep { from { transform: translateX(-100%); } to { transform: translateX(223%); } }
 @media (max-width: 600px) {
   .od-dock .dv-arch, .od-dock .dv-focus, .od-dock .dv-clear, .od-step .k-dots { display: none; }
-  .od-dock .dv-ib.dv-more { margin-left: auto; }
+  .od-dock .dv-ib.dv-eye { margin-left: auto; }
   .od-dock .dv-overall { order: 9; flex-basis: 100%; }
   .od-dock .od-primary { order: 8; }
   .dv-oldt { max-width: 160px; }
@@ -717,8 +721,7 @@ svg { display: block; flex: none; }
 
   function mount() {
     if (host || !document.body) return;
-    host = document.createElement('dev-panel');
-    sh = host.attachShadow({ mode: 'open' });
+    host = document.createElement('dev-panel');    sh = host.attachShadow({ mode: 'open' });
     // A page view transition lays a snapshot over everything and takes the pointer (the cursor flips to an
     // arrow and clicks hit <html>) until it ends. Let the pointer pass through to the real page and menu.
     document.head.append(Object.assign(document.createElement('style'), { textContent: '::view-transition { pointer-events: none; }' }));
@@ -731,7 +734,9 @@ svg { display: block; flex: none; }
     spacer = document.createElement('div'); spacer.setAttribute('aria-hidden', 'true'); spacer.dataset.devPanel = 'spacer';
     spacer.style.cssText = 'display:block;height:0;margin:0;padding:0;border:0;flex:none;pointer-events:none';
     if (!clean) document.body.appendChild(spacer);
-    od = window.OptionDots({ root: sh, key: 'devpanel:hidden', step: go, count: () => posText, plain: true,
+    // dark only, whatever the site or system uses: the shared overlay's theme check writes to a spare element
+    host.setAttribute('data-od-dark', '');
+    od = window.OptionDots({ root: sh, theme: document.createElement('i'), key: 'devpanel:hidden', step: go, count: () => posText, plain: true,
       list: () => (listOpen ? od.close() : showList()), select: (r) => { const g = groups.find((x) => x.rec === r); if (g) dotClick(g); } });
     sh.append(sh.getElementById('dv-css')); // kit, then the shared overlay's style, then this one, so later wins ties
     od.count.setAttribute('aria-haspopup', 'dialog'); od.count.title = 'Every group on the site';
@@ -765,7 +770,7 @@ svg { display: block; flex: none; }
     handle = ib('dv-handle', EYEI, 'Show the dock  ( h )', () => setDock('open'));
     sh.append(handle);
     // a new dock size (shown again, or the window resized) refits the rows to the width
-    try { new ResizeObserver(() => { renderRows(); fit(); }).observe(dockEl); } catch {}
+    try { new ResizeObserver(() => { renderRows(); updX(); fit(); }).observe(dockEl); } catch {}
     for (const g of groups) addDot(g);
     setDock(dockState, true);
     sync();
@@ -799,6 +804,17 @@ svg { display: block; flex: none; }
     });
     sh.querySelectorAll('.dv-focus button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === focusOn)));
     sh.querySelectorAll('.dv-clear').forEach((b) => { b.textContent = clearText; });
+    // row 1 never moves: each changing text keeps the width of its widest value (tabular digits, so 8 is as wide as any)
+    const d = (x) => String(x).replace(/\d/g, '8'), tot = d(all.length + st.old.length);
+    lockW(od.count, [`${d(all.length)} / ${d(all.length)}`]);
+    sh.querySelectorAll('.dv-arch').forEach((s) => { lockW(s.children[0], ['Open ' + tot]); lockW(s.children[1], ['Archived ' + tot]); });
+    sh.querySelectorAll('.dv-clear').forEach((b) => lockW(b, ['Clear', 'Clear all?', 'Undo']));
+    lockW(copyBtn, ['Copy choices', 'Copied']);
+  }
+  function lockW(b, texts) {
+    if (!b.offsetParent) return; // hidden: measured again when the dock shows
+    const t = b.textContent; b.style.minWidth = '';
+    b.style.minWidth = Math.max(...texts.map((x) => ((b.textContent = x), b.offsetWidth))) + 'px'; b.textContent = t;
   }
   // Clear: two clicks within 3 s (the kit's "Clear all?"), then Undo for 5 s. Never a browser confirm.
   let clearText = 'Clear', clearArm = 0, undo = null, undoT = 0;
@@ -1320,7 +1336,7 @@ svg { display: block; flex: none; }
   function veil() {
     if (!host) return;
     const bg = [document.body, document.documentElement].map((n) => getComputedStyle(n).backgroundColor)
-      .find((c) => c && c !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(c)) || (host.hasAttribute('data-od-dark') ? '#000' : '#fff');
+      .find((c) => c && c !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(c)) || '#fff';
     host.style.setProperty('--fz', `color-mix(in srgb, ${bg} 28%, transparent)`);
   }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(veil, 50));

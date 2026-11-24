@@ -1,6 +1,6 @@
 /* variants.css: one rule block per option. Keep it OUTSIDE the site repo; serve.mjs injects it.
    html[data-dv-<group id>="<option number>"] <target> { ... }   Option 1 ("Current") has no attribute.
-   Use the site's own tokens (var(--...)) so the option fits the page in light and dark.
+   Use the site's own tokens (var(--...)) so the option fits the page.
    Every option must work at phone width with no sideways scroll. See recipes.md for ready patterns. */
 
 /* 2 Soft ring */
