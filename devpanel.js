@@ -408,26 +408,38 @@ const KIT_CSS = String.raw`
 .k-comment { display: block; width: 100%; margin-top: 12px; font: inherit; font-size: 16px; line-height: 1.4; color: var(--ink); background: var(--card); border: .5px solid var(--line); border-radius: 12px; padding: 11px 14px; min-height: 46px; resize: none; overflow: hidden; outline: none; box-shadow: var(--shadow); field-sizing: content; }
 .k-comment::placeholder { color: var(--muted); }
 .k-comment:focus { border-color: var(--blue); }
+.k-final-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 0; padding: 0 2px; font-size: var(--fs-sm); font-weight: 500; }
+.k-final-bar > label { cursor: pointer; color: var(--ink); user-select: none; }
+.k-final { position: relative; flex: none; width: 42px; height: 26px; padding: 0; border: 0; border-radius: 13px; cursor: pointer; background: var(--sw-off); transition: background-color .2s ease; }
+.k-final::after { content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06); transition: transform .2s cubic-bezier(.3,.7,.3,1); }
+.k-final[aria-checked="true"] { background: var(--blue); }
+.k-final[aria-checked="true"]::after { transform: translateX(16px); }
+.k-final:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 13px; }
+.k-dots button[hidden] { display: none; }
 .k-dock { position: fixed; left: 0; right: 0; margin-inline: auto; width: max-content; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; padding: 6px; max-width: calc(100vw - 24px); border-radius: 999px; background: var(--dock); backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8); border: .5px solid var(--line); box-shadow: var(--shadow), inset 0 1px 0 var(--dock-hi); }
 .k-dock button { font: inherit; font-size: 14px; font-weight: 600; line-height: 1; color: var(--ink); background: transparent; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
 .k-dock .k-nav { width: 32px; height: 32px; padding: 0; font-size: 20px; display: grid; place-items: center; }
 .k-dock .k-nav:disabled { opacity: .3; cursor: default; }
 .k-dock output { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 0 4px; white-space: nowrap; min-width: 40px; text-align: center; }
+.k-dots { display: flex; align-items: center; gap: 2px; }
+.k-dots button { width: 14px; height: 14px; padding: 0; display: grid; place-items: center; }
+.k-dots button::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); opacity: .45; transition: transform .2s ease, opacity .2s ease; }
+.k-dots button[aria-current="true"]::after { opacity: 1; background: var(--blue); transform: scale(1.35); }
 .k-seg { display: flex; align-items: center; background: var(--seg); border-radius: 999px; padding: 2px; }
 .k-seg button { padding: 6px 10px; }
 .k-seg-label { font-size: 14px; font-weight: 600; color: var(--muted); padding: 0 6px 0 10px; white-space: nowrap; }
 .k-seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
 .k-dock .k-copy { background: var(--blue); color: #fff; }`;
 /* kit-css:end */
-  const KEY = 'devpanel', GO = 'devpanel:go', DOCK_KEY = 'devpanel:dock', Q = new URLSearchParams(location.search);
+  const KEY = 'devpanel', GO = 'devpanel:go', DOCK_KEY = 'devpanel:dock', FOCUS_KEY = 'devpanel:focus', Q = new URLSearchParams(location.search);
   // Loaded from another origin (serve.mjs on 4799 inside a Vite app): the page is an SPA that routes itself.
   const me = document.currentScript, spa = !!me && new URL(me.src, location.href).origin !== location.origin;
   const PREFIX = String(window.__dvTitlePrefix || ''); // '<project> > <Orca tab>', set by serve.mjs in front of this file
   const forced = Object.fromEntries((Q.get('dv-pick') || '').split(',').map((s) => s.split(':')).filter((p) => p[1] > 0).map(([k, v]) => [k, +v]));
-  const st = { picks: {}, notes: {}, groups: [] }, cfg = {};
+  const st = { picks: {}, notes: {}, groups: [], fin: {} }, cfg = {};
   let key = KEY, base = ''; // base: the site this page belongs to (DevPanel.config({ site })), '' = the whole origin
   function load() {
-    Object.assign(st, { picks: {}, notes: {}, groups: [] });
+    Object.assign(st, { picks: {}, notes: {}, groups: [], fin: {} });
     try {
       const saved = JSON.parse(localStorage.getItem(key));
       if (saved) Object.assign(st, saved);
@@ -450,15 +462,28 @@ const KIT_CSS = String.raw`
   const inBase = (p) => (norm(p) + '/').startsWith(base);
   const meta = (id) => st.groups.find((m) => m.id === id);
   // Site order: pages in the order they were first seen, groups in the order they were added; unknown page last.
+  // Only groups the variants file registers now: a stored group that was removed never counts or copies.
   function site() {
-    const pages = [...new Set(st.groups.map(home))].sort((a, b) => (a === null) - (b === null));
-    return pages.flatMap((p) => st.groups.filter((m) => home(m) === p));
+    const live = st.groups.filter((m) => groups.some((g) => g.id === m.id));
+    const pages = [...new Set(live.map(home))].sort((a, b) => (a === null) - (b === null));
+    return pages.flatMap((p) => live.filter((m) => home(m) === p));
+  }
+  // Groups the owner can use on this page right now: in the current view (Open or Archived) and with a target here.
+  const usable = () => groups.filter((g) => { const m = meta(g.id); return inSet(g) && (m && m.page ? isHere(m) : !!document.querySelector(g.target)); });
+  // Drop stored picks, comments and Final marks of groups the variants file no longer has.
+  function prune() {
+    const ids = new Set(groups.map((g) => g.id)), keep = (o) => Object.fromEntries(Object.entries(o || {}).filter(([k]) => ids.has(k)));
+    st.groups = st.groups.filter((m) => ids.has(m.id)); st.picks = keep(st.picks); st.notes = keep(st.notes); st.fin = keep(st.fin); save();
   }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   let host, sh, od, hl, gls, dockEl, grp, pill, handle, spacer, lb, sayOut, copyBtn, shownG = null, popG = null;
   let lit = null, stillT = 0, raf = 0, hoverT = 0, curId = null, goN = 0, sayT = 0, posText = '', listOpen = false;
-  let dockState = 'open';
+  let dockState = 'open', focusOn = 'on', arch = false, pager, more, fz, nUsable = -1;
   try { dockState = ['open', 'min', 'hide'].includes(localStorage.getItem(DOCK_KEY)) ? localStorage.getItem(DOCK_KEY) : 'open'; } catch {}
+  try { focusOn = localStorage.getItem(FOCUS_KEY) === 'off' ? 'off' : 'on'; } catch {}
+  // Open shows the groups not yet final, Archived the final ones (the kit's Final switch). Copy choices takes only open ones.
+  const fin = (id) => !!(st.fin && st.fin[id]);
+  const inSet = (m) => fin(m.id) === arch;
 
   // How the dock shows a group's options; see the header.
   const kind = (g) => !g.opts.length ? 'note' : g.kind || (g.opts.some((o) => o.img) ? 'images' : g.opts.length >= 8 ? 'many'
@@ -490,14 +515,35 @@ svg { display: block; flex: none; }
   mask: linear-gradient(180deg, transparent, #000 var(--e), #000 calc(100% - var(--e)), transparent); }
 .hl.hold { opacity: .5; }
 
-/* the dock: the kit's capsule. Order: minimize, back, count, next, the group, comment, Hide dots, Copy choices */
+/* Focus: the current group's target stays sharp, the rest of the page takes a light veil of the page's own color
+   (like the kit's opacity .8). One box with a huge shadow, so it is paint only. */
+.fz { position: absolute; left: 0; top: 0; border-radius: 10px; box-shadow: 0 0 0 200vmax var(--fz); opacity: 0; transition: opacity 160ms ease; }
+.fz.on { opacity: 1; }
+
+/* the dock: the kit's capsule. Order: minimize, pager (back, count, dots, next), the group, Open/Archived, Focus,
+   Hide dots, Clear, Copy choices. On a phone, Open/Archived, Focus and Clear move into the "…" menu. */
 .od-dock { gap: 6px; flex-wrap: wrap; }
 .od-dock.dv-wrap { border-radius: 24px; }
 .od-ctl { display: contents; }
 /* two classes each: the shared overlay's ".od-ctl button { all: unset }" would reset a one-class order */
-.od-dock .dv-min { order: 0; } .od-dock .od-step { order: 1; } .od-dock .dv-grp { order: 2; } .od-dock .od-eye { order: 4; }
-.od-dock .dv-say { order: 6; } .od-dock .od-primary { order: 9; }
+.od-dock .dv-min { order: 0; } .od-dock .od-step { order: 1; } .od-dock .dv-grp { order: 2; } .od-dock .dv-arch { order: 3; }
+.od-dock .dv-focus { order: 4; } .od-dock .od-eye { order: 5; } .od-dock .dv-clear { order: 6; } .od-dock .dv-more { order: 7; }
+.od-dock .dv-say { order: 8; } .od-dock .od-primary { order: 9; }
+.od-dock .dv-ib.dv-more { display: none; font-size: 18px; letter-spacing: 1px; }
 .od-ctl .od-step { background: none; padding: 0; gap: 0; }
+.od-step .k-dots { display: flex; gap: 2px; margin: 0 2px; }
+.od-step .k-dots[hidden] { display: none; }
+/* ".od-ctl button { all: unset }" would undo the kit's dot buttons */
+.od-step .k-dots button { width: 14px; height: 14px; padding: 0; display: grid; place-items: center; cursor: pointer; border-radius: 50%; }
+/* no hover pills: hover changes only the text color, like the kit's dock */
+.od-dock .od-ctl button:hover, .od-dock .od-ctl .od-step button:hover, .od-dock .od-ctl .od-eye[aria-checked="true"] { background: none; }
+.od-dock .k-seg button:not([aria-pressed="true"]):not(.dv-sel):not(.dv-lab):hover, .od-dock .dv-ib:hover, .od-dock .od-nav:hover:not(:disabled),
+  .od-dock .dv-clear:hover, .od-dock .od-count:hover { color: var(--od-blue); }
+.od-dock .k-dots button:hover::after { opacity: .8; }
+.dv-xs { display: grid; gap: 10px; justify-items: start; }
+.dv-xs .k-seg button, .dv-xs .k-clear { font: 600 14px/1 var(--od-font); color: var(--ink); border-radius: 999px; padding: 8px 14px; }
+.dv-xs .k-seg button { padding: 6px 10px; }
+.od-body .k-final-bar { margin-top: 12px; padding: 10px 2px 0; border-top: .5px solid var(--sep); font-size: 14px; }
 .od-ctl .od-nav, .dv-ib, .od-dock > .dv-ib { width: 32px; padding: 0; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--od-ink); }
 .od-ctl .od-nav svg { width: 12px; height: 12px; }
 .od-ctl .od-count { height: 32px; padding: 0 6px; font: 600 14px/1 var(--od-font); min-width: 44px; }
@@ -505,7 +551,7 @@ svg { display: block; flex: none; }
 .od-ctl .od-eye { transition: none; }
 .dv-ib svg { width: 16px; height: 16px; }
 .dv-min svg { width: 13px; height: 13px; }
-.od-dock button:hover, .dv-ib:hover, .od-ctl .od-count[aria-expanded="true"] { background: var(--od-fill); }
+.od-ctl .od-count[aria-expanded="true"] { color: var(--od-blue); }
 .od-dock > .od-primary:hover { background: var(--od-blue); filter: brightness(1.08); }
 .dv-ib[data-on="true"] { color: var(--od-blue); }
 .dv-say { color: var(--od-ink); font: 500 13px/1.3 var(--od-font); max-width: 240px; padding: 0 6px; }
@@ -519,7 +565,6 @@ svg { display: block; flex: none; }
 .dv-lab span:last-child { overflow: hidden; text-overflow: ellipsis; }
 .dv-lab .od-mini { width: 16px; height: 16px; font-size: 9px; }
 .od-dock .dv-lab:hover { background: none; color: var(--ink); }
-.od-dock .dv-o:not([aria-pressed="true"]):hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
 .od-dock .dv-sel, .od-dock .dv-sel:hover { background: var(--seg-on); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
 .od-dock .dv-sel { display: flex; align-items: center; gap: 8px; min-width: 150px; max-width: 280px; padding: 6px 10px 6px 12px; }
 .dv-sel span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
@@ -573,10 +618,6 @@ svg { display: block; flex: none; }
 .od-body .k-comment { font-size: 15px; margin-top: 10px; min-height: 40px; padding: 9px 12px; box-shadow: none; background: var(--inset); }
 .od-body .k-hint { font-size: 13px; margin: 0 0 8px; line-height: 1.4; }
 .od-body .k-hint + .dv-list, .od-body .k-hint + .dv-imgs { margin-top: 2px; }
-.dv-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
-.dv-foot button { padding: 7px 12px; border-radius: 999px; font: 600 13px/1 var(--od-font); color: var(--od-muted); }
-.dv-foot button:hover { background: var(--od-fill); color: var(--od-ink); }
-.dv-foot button.armed { color: #ff3b30; }
 /* the list of every group: page heads, then a row per group with its pick as the note */
 .dv-ghead { padding: 8px 8px 4px; font: 600 12px/1.3 var(--od-font); color: var(--od-muted); }
 .dv-ghead i { font-style: normal; font-weight: 400; }
@@ -594,6 +635,8 @@ svg { display: block; flex: none; }
 .dv-o { position: relative; overflow: hidden; }
 @keyframes dv-sweep { from { transform: translateX(-100%); } to { transform: translateX(223%); } }
 @media (max-width: 600px) {
+  .od-dock .dv-arch, .od-dock .dv-focus, .od-dock .dv-clear, .od-step .k-dots { display: none; }
+  .od-dock .dv-ib.dv-more { display: grid; }
   .od-dock .dv-grp { order: -1; flex: 1 1 100%; }
   .dv-track { flex: 1; }
   .od-dock .dv-sel { flex: 1; min-width: 0; max-width: none; }
@@ -617,8 +660,8 @@ svg { display: block; flex: none; }
     // A page view transition lays a snapshot over everything and takes the pointer (the cursor flips to an
     // arrow and clicks hit <html>) until it ends. Let the pointer pass through to the real page and menu.
     document.head.append(Object.assign(document.createElement('style'), { textContent: '::view-transition { pointer-events: none; }' }));
-    sh.innerHTML = `<style>${KIT_CSS}</style><style id="dv-css">${CSS}</style><div class="hl"><div class="gl h"></div><div class="gl h"></div><div class="gl v"></div><div class="gl v"></div></div>`;
-    hl = sh.querySelector('.hl'); gls = sh.querySelectorAll('.gl');
+    sh.innerHTML = `<style>${KIT_CSS}</style><style id="dv-css">${CSS}</style><div class="fz"></div><div class="hl"><div class="gl h"></div><div class="gl h"></div><div class="gl v"></div><div class="gl v"></div></div>`;
+    hl = sh.querySelector('.hl'); gls = sh.querySelectorAll('.gl'); fz = sh.querySelector('.fz');
     const clean = Q.has('dv-clean');
     if (clean) host.style.display = 'none';
     document.body.appendChild(host);
@@ -632,10 +675,17 @@ svg { display: block; flex: none; }
     od.count.setAttribute('aria-haspopup', 'dialog'); od.count.title = 'Every group on the site';
     sayOut = mk('output', 'dv-say'); sayOut.hidden = true;
     copyBtn = mk('button', 'od-primary k-copy', 'Copy choices'); copyBtn.type = 'button'; copyBtn.onclick = copy;
-    copyBtn.title = 'Copies every pick and comment as a list, one line per group, to paste in chat';
+    copyBtn.title = 'Copies the pick and comment of every open group as a list, one line per group, to paste in chat';
     grp = mk('div', 'dv-grp');
     const min = ib('dv-ib dv-min', MIN, 'Minimize the dock', () => setDock('min'));
-    dockEl = od.dock(min, grp, sayOut, copyBtn); dockEl.classList.add('k-dock');
+    // the kit's pager: one small dot per group between the count and next; a click goes to that group
+    const step = od.controls.querySelector('.od-step');
+    pager = mk('div', 'k-dots'); step.insertBefore(pager, step.lastChild);
+    pager.onclick = (e) => { const b = e.target.closest('button'); if (b) goTo(b.dataset.id, true); };
+    more = ib('dv-ib dv-more', '…', 'More: Open or Archived, Focus, Clear', () => (more.getAttribute('aria-expanded') === 'true' ? od.close() : od.open({
+      label: 'More', anchor: more, render: (b) => { b.innerHTML = '<p class="k-hint">Final groups move to Archived. Focus dims the rest of the page. Clear empties every pick and comment.</p>'; const x = mk('div', 'dv-xs'); x.append(...extras()); b.append(x); updX(); } })));
+    dockEl = od.dock(min, grp, ...extras(), more, sayOut, copyBtn); dockEl.classList.add('k-dock');
+    updX();
     pill = ib('dv-pill', '', 'Open the dock', () => setDock('open'));
     handle = ib('dv-handle', DOCKI, 'Show the dock  ( h )', () => setDock('open'));
     sh.append(pill, handle);
@@ -645,24 +695,67 @@ svg { display: block; flex: none; }
     sync();
   }
 
+  // The kit's Open/Archived switch, Focus switch and Clear button. Built twice: in the dock, and in the phone's "…" menu.
+  function extras() {
+    const seg = (cls, label, items, onPick, lab) => {
+      const s = mk('div', 'k-seg ' + cls); s.setAttribute('role', 'group'); s.setAttribute('aria-label', label);
+      if (lab) { const l = mk('span', 'k-seg-label', lab); l.setAttribute('aria-hidden', 'true'); s.append(l); }
+      for (const [v, t] of items) { const b = mk('button', '', t); b.type = 'button'; b.dataset.v = v; b.onclick = () => onPick(v); s.append(b); }
+      return s;
+    };
+    const a = seg('dv-arch', 'Groups', [['open', 'Open'], ['archived', 'Archived']], (v) => {
+      arch = v === 'archived'; curId = null; shownG = null; od.close(); sync(); od.sync();
+      if (!site().some(inSet)) say(arch ? 'Nothing is archived yet.' : 'Everything is final. See Archived.');
+    });
+    const f = seg('dv-focus', 'Focus', [['on', 'On'], ['off', 'Off']], (v) => {
+      focusOn = v; try { localStorage.setItem(FOCUS_KEY, v); } catch {} updX(); schedule();
+    }, 'Focus');
+    const c = mk('button', 'k-clear dv-clear', clearText); c.type = 'button'; c.onclick = clearAll;
+    c.title = 'Two clicks empty every pick, comment and Final. Undo shows for 5 seconds after.';
+    return [a, f, c];
+  }
+  function updX() {
+    if (!sh) return;
+    const all = site(), n = all.filter((m) => fin(m.id)).length;
+    sh.querySelectorAll('.dv-arch').forEach((s) => {
+      s.children[0].textContent = 'Open ' + (all.length - n); s.children[1].textContent = 'Archived ' + n;
+      s.children[0].setAttribute('aria-pressed', String(!arch)); s.children[1].setAttribute('aria-pressed', String(arch));
+    });
+    sh.querySelectorAll('.dv-focus button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === focusOn)));
+    sh.querySelectorAll('.dv-clear').forEach((b) => { b.textContent = clearText; });
+  }
+  // Clear: two clicks within 3 s (the kit's "Clear all?"), then Undo for 5 s. Never a browser confirm.
+  let clearText = 'Clear', clearArm = 0, undo = null, undoT = 0;
+  function clearAll() {
+    const set = (t) => { clearText = t; updX(); };
+    if (undo) { clearTimeout(undoT); Object.assign(st, undo); undo = null; save(); groups.forEach((g) => setVar(g, pick(g), true)); shownG = null; sync(); return set('Clear'); }
+    if (!clearArm) { set('Clear all?'); clearArm = setTimeout(() => { clearArm = 0; set('Clear'); }, 3000); return; }
+    clearTimeout(clearArm); clearArm = 0;
+    undo = JSON.parse(JSON.stringify({ picks: st.picks, notes: st.notes, fin: st.fin }));
+    Object.assign(st, { picks: {}, notes: {}, fin: {} }); save(); od.close(); groups.forEach((g) => setVar(g, 1)); shownG = null; sync();
+    set('Undo'); undoT = setTimeout(() => { undo = null; set('Clear'); }, 5000);
+  }
+
   // open: the full dock. min: a small capsule with the count. hide: only a corner handle. Kept after a reload.
-  function setDock(s, quiet) {
-    dockState = s; try { localStorage.setItem(DOCK_KEY, s); } catch {}
+  function setDock(s, quiet, temp) {
+    if (host.hasAttribute('data-empty') && !temp) return; // no groups here: only the handle shows
+    if (!temp) { dockState = s; try { localStorage.setItem(DOCK_KEY, s); } catch {} }
     if (s !== 'open') od.close();
     const show = { open: dockEl, min: pill, hide: handle }[s];
     for (const n of [dockEl, pill, handle]) { n.hidden = n !== show; n.classList.remove('dv-in'); }
     if (!quiet) { void show.offsetWidth; show.classList.add('dv-in'); }
-    fit();
+    fit(); schedule();
   }
   function fit() {
     if (!dockEl) return;
-    const n = dockState === 'open' ? dockEl : dockState === 'min' ? pill : null, h = n ? n.getBoundingClientRect().height : 0;
+    const s = host.hasAttribute('data-empty') ? 'hide' : dockState;
+    const n = s === 'open' ? dockEl : s === 'min' ? pill : null, h = n ? n.getBoundingClientRect().height : 0;
     spacer.style.height = h ? Math.ceil(h + 32) + 'px' : '0'; // 16 px under the dock and 16 px of air above it
     dockEl.classList.toggle('dv-wrap', dockEl.offsetHeight > 52);
   }
 
   function addDot(g) {
-    g.rec = od.add({ target: () => sample(g), label: g.label, pick: g.opts.length > 0, pos: g.pos });
+    g.rec = od.add({ target: () => (inSet(g) ? sample(g) : {}), label: g.label, pick: g.opts.length > 0, pos: g.pos });
     g.el = g.rec.el;
     g.el.onpointerenter = (e) => { if (e.pointerType !== 'touch') glow(g); };
   }
@@ -802,7 +895,14 @@ svg { display: block; flex: none; }
     body.innerHTML = `<p class="k-hint">${hint}</p>` + (k === 'many' ? `<div class="dv-filter"><input type="search" placeholder="Filter ${g.opts.length} options" aria-label="Filter options"></div>` : '')
       + (k === 'images' ? `<div class="dv-imgs"><div class="dv-grid" role="listbox" aria-label="${esc(g.label)}">${g.opts.map((o, j) => tile(o, j + 1)).join('')}</div><figure class="dv-pv"><div class="th" title="Open full size"></div><figcaption><b></b><small></small></figcaption></figure></div>`
         : k === 'note' ? '' : `<div class="dv-list" role="listbox" aria-label="${esc(g.label)}">${g.opts.map((o, j) => row(o, j + 1)).join('')}</div><div class="dv-none" hidden>No option matches.</div>`)
-      + `<textarea class="k-comment" rows="1" placeholder="Comment on ${esc(g.label)}"></textarea>`;
+      + `<textarea class="k-comment" rows="1" placeholder="Comment on ${esc(g.label)}"></textarea>`
+      + `<div class="k-final-bar"><label for="dv-fin">Final</label><button type="button" id="dv-fin" class="k-final" role="switch" aria-checked="${fin(g.id)}" title="${fin(g.id) ? 'Final. Turn off to move back to Open' : 'Turn on to move to Archived'}"></button></div>`;
+    // the kit's Final switch: the group leaves this view (Open or Archived) and the dock moves to the next one
+    body.querySelector('.k-final').onclick = (e) => {
+      const on = !fin(g.id); e.currentTarget.setAttribute('aria-checked', String(on));
+      if (on) st.fin[g.id] = true; else delete st.fin[g.id];
+      save(); setTimeout(() => { od.close(); sync(); od.sync(); }, 220); // let the knob slide first
+    };
     const list = body.querySelector('.dv-list, .dv-grid'), ta = body.querySelector('textarea');
     if (list) {
       list.onpointerover = (e) => { const b = e.target.closest('[data-i]'); if (!b || b.contains(e.relatedTarget)) return; activate(g, b, true); if (e.pointerType !== 'touch') glow(g); };
@@ -846,7 +946,7 @@ svg { display: block; flex: none; }
   // Arrow keys move inside the open popover (a grid moves by row with up and down), Enter picks.
   addEventListener('keydown', (e) => {
     if (lb && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); return lb.end(); }
-    if (!popG || od.shown == null || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!popG || e.metaKey || e.ctrlKey || e.altKey) return;
     const t = e.composedPath()[0];
     if (t && t.tagName === 'TEXTAREA') return;
     const items = [...od.body.querySelectorAll('[data-i]')].filter((b) => !b.hidden); if (!items.length) return;
@@ -869,28 +969,30 @@ svg { display: block; flex: none; }
         + all.filter((m) => home(m) === p).map((m) => {
           const i = st.picks[m.id] || 1, name = m.opts && m.opts[i - 1];
           return `<button type="button" class="dv-row" data-id="${esc(m.id)}" aria-selected="${m.id === curId}"${p === null ? ' disabled title="Open its page once so the dock knows where it is"' : ''}><span class="ck">✓</span><span><b>${esc(m.label)}</b><small>${m.opts && m.opts.length ? `${i} ${esc(name || '?')}` : 'Comment'}</small></span></button>`;
-        }).join('')).join('')}</div><div class="dv-foot"><button type="button" class="dv-reset">Reset every pick</button></div>`;
+        }).join('')).join('')}</div>`;
       body.querySelector('.dv-list').onclick = (e) => { const b = e.target.closest('.dv-row'); if (b && !b.disabled) goTo(b.dataset.id, true); };
-      // Two clicks within 3 s: picks and comments go; groups on other pages come back when their page is opened.
-      const r = body.querySelector('.dv-reset'); let armed = 0;
-      r.onclick = () => {
-        if (!armed) { r.textContent = 'Click again to reset'; r.classList.add('armed'); armed = setTimeout(() => { armed = 0; r.textContent = 'Reset every pick'; r.classList.remove('armed'); }, 3000); return; }
-        clearTimeout(armed);
-        st.picks = {}; st.notes = {}; st.groups = st.groups.filter((m) => groups.some((g) => g.id === m.id));
-        save(); od.close(); groups.forEach((g) => setVar(g, 1)); shownG = null; sync();
-      };
     } });
     listOpen = true; popG = null;
   }
 
   function sync() {
     if (!od) return;
-    const all = site(), blue = all.filter((m) => m.opts && m.opts.length), k = blue.findIndex((m) => m.id === curId);
-    posText = `${k < 0 ? '–' : k + 1} / ${blue.length}`;
-    for (const g of groups) if (g.rec) g.rec.n = blue.findIndex((m) => m.id === g.id) + 1;
-    od.sync();
-    // the dock shows the current group; with none yet, the first group on this page (a blue one first)
-    if (curId === null && groups.length) curId = (groups.find((x) => x.opts.length) || groups[0]).id;
+    // the count and pager cover only the blue groups usable on this page now (see usable)
+    const here_ = usable(), blue = here_.filter((g) => g.opts.length);
+    if (curId !== null && !here_.some((g) => g.id === curId)) curId = null;
+    // the dock shows the current group; with none yet, the first usable group (a blue one first)
+    if (curId === null && here_.length) curId = (blue[0] || here_[0]).id;
+    const k = blue.findIndex((g) => g.id === curId);
+    posText = k < 0 ? `${blue.length}` : `${k + 1} / ${blue.length}`;
+    od.controls.querySelector('.od-step').hidden = !blue.length; // no pager with nothing to page through
+    pager.hidden = blue.length < 2;
+    pager.innerHTML = blue.map((g) => `<button type="button" data-id="${esc(g.id)}" title="${esc(g.label)}" aria-label="${esc(g.label)}" aria-current="${g.id === curId}"></button>`).join('');
+    for (const g of groups) if (g.rec) g.rec.n = blue.indexOf(g) + 1;
+    od.sync(); updX();
+    // nothing usable here: no dock, only the corner handle (not saved, so the dock comes back with groups)
+    const none = !here_.length && !site().some((m) => fin(m.id) !== arch);
+    if (none !== host.hasAttribute('data-empty')) { host.toggleAttribute('data-empty', none); setDock(none ? 'hide' : dockState, true, true); }
+    handle.title = none ? 'No option groups on this page' : 'Show the dock  ( h )'; nUsable = here_.length;
     const g = groups.find((x) => x.id === curId);
     for (const x of groups) if (x.el) x.el.setAttribute('aria-current', String(x === g));
     pill.innerHTML = `<span class="od-dot od-mini" data-kind="pick">${g && g.el && g.opts.length ? g.el.innerHTML : ''}</span><span>${posText}</span>${UP}`;
@@ -907,7 +1009,7 @@ svg { display: block; flex: none; }
   // navigates there first. On arrival the group becomes current, its popover opens, and the page scrolls the target
   // smoothly into the free part above the popover (only when it is not already in view there).
   function go(d) {
-    const list = site().filter((m) => m.page && m.opts && m.opts.length); if (!list.length) return;
+    const list = site().filter((m) => m.page && m.opts && m.opts.length && inSet(m)); if (!list.length) return;
     let k = list.findIndex((m) => m.id === curId);
     if (k < 0) { const f = list.findIndex(isHere); k = Math.max(f, 0) - d; } // start on this page
     goTo(list[(k + d + list.length) % list.length].id, true);
@@ -973,6 +1075,12 @@ svg { display: block; flex: none; }
       if (m && !m.page && r && r.width > 0) { m.page = [location.pathname]; save(); sync(); }
       g.r = r;
     }
+    if (usable().length !== nUsable) sync(); // a target appeared or went away (an SPA render)
+    // Focus: a hole around the current group's target, the rest of the page veiled
+    const c = groups.find((x) => x.id === curId), fr = c && inSet(c) && c.r;
+    const fon = focusOn === 'on' && dockState !== 'hide' && !host.hasAttribute('data-empty') && !!fr && fr.width > 0;
+    fz.classList.toggle('on', fon);
+    if (fon) { const P = 6; box(fz, fr.left - P, fr.top - P, fr.width + 2 * P, fr.height + 2 * P); }
     const r = lit && lit.r;
     hl.hidden = !(r && r.width > 0);
     if (hl.hidden) return;
@@ -991,7 +1099,7 @@ svg { display: block; flex: none; }
   const schedule = () => { if (!raf && od) raf = requestAnimationFrame(place); };
 
   function md() {
-    const all = site(), many = new Set(all.map(home)).size > 1; // name the page only when there are several
+    const all = site().filter((m) => !fin(m.id)), many = new Set(all.map(home)).size > 1; // name the page only when there are several
     return all.map((m) => {
       const i = st.picks[m.id] || 1, note = (st.notes[m.id] || '').trim(), co = !(m.opts && m.opts.length);
       let s = `- ${m.label}${many && m.page ? ` (${home(m)})` : ''}${co ? (note ? ':' : '') : `: ${i} ${m.opts[i - 1] || '?'}`}`;
@@ -1023,8 +1131,17 @@ svg { display: block; flex: none; }
     const b = [...sh.querySelectorAll('.od-body [data-i], .od-dock button, .dv-pill, .dv-handle'), ...od.layer.children].find((el) => !el.hidden && inR(el));
     if (b) b.click();
   }, true);
+  // The Focus veil takes the page's own background color, so the rest of the page fades toward it (the kit dims to .8).
+  function veil() {
+    if (!host) return;
+    const bg = [document.body, document.documentElement].map((n) => getComputedStyle(n).backgroundColor)
+      .find((c) => c && c !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(c)) || (host.hasAttribute('data-od-dark') ? '#000' : '#fff');
+    host.style.setProperty('--fz', `color-mix(in srgb, ${bg} 28%, transparent)`);
+  }
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setTimeout(veil, 50));
   const boot = () => {
-    mount();
+    prune(); // the variants file ran before boot: anything stored for a group it no longer has goes
+    mount(); veil();
     try { new ResizeObserver(schedule).observe(document.body); } catch {}
     // targets an app renders later (board cards after a fetch) get their dot as soon as they appear
     new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });

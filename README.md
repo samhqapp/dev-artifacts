@@ -10,7 +10,7 @@ Show design options live on your local site. Click a dot, try each look, copy yo
   |  +----------------------------+                             |
   |                                                             |
   |                                                             |
-  | ( - < 1/3 > [(1) Email field  Current|Soft ring|Pill] [c] [eye] [Copy choices] )
+  | ( - < 1/3 ●●● > [(1) Email  Current|Soft|Pill] [c] [Open 3|Archived 0] [Focus On|Off] [eye] Clear [Copy choices] )
   +-------------------------------------------------------------+
                                dock
 ```
@@ -74,8 +74,14 @@ To see every kind of group on a demo page: `node serve.mjs examples/demo --varia
 - `-` shrinks the dock to a small capsule (count and chevron). Key `h` hides it fully; a small corner handle brings it
   back. Both are kept after a reload. An empty block the height of the dock is added after the page, so the footer
   always scrolls above it.
-- The dock also has the comment button, the eye button (hide dots, key `.`) and **Copy choices**.
-- The "2 / 5" count is for the whole site. Click it to see **every group**, grouped by page, with each one's current pick.
+- The dock is the artifact kit's dock: the pager (one dot per group, click to go there), the comment button,
+  **Open / Archived** (the **Final** switch at the end of each popover moves a group to Archived), **Focus On / Off**
+  (dims the rest of the page, paint only, kept after a reload), the eye button (hide dots, key `.`), **Clear** (two
+  clicks, then Undo for 5 seconds) and **Copy choices** (open groups only). On a phone, Open / Archived, Focus and
+  Clear sit in the `…` menu.
+- The count covers only groups you can use on this page now. With no groups, only the corner handle shows. Stored
+  picks of a group the variants file no longer has are dropped. `examples/selfcheck.mjs` checks this.
+- The "2 / 5" count opens the list of every group. Click it to see **every group**, grouped by page, with each one's current pick.
   Click a row to go there. Your picks and comments stay in your browser, for the whole site.
 
 **Copy choices** gives one line per group, from every page. Paste it to the person or coding agent who builds the site.

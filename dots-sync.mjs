@@ -11,7 +11,7 @@ import { join } from 'node:path';
 const src = readFileSync(new URL('./dots.js', import.meta.url), 'utf8').trim();
 const A = '/* option-dots:start', B = '/* option-dots:end */', KA = '/* kit-css:start', KB = '/* kit-css:end */';
 const KIT = process.env.KIT_CSS || join(homedir(), '.agents/artifact-kit/kit.css');
-const TAKE = /^\.k-(dock|seg|comment|hint|copy|nav)\b/;
+const TAKE = /^\.k-(dock|seg|comment|hint|copy|nav|dots|final|clear)\b/;
 
 // Top-level rules of kit.css (comments dropped, @media blocks skipped).
 function kitCss() {
