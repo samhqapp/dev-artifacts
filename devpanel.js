@@ -646,6 +646,8 @@ svg { display: block; flex: none; }
 .dv-row .ck { font-size: 12px; font-weight: 700; line-height: 20px; color: var(--od-blue); visibility: hidden; }
 .dv-row[aria-selected="true"] .ck { visibility: visible; }
 .dv-row b { display: block; font: 500 14px/20px var(--od-font); }
+.dv-sw { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 50%; vertical-align: -0.5px;
+  box-shadow: inset 0 0 0 .5px rgba(0,0,0,.2); }
 .dv-row[aria-selected="true"] b { font-weight: 600; }
 .dv-row small { display: block; font: 12.5px/1.35 var(--od-font); color: var(--od-muted); }
 .dv-filter { position: sticky; top: -8px; z-index: 1; margin: -8px -14px 6px; padding: 8px 14px 6px; background: var(--od-pop); }
@@ -914,11 +916,11 @@ svg { display: block; flex: none; }
     const k = kind(g), n = inlineN(g), p = pick(g), focused = sh.activeElement && grp.contains(sh.activeElement);
     // Options show once: the first n inline here, the rest behind "…" (the popover's full list). The "…" item carries the
     // pick when it is past n, so the pick always shows.
-    const o = (j) => `<button type="button" class="dv-o" data-i="${j}" aria-pressed="${p === j}">${esc(g.opts[j - 1].name)}</button>`;
+    const o = (j) => `<button type="button" class="dv-o" data-i="${j}" aria-pressed="${p === j}">${swatch(g, j)}${esc(g.opts[j - 1].name)}</button>`;
     grp.innerHTML = `<div class="dv-track k-seg"><button type="button" class="dv-lab k-seg-label" aria-haspopup="dialog" title="${k === 'note' ? 'Click to comment' : 'Click for the comment' + (hasMore(g) ? ', every option' : '') + ' and Final'}"><span>${esc(g.label)}</span></button>`
       + (k === 'note' ? `<button type="button" class="dv-sel" aria-haspopup="dialog" aria-expanded="false"><span></span>${CHEV}</button>`
         : g.opts.slice(0, n).map((_, j) => o(j + 1)).join('')
-          + (hasMore(g) ? `<button type="button" class="dv-o dv-moreo" aria-haspopup="dialog" aria-pressed="${p > n}" data-tip="All ${g.opts.length} options">${p > n ? esc(g.opts[p - 1].name) + ' ' : ''}…</button>` : ''))
+          + (hasMore(g) ? `<button type="button" class="dv-o dv-moreo" aria-haspopup="dialog" aria-pressed="${p > n}" data-tip="All ${g.opts.length} options">${p > n ? swatch(g, p) + esc(g.opts[p - 1].name) + ' ' : ''}…</button>` : ''))
       + `</div>`;
     const cm = ib('dv-ib dv-cm', BUBBLE, 'Comment', () => (popG === g ? focusNote() : popFor(g, true)));
     if (k !== 'note') grp.append(cm);
@@ -941,11 +943,18 @@ svg { display: block; flex: none; }
   }
   // One line about an option: its note, or for option 1 "The site as it is now".
   const optNote = (g, i) => (g.opts[i - 1] || {}).note || (i === 1 && g.current !== false ? 'The site as it is now' : '');
+  // A small round swatch when the option's value (`color`, else its note) is a CSS color such as #f0654f or rgb(...).
+  const swatch = (g, i) => {
+    const o = g.opts[i - 1] || {}, c = String(o.color || o.note || '').trim();
+    return /^(#[0-9a-f]{3,8}|(rgb|hsl|hwb|lab|lch|oklab|oklch)a?\(.+\))$/i.test(c) && window.CSS.supports('color', c)
+      ? `<i class="dv-sw" style="background:${esc(c)}"></i>` : '';
+  };
   // The small tooltip over an inline dock option (its one-line note), so the popover is not needed to read it.
   let tip;
   function tipFor(b, text) {
     if (!tip) { tip = mk('div', 'dv-tip'); tip.setAttribute('role', 'tooltip'); sh.append(tip); }
-    if (!b || !text) return tip.classList.remove('on');
+    // a re-rendered dock under a still pointer fires pointerover again, so an open popover always wins
+    if (!b || !text || popG) return tip.classList.remove('on');
     tip.textContent = text; tip.classList.add('on');
     const r = b.getBoundingClientRect(), w = tip.offsetWidth;
     tip.style.left = Math.min(Math.max(r.left + r.width / 2 - w / 2, 8), innerWidth - w - 8) + 'px';
@@ -978,7 +987,7 @@ svg { display: block; flex: none; }
   }
   function fillPop(g, body, k) {
     const p = pick(g);
-    const row = (o, j) => `<button type="button" class="dv-row" role="option" data-i="${j}" aria-selected="${p === j}"><span class="ck">✓</span><span><b>${esc(o.name)}</b>${optNote(g, j) ? `<small>${esc(optNote(g, j))}</small>` : ''}</span></button>`;
+    const row = (o, j) => `<button type="button" class="dv-row" role="option" data-i="${j}" aria-selected="${p === j}"><span class="ck">✓</span><span><b>${swatch(g, j)}${esc(o.name)}</b>${optNote(g, j) ? `<small>${esc(optNote(g, j))}</small>` : ''}</span></button>`;
     const tile = (o, j) => `<button type="button" class="dv-tile" role="option" data-i="${j}" aria-selected="${p === j}" title="${esc(o.note || o.name)}"><span class="th"${o.img ? ` style="background-image:url('${esc(o.img)}')"` : ''}>${o.img ? '' : esc(o.name)}</span><span>${esc(o.name)}</span></button>`;
     // the kit's visible hint: one line on how this popover works
     const hint = { many: 'Type to filter. Hover an option to see it on the page. Click or an arrow key picks it, Enter closes.',
