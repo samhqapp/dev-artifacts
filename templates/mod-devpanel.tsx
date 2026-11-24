@@ -106,6 +106,8 @@ export function devPanel(cfg: { groups: DevGroup[]; heading: string }) {
             Copy choices
           </Button>
         </Box>
+        {/* Arrow keys belong to Claude Code (← opens its sessions list), so name the keys that work. */}
+        <Text dimColor>Keys: n p group · 1 2 3 pick · Tab comment, Enter save · y copy. No arrows: ← opens Claude's session list (Esc returns). Keys not working? Click the pane.</Text>
       </Box>
     )
   }
