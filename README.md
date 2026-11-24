@@ -9,9 +9,8 @@ Show design options live on your local site. Click a dot, try each look, copy yo
   |  |  Email field               |  ^ dot                      |
   |  +----------------------------+                             |
   |                                                             |
-  |  ( (1) Email field          [1 Current|2 Soft ring|3 Pill] )|
-  |  ( [ Comment on Email field                              ] )|
-  |  ( [< 1 / 3 >] [eye]          1 pick  Reset  [Copy choices]) |
+  |                                                             |
+  | ( - < 1/3 > [(1) Email field  Current|Soft ring|Pill] [c] [eye] [Copy choices] )
   +-------------------------------------------------------------+
                                dock
 ```
@@ -46,20 +45,36 @@ It needs Node 22 or newer. It has no npm packages and no build step. It adds not
 
 The server only listens on your own computer. When you edit a file, the page reloads by itself.
 
+To see every kind of group on a demo page: `node serve.mjs examples/demo --variants templates/presets.js --css templates/presets.css`.
+
 ## How it works
 
 - Each section with options gets a small blue **dot** just outside its top-right corner. A group with only a comment
   field (`options: [], current: false`) gets a green dot, so the blue dots are the ones that still need a pick.
   Back and next step through the blue dots only. The eye button hides the dots, and a reload keeps it.
 - The dots and dock are `dots.js`, shared with other tools. Edit it there and run `node dots-sync.mjs devpanel.js`.
-- The **dock** at the bottom holds the current group: its name, the hovered or picked option's note, the options as a
-  segmented control (a compact list when they do not fit), and a comment field. Click a dot to make its group current.
-- Hover an option to preview it. Click it to keep it; the page changes at once.
-- Hovering an option or a dot pulses a faint red glow line around the section once: no fill, never looping, and the page
-  never moves. With reduced motion, a still faint glow shows while you hover.
-- The dock also has the eye button (hide dots, key `.`), the pick count, **Reset**, and **Copy choices**.
-- **Back** and **next** (keys `[` and `]`) go to every blue dot on the whole site and make it current. A group on another
-  page takes you to that page first. If a group never shows up, the dock says so.
+- The dock, popovers, comment fields and hints use the artifact kit's own classes and tokens (`k-dock`, `k-seg`,
+  `k-comment`, `k-hint`), copied in by `dots-sync.mjs` from `kit.css` (`$KIT_CSS`, else `~/.agents/artifact-kit/kit.css`).
+- The **dock** holds one select button for the current group: its name and its pick. How it opens depends on the kind,
+  picked from the options (set `kind` to force one; `templates/presets.js` has one example of each):
+
+  | Kind | When | Shows as |
+  |---|---|---|
+  | `flat` | 2-3 short options | the options right in the dock, as a segmented control |
+  | `select` | 4-7 options | a popover list |
+  | `many` | 8 or more | a popover list with a filter field |
+  | `images` | any option has `img` | a thumbnail grid and a big preview; click the preview for full size |
+  | note | `options: [], current: false` | a green dot and a comment field |
+
+- Hover an option to preview it. Click it to keep it. Arrow keys and Enter work in the popover; Esc closes it.
+- Hovering an option or a dot draws thin, faint red guide lines along the section's four edges. They grow out past the
+  section (to the screen edge when it is off screen), glow once and fade, about 1 second. No fill; the page never moves.
+- **Back** and **next** (keys `[` and `]`) and a click on a blue dot scroll smoothly to the group and open its popover.
+  A group on another page takes you to that page first.
+- `-` shrinks the dock to a small capsule (count and chevron). Key `h` hides it fully; a small corner handle brings it
+  back. Both are kept after a reload. An empty block the height of the dock is added after the page, so the footer
+  always scrolls above it.
+- The dock also has the comment button, the eye button (hide dots, key `.`) and **Copy choices**.
 - The "2 / 5" count is for the whole site. Click it to see **every group**, grouped by page, with each one's current pick.
   Click a row to go there. Your picks and comments stay in your browser, for the whole site.
 
@@ -99,9 +114,10 @@ When `target` matches many elements, such as every card, the dot and outline sit
 Your options still change every card. `sample: 'all'` outlines all of them in one box instead.
 `apply(i)` runs your own code for changes that CSS cannot do, such as new text. More ready examples are in `recipes.md`.
 
-`DevPanel.config({ title: 'my-site > email field' })` sets the browser tab title (`<project> > <topic>`) while the overlay
-runs. It lives only in the injected code, and it is set again if the site rewrites its own title. Without it, the title
-stays and the console warns once.
+`DevPanel.config({ topic: 'email field' })` sets the browser tab title to `<prefix> > email field` while the overlay
+runs. `serve.mjs` and `quick.mjs` get the prefix from `~/.agents/bin/orca-title` (or `DV_TITLE_CMD`) when it exists,
+else the repo folder name. An old `title: 'a > b'` still works; its last part is the topic. The title is set again if
+the site rewrites its own. Without a topic, the title stays and the console warns once.
 
 One server, several separate sites (such as `/memory/` and `/throttlecontrol/`): put this first in `variants.js`, so
 each site gets its own picks, count, back and next, and Copy choices. Groups whose `page` is on another site are skipped.

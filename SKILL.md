@@ -24,9 +24,10 @@ the overlay. Generic improvements go into this repo; user-specific notes stay in
 ## Steps
 
 1. Copy `<repo>/templates/variants.js` and `variants.css` into a scratch folder outside the site repo.
-2. Write the options. One group per section; option 1 is "Current". Patterns: `<repo>/recipes.md`.
-   Always set the tab title first in `variants.js`: `DevPanel.config({ title: 'samhq_backend > buy dialog' })`
-   (`<repo folder name> > <topic of 1-3 words>`, never a bare "ui", "site", or "options").
+2. Write the options. One group per section; option 1 is "Current". Copy the fitting kind from
+   `<repo>/templates/presets.js` (flat, select, many, images, comment only, footer); more patterns in `<repo>/recipes.md`.
+   Always set the topic first in `variants.js`: `DevPanel.config({ topic: 'buy dialog' })` (1-3 words, never a
+   bare "ui", "site", or "options"). The server adds the `<project> > <Orca tab>` prefix itself.
 3. Check every option in one call, then look at every shot:
    `node <repo>/serve.mjs <site dir> --variants v.js --css v.css --shot <scratch>/shots --each --sizes 1440x900,390x844`
    Add `--open <group>` to check one group in the dock. Fix what looks wrong and shoot again only after a change.
@@ -52,12 +53,13 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 
 - Dots and dock come from `<repo>/dots.js`, the one shared overlay (the artifact kit uses it too). Edit only
   that file, then run `node <repo>/dots-sync.mjs <file>` for each copy (devpanel.js and any other file with its markers).
-- The options live in the dock, like the kit's dock: the current group's name and note, its options as a segmented
-  control (a compact list when they do not fit), and its comment field. A dot click makes its group current.
+- It is built from the artifact kit's classes and hints (`dots-sync.mjs` copies the kit.css rules in). Do not restyle it per site.
+- The dock shows one select button for the current group. 2-3 short options sit right in the dock as a segmented
+  control; more open a popover (a list, a list with a filter at 8+, or a picture grid when options have `img`).
   A blue dot is a group to pick; a green dot is a comment-only group (`options: [], current: false`).
-- Hovering a dock option or a dot pulses a faint red glow line on the section once (no fill, no loop, no layout change).
-- The dock also has back and next (`[` and `]` keys) over the blue dots only, an eye button that hides the dots (`.` key,
-  kept after a reload), Reset, and Copy choices. Back and next move to another page when needed.
+- Back, next (`[` `]`) and a blue dot click scroll smoothly to the group and open its popover. Arrow keys work inside.
+- Hovering an option or a dot draws faint red guide lines past the section's edges for about 1 second (no fill, no shift).
+- `-` shrinks the dock to a capsule; `h` hides it, a corner handle brings it back. A spacer keeps the footer above the dock.
 - The "2 / 5" count is the site total of blue dots. Clicking it lists every group by page with its pick; a row goes there.
 - Picks, comments, and Copy choices cover the whole site (one store per origin, or per `site`, see below).
 

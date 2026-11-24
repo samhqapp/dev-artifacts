@@ -13,7 +13,8 @@
    od.add({ target, label, pick, render(body, rec), onClose(), pos: 'tr'|'tl', n }) -> rec
      target: an element, or a function that returns { t: element, r: rect }. pick: true blue, false green.
      render fills the popover body each time it opens. n: the number on a blue dot (default: its place on the page).
-   od.open(rec), od.close(), od.go(rec, open) -> Promise, od.step(d), od.sync(), od.controls, od.dock(...buttons).
+   od.open(rec): rec may carry anchor (a dock button: the popover grows up out of it) and reveal() (a rect the popover
+     must not cover: the page scrolls it into the free part). od.close(), od.go(rec, open) -> Promise, od.step(d), od.sync(), od.controls, od.dock(...buttons).
    od.freeze: a performance.now() time; until then a scroll does not move an open popover (a live preview is settling).
    Keys: [ and ] step, . hides the dots, Escape closes. */
 (() => {
@@ -54,6 +55,7 @@
   backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6); font: 14px/1.45 var(--od-font); text-align: left;
   transform-origin: top left; opacity: 0; transform: translateY(-4px) scale(.98); visibility: hidden; pointer-events: none;
   transition: opacity var(--od-close) var(--od-out), transform var(--od-close) var(--od-out), visibility 0s linear var(--od-close); }
+.od-pop.od-up:not(.od-show) { transform: translateY(6px) scale(.97); } /* anchored to a dock button: grows up out of it */
 .od-pop.od-show { opacity: 1; transform: none; visibility: visible; pointer-events: auto;
   transition: opacity 160ms ease, transform var(--od-open) var(--od-ease), visibility 0s; }
 .od-pop *, .od-pop *::before, .od-pop *::after { box-sizing: border-box; }
@@ -133,7 +135,10 @@
 
   window.OptionDots = (o = {}) => {
     const d = document, root = o.root || d.body, host = root.host, themeEl = o.theme || host || d.documentElement;
-    const key = o.key || 'od-hidden:' + location.pathname, DOCK = 72, M = 8;
+    const key = o.key || 'od-hidden:' + location.pathname, M = 8;
+    let DOCK = 72, dockEl = null;
+    // room the dock takes at the bottom of the window: its real top edge when it shows, else 72 px
+    const dockRoom = () => { const r = dockEl && dockEl.getBoundingClientRect(); return (DOCK = r && r.height ? innerHeight - r.top + M : dockEl ? M : 72); };
     const sheetMQ = matchMedia('(max-width: 600px)'), darkMQ = matchMedia('(prefers-color-scheme: dark)');
     const reduce = matchMedia('(prefers-reduced-motion: reduce)');
     const el = (t, c, html) => { const n = d.createElement(t); if (c) n.className = c; if (html) n.innerHTML = html; return n; };
@@ -195,16 +200,22 @@
       pop.setAttribute('aria-label', r.label || 'Options');
       body.replaceChildren(); if (r.render) r.render(body, r);
       recs.forEach((x) => x.el.setAttribute('aria-expanded', String(x === r)));
+      if (r.anchor) r.anchor.setAttribute('aria-expanded', 'true');
+      pop.classList.toggle('od-up', !!r.anchor);
       body.scrollTop = 0; placeNow = true; place(); pop.classList.add('od-show'); sync();
-      if (sheetMQ.matches && r.el) requestAnimationFrame(() => { // bring the target into the free part above the sheet
-        const b = box(r).r, top = innerHeight - pop.offsetHeight - M;
-        if (b && (b.top < M || b.bottom > top - M)) scrollBy(0, b.top - Math.max(12, (top - b.height) / 2));
+      // r.reveal() names the rect the popover must not cover (a dock popover's group target)
+      if ((sheetMQ.matches && r.el) || r.reveal) requestAnimationFrame(() => { // bring the target into the free part above the popover
+        const b = r.reveal ? r.reveal() : box(r).r, p = pop.getBoundingClientRect(); if (!b || !b.width) return;
+        // the floor is the popover's top when the target is under it, else the dock's top
+        const under = sheetMQ.matches || !(b.right < p.left || b.left > p.right), top = under ? (sheetMQ.matches ? innerHeight - pop.offsetHeight - M : p.top) : innerHeight - dockRoom();
+        if (b.top < M || b.bottom > top - M) scrollBy({ top: b.top - Math.max(12, (top - b.height) / 2), behavior: reduce.matches ? 'instant' : 'smooth' });
       });
     }
     function close() {
       if (!shown) return;
       const r = shown; shown = null; pop.classList.remove('od-show');
       recs.forEach((x) => x.el.setAttribute('aria-expanded', 'false'));
+      if (r.anchor) r.anchor.setAttribute('aria-expanded', 'false');
       if (r.onClose) r.onClose();
     }
     function pulse(r) { r.el.classList.remove('od-pulse'); void r.el.offsetWidth; r.el.classList.add('od-pulse'); setTimeout(() => r.el.classList.remove('od-pulse'), 1500); }
@@ -220,6 +231,7 @@
       close(); if (r.pick) cur = r; sync();
       return new Promise((res) => {
         const { t, r: b } = box(r); if (!t) return res(false);
+        dockRoom();
         const vh = innerHeight, tall = b.height > vh - DOCK - 16;
         const seen = tall ? b.top >= 0 && b.top < vh / 3 : b.top >= M && b.bottom <= vh - DOCK;
         const done = () => { pulse(r); if (openIt) open(r); res(true); };
@@ -256,9 +268,14 @@
       // beside the target on the roomiest side (right, left, below, above), so the target stays in view
       const keep = body.scrollTop;
       pop.style.width = pop.style.maxHeight = '';
+      dockRoom();
       let w = pop.offsetWidth, h = pop.offsetHeight, left, top;
-      const b = shown.el ? box(shown).r : null;
-      if (!b) { // no target (a list): centered just above the dock
+      const b = shown.el ? box(shown).r : null, a = shown.anchor && shown.anchor.getBoundingClientRect();
+      if (a) { // a dock button: just above it, its left edge on the button's, grown out of the button's middle
+        if (h > a.top - 2 * M) { pop.style.maxHeight = a.top - 2 * M + 'px'; h = pop.offsetHeight; }
+        left = Math.min(Math.max(a.left - 6, M), vw - w - M); top = a.top - M - h;
+        pop.style.transformOrigin = `${Math.round(a.left + a.width / 2 - left)}px 100%`;
+      } else if (!b) { // no target (a list): centered just above the dock
         if (h > vh - DOCK - 2 * M) { pop.style.maxHeight = vh - DOCK - 2 * M + 'px'; h = pop.offsetHeight; }
         left = (vw - w) / 2; top = vh - DOCK - h;
       } else {
@@ -345,7 +362,7 @@
 
     function dock(...buttons) {
       const k = el('div', 'od-dock'); k.setAttribute('role', 'toolbar'); k.setAttribute('aria-label', 'Options'); k.setAttribute('data-od-keep', '');
-      k.append(ctl, ...buttons); root.append(k); return k;
+      k.append(ctl, ...buttons); root.append(k); dockEl = k; return k;
     }
     const api = { add, open, close, go, step, sync, schedule, pulse, dock, setHidden, controls: ctl, count, pop, body, layer, freeze: 0,
       get hidden() { return hidden; }, get shown() { return shown; }, get current() { return cur; }, set current(r) { cur = r; sync(); } };

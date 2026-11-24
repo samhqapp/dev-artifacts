@@ -1,22 +1,29 @@
 /* Dev artifacts (DevPanel): a dev-only overlay that shows design options live on a real site.
-   DevPanel.group({ id, label, target, options: [{ name, note? }], page?: '/all' | ['/a', '/b'], dot?: 'tr'|'tl',
+   DevPanel.group({ id, label, target, options: [{ name, note?, img? }], kind?, page?: '/about' | ['/a', '/b'], dot?: 'tr'|'tl',
      current?: false, sample?: 'first'|'all', apply?(i) })
    Option 1 is "Current" (no attribute) unless current: false. Picking option i > 1 sets data-dv-<id>="<i>" on <html>.
    A group with options gets a blue dot. `options: [], current: false` makes a comment-only group with a green dot.
-   A group without `page` belongs to the page where its target first shows up. Picks, comments, and the list of
-   groups are kept for the whole site (one localStorage key per origin), so the dock counts and walks every page.
-   DevPanel.config({ site: '/memory/' | ['/a/', '/b/'] }) splits one server into separate sites, each with its own store;
-   groups whose `page` is on another site are skipped. Call it before DevPanel.group.
-   DevPanel.config({ title: '<project> > <topic>' }) sets the browser tab title while the overlay runs, such as
-   'samhq_backend > buy dialog'. Without it the title stays and the console warns once.
+   kind picks how the dock shows the options (default: chosen from the options):
+     'flat'   2-3 short options as one segmented row in the dock (the kit's look),
+     'select' a select button in the dock; its popover lists the options,
+     'many'   the same with a filter field (8 or more options),
+     'images' a grid of thumbnails with a big preview (any option with img).
+   Every popover ends with the group's comment field. A group without `page` belongs to the page where its target first
+   shows up. Picks, comments, and the list of groups are kept for the whole site (one localStorage key per origin).
+   DevPanel.config({ topic: 'buy dialog' }) names the page: the tab title is '<prefix> > <topic>', where serve.mjs puts the
+   prefix ('<project> > <Orca tab>', or the repo folder name) in front of this file. An old `title` is read as the topic
+   (its last ' > ' part). DevPanel.config({ site: '/memory/' | ['/a/', '/b/'] }) splits one server into separate sites,
+   each with its own store; groups whose `page` is on another site are skipped. Call it before DevPanel.group.
    DevPanel.config({ navigate(path) }) lets an app route itself; otherwise an SPA gets pushState + popstate and a
    static site a normal page load. Everything lives in one shadow root, so no style leaks in or out. Never ship this file.
-   The dots and dock come from the shared option-dots overlay (dots.js, copied in below). The current group lives in
-   the dock: its name, its options as a segmented control (a compact list when they do not fit), and its comment field.
-   A dot click makes its group current. Hovering a dock option or a dot pulses a faint red glow line on the target once.
-   URL params: ?dv-open=<id> makes a group current, ?dv-hl=<id> holds the glow at its peak (for screenshots),
+   The dots come from the shared option-dots overlay (dots.js, copied in below). The dock: minimize, back, count, next,
+   the current group (a select button, or a segmented row), comment, Hide dots, Copy choices. Minimized it is a small
+   capsule; hidden (key h) only a corner handle shows. An empty spacer the dock's height ends the page, so its footer
+   can scroll above the dock. Hovering an option or a dot, or arriving at a group, shows faint red guide lines once.
+   URL params: ?dv-open=<id> opens a group, ?dv-hl=<id> holds the guide lines (for screenshots),
    ?dv-pick=<id>:<i>[,<id>:<i>] forces options (nothing is saved), ?dv-clean hides the whole overlay.
-   Keys: . hides the dots, ] and [ go to the next and previous blue dot on any page (also DevPanel.next() and .back()). */
+   Keys: . hides the dots, h hides the dock, ] and [ go to the next and previous blue dot on any page, arrows and Enter
+   move and pick inside a popover, Escape closes it. */
 /* option-dots:start: a copy of dev-artifacts/dots.js. Edit that file, then run dots-sync.mjs. */
 /* Option dots: one shared overlay of option dots, with the artifact kit's look and motion.
    A blue dot opens choices to pick. A green dot opens only a comment field.
@@ -33,7 +40,8 @@
    od.add({ target, label, pick, render(body, rec), onClose(), pos: 'tr'|'tl', n }) -> rec
      target: an element, or a function that returns { t: element, r: rect }. pick: true blue, false green.
      render fills the popover body each time it opens. n: the number on a blue dot (default: its place on the page).
-   od.open(rec), od.close(), od.go(rec, open) -> Promise, od.step(d), od.sync(), od.controls, od.dock(...buttons).
+   od.open(rec): rec may carry anchor (a dock button: the popover grows up out of it) and reveal() (a rect the popover
+     must not cover: the page scrolls it into the free part). od.close(), od.go(rec, open) -> Promise, od.step(d), od.sync(), od.controls, od.dock(...buttons).
    od.freeze: a performance.now() time; until then a scroll does not move an open popover (a live preview is settling).
    Keys: [ and ] step, . hides the dots, Escape closes. */
 (() => {
@@ -74,6 +82,7 @@
   backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6); font: 14px/1.45 var(--od-font); text-align: left;
   transform-origin: top left; opacity: 0; transform: translateY(-4px) scale(.98); visibility: hidden; pointer-events: none;
   transition: opacity var(--od-close) var(--od-out), transform var(--od-close) var(--od-out), visibility 0s linear var(--od-close); }
+.od-pop.od-up:not(.od-show) { transform: translateY(6px) scale(.97); } /* anchored to a dock button: grows up out of it */
 .od-pop.od-show { opacity: 1; transform: none; visibility: visible; pointer-events: auto;
   transition: opacity 160ms ease, transform var(--od-open) var(--od-ease), visibility 0s; }
 .od-pop *, .od-pop *::before, .od-pop *::after { box-sizing: border-box; }
@@ -153,7 +162,10 @@
 
   window.OptionDots = (o = {}) => {
     const d = document, root = o.root || d.body, host = root.host, themeEl = o.theme || host || d.documentElement;
-    const key = o.key || 'od-hidden:' + location.pathname, DOCK = 72, M = 8;
+    const key = o.key || 'od-hidden:' + location.pathname, M = 8;
+    let DOCK = 72, dockEl = null;
+    // room the dock takes at the bottom of the window: its real top edge when it shows, else 72 px
+    const dockRoom = () => { const r = dockEl && dockEl.getBoundingClientRect(); return (DOCK = r && r.height ? innerHeight - r.top + M : dockEl ? M : 72); };
     const sheetMQ = matchMedia('(max-width: 600px)'), darkMQ = matchMedia('(prefers-color-scheme: dark)');
     const reduce = matchMedia('(prefers-reduced-motion: reduce)');
     const el = (t, c, html) => { const n = d.createElement(t); if (c) n.className = c; if (html) n.innerHTML = html; return n; };
@@ -215,16 +227,22 @@
       pop.setAttribute('aria-label', r.label || 'Options');
       body.replaceChildren(); if (r.render) r.render(body, r);
       recs.forEach((x) => x.el.setAttribute('aria-expanded', String(x === r)));
+      if (r.anchor) r.anchor.setAttribute('aria-expanded', 'true');
+      pop.classList.toggle('od-up', !!r.anchor);
       body.scrollTop = 0; placeNow = true; place(); pop.classList.add('od-show'); sync();
-      if (sheetMQ.matches && r.el) requestAnimationFrame(() => { // bring the target into the free part above the sheet
-        const b = box(r).r, top = innerHeight - pop.offsetHeight - M;
-        if (b && (b.top < M || b.bottom > top - M)) scrollBy(0, b.top - Math.max(12, (top - b.height) / 2));
+      // r.reveal() names the rect the popover must not cover (a dock popover's group target)
+      if ((sheetMQ.matches && r.el) || r.reveal) requestAnimationFrame(() => { // bring the target into the free part above the popover
+        const b = r.reveal ? r.reveal() : box(r).r, p = pop.getBoundingClientRect(); if (!b || !b.width) return;
+        // the floor is the popover's top when the target is under it, else the dock's top
+        const under = sheetMQ.matches || !(b.right < p.left || b.left > p.right), top = under ? (sheetMQ.matches ? innerHeight - pop.offsetHeight - M : p.top) : innerHeight - dockRoom();
+        if (b.top < M || b.bottom > top - M) scrollBy({ top: b.top - Math.max(12, (top - b.height) / 2), behavior: reduce.matches ? 'instant' : 'smooth' });
       });
     }
     function close() {
       if (!shown) return;
       const r = shown; shown = null; pop.classList.remove('od-show');
       recs.forEach((x) => x.el.setAttribute('aria-expanded', 'false'));
+      if (r.anchor) r.anchor.setAttribute('aria-expanded', 'false');
       if (r.onClose) r.onClose();
     }
     function pulse(r) { r.el.classList.remove('od-pulse'); void r.el.offsetWidth; r.el.classList.add('od-pulse'); setTimeout(() => r.el.classList.remove('od-pulse'), 1500); }
@@ -240,6 +258,7 @@
       close(); if (r.pick) cur = r; sync();
       return new Promise((res) => {
         const { t, r: b } = box(r); if (!t) return res(false);
+        dockRoom();
         const vh = innerHeight, tall = b.height > vh - DOCK - 16;
         const seen = tall ? b.top >= 0 && b.top < vh / 3 : b.top >= M && b.bottom <= vh - DOCK;
         const done = () => { pulse(r); if (openIt) open(r); res(true); };
@@ -276,9 +295,14 @@
       // beside the target on the roomiest side (right, left, below, above), so the target stays in view
       const keep = body.scrollTop;
       pop.style.width = pop.style.maxHeight = '';
+      dockRoom();
       let w = pop.offsetWidth, h = pop.offsetHeight, left, top;
-      const b = shown.el ? box(shown).r : null;
-      if (!b) { // no target (a list): centered just above the dock
+      const b = shown.el ? box(shown).r : null, a = shown.anchor && shown.anchor.getBoundingClientRect();
+      if (a) { // a dock button: just above it, its left edge on the button's, grown out of the button's middle
+        if (h > a.top - 2 * M) { pop.style.maxHeight = a.top - 2 * M + 'px'; h = pop.offsetHeight; }
+        left = Math.min(Math.max(a.left - 6, M), vw - w - M); top = a.top - M - h;
+        pop.style.transformOrigin = `${Math.round(a.left + a.width / 2 - left)}px 100%`;
+      } else if (!b) { // no target (a list): centered just above the dock
         if (h > vh - DOCK - 2 * M) { pop.style.maxHeight = vh - DOCK - 2 * M + 'px'; h = pop.offsetHeight; }
         left = (vw - w) / 2; top = vh - DOCK - h;
       } else {
@@ -365,7 +389,7 @@
 
     function dock(...buttons) {
       const k = el('div', 'od-dock'); k.setAttribute('role', 'toolbar'); k.setAttribute('aria-label', 'Options'); k.setAttribute('data-od-keep', '');
-      k.append(ctl, ...buttons); root.append(k); return k;
+      k.append(ctl, ...buttons); root.append(k); dockEl = k; return k;
     }
     const api = { add, open, close, go, step, sync, schedule, pulse, dock, setHidden, controls: ctl, count, pop, body, layer, freeze: 0,
       get hidden() { return hidden; }, get shown() { return shown; }, get current() { return cur; }, set current(r) { cur = r; sync(); } };
@@ -376,9 +400,29 @@
 /* option-dots:end */
 (() => {
   if (window.DevPanel) return;
-  const KEY = 'devpanel', GO = 'devpanel:go', Q = new URLSearchParams(location.search);
+/* kit-css:start: cut from the artifact kit's kit.css by dots-sync.mjs. Do not edit. */
+const KIT_CSS = String.raw`
+:host { --page: #f2f2f7; --card: #ffffff; --inset: #f2f2f7; --ink: #1c1c1e; --muted: rgba(60,60,67,.62); --line: rgba(60,60,67,.16); --blue: #007aff; --blue-ink: #0062cc; --blue-bg: rgba(0,122,255,.09); --red: #d70015; --red-bg: rgba(255,59,48,.09); --amb: #b25000; --amb-bg: rgba(255,159,10,.13); --grn: #248a3d; --grn-bg: rgba(52,199,89,.12); --gry: rgba(60,60,67,.62); --gry-bg: rgba(120,120,128,.13); --dock: rgba(255,255,255,.66); --dock-hi: rgba(255,255,255,.7); --seg: rgba(120,120,128,.16); --seg-on: #ffffff; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06); --zebra: rgba(120,120,128,.06); --sep: rgba(60,60,67,.1); --soft: rgba(120,120,128,.09); --sw-off: rgba(120,120,128,.24); --ref-open: #1a7f37; --ref-merged: #8250df; --ref-draft: #6e7781; --ref-closed: #cf222e; --ref-mine: #e8590c; --pop: rgba(255,255,255,.94); --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; --fs-title: 44px; --fs-h2: 28px; --fs-slide: 34px; --fs-body: 17px; --fs-sm: 15px; --fs-kicker: 13px; --k-ease: linear(0, 0.022, 0.075, 0.147, 0.228, 0.31, 0.391, 0.467, 0.537, 0.601, 0.657, 0.708, 0.751, 0.789, 0.822, 0.85, 0.874, 0.895, 0.912, 0.927, 0.939, 0.949, 0.958, 0.965, 0.971, 0.976, 0.98, 0.984, 0.987, 0.989, 0.991, 0.993, 0.994, 0.995, 0.996, 0.997, 0.997, 0.998, 0.998, 0.998, 1); --k-ease-close: cubic-bezier(.22, 1, .36, 1); --k-open: 380ms; --k-close: 220ms; --k-fade: 100ms; --k-morph-in: 150ms; --k-morph-out: 100ms; --k-words-at: 40ms; --k-stagger: 12ms; --gutter-l: max(16px, env(safe-area-inset-left, 0px)); --gutter-r: max(16px, env(safe-area-inset-right, 0px)); --m-canvas: #09090b; --m-text: #f4f4f7; --m-sec: rgba(244,244,247,.66); --m-tile: #18181c; --m-line: rgba(255,255,255,.14); --m-glass: rgba(20,20,25,.78); --m-on: #34c759; --m-red: #f14c35; --m-knob: #ffffff; }
+:host([data-od-dark]) { --page: #000000; --card: #1c1c1e; --inset: #000000; --ink: #f2f2f7; --muted: rgba(235,235,245,.6); --line: rgba(84,84,88,.6); --blue: #0a84ff; --blue-ink: #4da3ff; --blue-bg: rgba(10,132,255,.16); --red: #ff6961; --red-bg: rgba(255,69,58,.16); --amb: #ff9f0a; --amb-bg: rgba(255,159,10,.16); --grn: #30d158; --grn-bg: rgba(48,209,88,.14); --gry: rgba(235,235,245,.6); --gry-bg: rgba(142,142,147,.18); --dock: rgba(40,40,44,.6); --dock-hi: rgba(255,255,255,.14); --seg: rgba(118,118,128,.32); --seg-on: #636366; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3); --zebra: rgba(255,255,255,.035); --sep: rgba(84,84,88,.42); --soft: rgba(255,255,255,.06); --sw-off: rgba(120,120,128,.4); --ref-open: #3fb950; --ref-merged: #a371f7; --ref-draft: #8b949e; --ref-closed: #f85149; --ref-mine: #ff922b; --pop: rgba(44,44,48,.94);  }
+.k-hint { font-size: 16px; color: var(--muted); margin: 0 0 16px; max-width: 80ch; text-wrap: pretty; }
+.k-comment { display: block; width: 100%; margin-top: 12px; font: inherit; font-size: 16px; line-height: 1.4; color: var(--ink); background: var(--card); border: .5px solid var(--line); border-radius: 12px; padding: 11px 14px; min-height: 46px; resize: none; overflow: hidden; outline: none; box-shadow: var(--shadow); field-sizing: content; }
+.k-comment::placeholder { color: var(--muted); }
+.k-comment:focus { border-color: var(--blue); }
+.k-dock { position: fixed; left: 0; right: 0; margin-inline: auto; width: max-content; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; padding: 6px; max-width: calc(100vw - 24px); border-radius: 999px; background: var(--dock); backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8); border: .5px solid var(--line); box-shadow: var(--shadow), inset 0 1px 0 var(--dock-hi); }
+.k-dock button { font: inherit; font-size: 14px; font-weight: 600; line-height: 1; color: var(--ink); background: transparent; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+.k-dock .k-nav { width: 32px; height: 32px; padding: 0; font-size: 20px; display: grid; place-items: center; }
+.k-dock .k-nav:disabled { opacity: .3; cursor: default; }
+.k-dock output { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 0 4px; white-space: nowrap; min-width: 40px; text-align: center; }
+.k-seg { display: flex; align-items: center; background: var(--seg); border-radius: 999px; padding: 2px; }
+.k-seg button { padding: 6px 10px; }
+.k-seg-label { font-size: 14px; font-weight: 600; color: var(--muted); padding: 0 6px 0 10px; white-space: nowrap; }
+.k-seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.k-dock .k-copy { background: var(--blue); color: #fff; }`;
+/* kit-css:end */
+  const KEY = 'devpanel', GO = 'devpanel:go', DOCK_KEY = 'devpanel:dock', Q = new URLSearchParams(location.search);
   // Loaded from another origin (serve.mjs on 4799 inside a Vite app): the page is an SPA that routes itself.
   const me = document.currentScript, spa = !!me && new URL(me.src, location.href).origin !== location.origin;
+  const PREFIX = String(window.__dvTitlePrefix || ''); // '<project> > <Orca tab>', set by serve.mjs in front of this file
   const forced = Object.fromEntries((Q.get('dv-pick') || '').split(',').map((s) => s.split(':')).filter((p) => p[1] > 0).map(([k, v]) => [k, +v]));
   const st = { picks: {}, notes: {}, groups: [] }, cfg = {};
   let key = KEY, base = ''; // base: the site this page belongs to (DevPanel.config({ site })), '' = the whole origin
@@ -411,92 +455,160 @@
     return pages.flatMap((p) => st.groups.filter((m) => home(m) === p));
   }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-  let host, sh, od, hl, gls, panel, picksOut, copyBtn, open = null, lit = null, glowA = null, raf = 0;
-  let previewT = 0, hoverT = 0, busyN = 0;
-  let curId = null, goN = 0, sayT = 0, posText = ''; // back/next: the current group
-  let listOpen = false; // the count button's list of every group on the site
+  let host, sh, od, hl, gls, dockEl, grp, pill, handle, spacer, lb, sayOut, copyBtn, shownG = null, popG = null;
+  let lit = null, stillT = 0, raf = 0, hoverT = 0, curId = null, goN = 0, sayT = 0, posText = '', listOpen = false;
+  let dockState = 'open';
+  try { dockState = ['open', 'min', 'hide'].includes(localStorage.getItem(DOCK_KEY)) ? localStorage.getItem(DOCK_KEY) : 'open'; } catch {}
+
+  // How the dock shows a group's options; see the header.
+  const kind = (g) => !g.opts.length ? 'note' : g.kind || (g.opts.some((o) => o.img) ? 'images' : g.opts.length >= 8 ? 'many'
+    : g.opts.length <= 3 && g.opts.reduce((n, o) => n + o.name.length, 0) <= 36 ? 'flat' : 'select');
+
+  const svg = (d, w = 1.6) => `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const CHEV = svg('M3 4.5 6 7.5l3-3'), UP = svg('M3 7.5 6 4.5l3 3'), MIN = svg('M3 6h6');
+  const BUBBLE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3h9A1.5 1.5 0 0 1 14 4.5v5a1.5 1.5 0 0 1-1.5 1.5H8l-3 2.5V11H3.5A1.5 1.5 0 0 1 2 9.5v-5A1.5 1.5 0 0 1 3.5 3Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>';
+  const DOCKI = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="9.5" width="11" height="4" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 6.5 8 4.5l2 2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   const CSS = `
-:host { all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; color-scheme: light;
-  --blue: #007aff; --ink: #1d1d1f; --muted: rgba(60,60,67,.6); --sep: rgba(0,0,0,.09);
-  font: 13px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif; color: var(--ink);
-  -webkit-font-smoothing: antialiased; }
-:host([data-od-dark]) { color-scheme: dark; --blue: #0a84ff; --ink: #f5f5f7; --muted: rgba(235,235,245,.6); --sep: rgba(255,255,255,.1); }
+:host { all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; color-scheme: light; --dv-red: #ff3b30;
+  font: 14px/1.35 var(--od-font); color: var(--od-ink); -webkit-font-smoothing: antialiased; }
+:host([data-od-dark]) { color-scheme: dark; --dv-red: #ff453a; }
 * { box-sizing: border-box; outline: none !important; -webkit-tap-highlight-color: transparent; }
-button, textarea { font: inherit; color: inherit; }
+button, textarea, input { font: inherit; color: inherit; }
 button { cursor: pointer; border: 0; background: none; padding: 0; }
 [hidden] { display: none !important; }
+svg { display: block; flex: none; }
 
-/* changed-element glow: four thin red lines on the target's edges, a soft glow, ends that fade out. No fill.
-   It pulses once (fade in, then out) per hover of a dock option or a dot; paint only, so the page never moves. */
-.hl { position: absolute; inset: 0; opacity: 0; --red: #ff3b30; }
-:host([data-od-dark]) .hl { --red: #ff453a; }
-.gl { position: absolute; left: 0; top: 0; background: var(--red); box-shadow: 0 0 6px 1px var(--red); }
-.gl.h { height: 1px; -webkit-mask: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
-  mask: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
-.gl.v { width: 1px; -webkit-mask: linear-gradient(180deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
-  mask: linear-gradient(180deg, transparent, #000 24px, #000 calc(100% - 24px), transparent); }
-.hl.hold { opacity: .4; }
+/* guide lines: four thin faint red lines on the target's edges, like the guide lines on a chart. They shoot out about a
+   third of the window past the target (to the window's edge when it is off screen) and fade at their ends. No fill.
+   Paint only, so the page never moves. */
+.hl { position: absolute; inset: 0; opacity: 0; }
+.gl { position: absolute; left: 0; top: 0; background: var(--dv-red); }
+.gl.h { height: 1px; -webkit-mask: linear-gradient(90deg, transparent, #000 var(--e), #000 calc(100% - var(--e)), transparent);
+  mask: linear-gradient(90deg, transparent, #000 var(--e), #000 calc(100% - var(--e)), transparent); }
+.gl.v { width: 1px; -webkit-mask: linear-gradient(180deg, transparent, #000 var(--e), #000 calc(100% - var(--e)), transparent);
+  mask: linear-gradient(180deg, transparent, #000 var(--e), #000 calc(100% - var(--e)), transparent); }
+.hl.hold { opacity: .5; }
 
-/* the current group in the dock: name and note, options as a segmented control, comment field */
-.od-dock.dv-has { width: min(720px, calc(100vw - 24px)); border-radius: 24px; justify-content: flex-start; gap: 6px 8px; }
-.od-dock.dv-has > .od-ctl { margin-right: auto; }
-.dv-panel { order: -1; flex: 1 0 100%; min-width: 0; display: grid; gap: 8px; padding: 8px 8px 4px; }
-.dv-panel[hidden] { display: none; }
-.dv-head { display: flex; align-items: center; gap: 8px 12px; min-width: 0; }
-.dv-label { flex: 1 1 140px; min-width: 0; display: flex; align-items: center; gap: 8px; }
-.dv-label > span:last-child { min-width: 0; }
-.dv-label b { display: block; font: 600 14px/1.25 var(--od-font); color: var(--od-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dv-note { display: block; min-height: 16px; font: 500 12px/16px var(--od-font); color: var(--od-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dv-seg { flex: 0 1 auto; min-width: 0; overflow: hidden; display: flex; padding: 2px; gap: 2px; border-radius: 999px; background: var(--od-fill); }
-.dv-seg button { position: relative; overflow: hidden; flex: 1 0 auto; height: 30px; padding: 0 12px; border-radius: 999px; white-space: nowrap;
-  font: 600 13px/1 var(--od-font); color: var(--od-ink); transition: background-color .18s ease, color .18s ease; }
-.dv-seg button:hover, .dv-seg button:focus-visible { background: color-mix(in srgb, var(--od-ink) 8%, transparent); }
-.dv-seg button[aria-checked="true"] { background: var(--od-blue); color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
-.dv-seg button .n { color: inherit; opacity: .55; font-variant-numeric: tabular-nums; margin-right: 5px; }
-/* many options: a compact list of rounded rows instead of one row of segments */
-.dv-seg.dv-list { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); max-height: 30vh;
-  overflow-y: auto; border-radius: 14px; scrollbar-width: none; }
-.dv-head:has(.dv-list) { flex-wrap: wrap; }
-.dv-seg.dv-list button { border-radius: 12px; text-align: left; overflow: hidden; text-overflow: ellipsis; }
-.dv-panel textarea { display: block; width: 100%; min-height: 38px; padding: 9px 12px; resize: none; overflow: hidden;
-  font: 14px/1.4 var(--od-font); color: var(--od-ink); background: var(--od-card); border: .5px solid var(--od-line); border-radius: 12px; }
-.dv-panel textarea:focus { border-color: var(--od-blue); }
-.dv-panel textarea::placeholder { color: var(--od-muted); }
+/* the dock: the kit's capsule. Order: minimize, back, count, next, the group, comment, Hide dots, Copy choices */
+.od-dock { gap: 6px; flex-wrap: wrap; }
+.od-dock.dv-wrap { border-radius: 24px; }
+.od-ctl { display: contents; }
+/* two classes each: the shared overlay's ".od-ctl button { all: unset }" would reset a one-class order */
+.od-dock .dv-min { order: 0; } .od-dock .od-step { order: 1; } .od-dock .dv-grp { order: 2; } .od-dock .od-eye { order: 4; }
+.od-dock .dv-say { order: 6; } .od-dock .od-primary { order: 9; }
+.od-ctl .od-step { background: none; padding: 0; gap: 0; }
+.od-ctl .od-nav, .dv-ib, .od-dock > .dv-ib { width: 32px; padding: 0; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--od-ink); }
+.od-ctl .od-nav svg { width: 12px; height: 12px; }
+.od-ctl .od-count { height: 32px; padding: 0 6px; font: 600 14px/1 var(--od-font); min-width: 44px; }
+.od-ctl .od-count::before { content: none; }
+.od-ctl .od-eye { transition: none; }
+.dv-ib svg { width: 16px; height: 16px; }
+.dv-min svg { width: 13px; height: 13px; }
+.od-dock button:hover, .dv-ib:hover, .od-ctl .od-count[aria-expanded="true"] { background: var(--od-fill); }
+.od-dock > .od-primary:hover { background: var(--od-blue); filter: brightness(1.08); }
+.dv-ib[data-on="true"] { color: var(--od-blue); }
+.dv-say { color: var(--od-ink); font: 500 13px/1.3 var(--od-font); max-width: 240px; padding: 0 6px; }
 
-/* loading state: a sweep across the hovered option while a preview settles. .opt rows are the list of every group. */
-.dv-seg button.loading::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 60%; pointer-events: none;
-  animation: dv-sweep .8s linear infinite; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--blue) 16%, transparent), transparent); }
-.opt { position: relative; overflow: hidden; display: grid; grid-template-columns: 12px 1fr auto; align-items: start; column-gap: 7px;
-  width: 100%; text-align: left; padding: 5px 9px 6px 7px; border-radius: 8px; }
-.opt:hover, .opt:focus-visible { background: var(--blue); color: #fff; }
-.opt .ck { font-size: 11px; font-weight: 700; line-height: 18px; visibility: hidden; }
-.opt[aria-selected="true"] .ck { visibility: visible; }
-.opt .name { display: block; line-height: 18px; }
-.opt .note { display: block; color: var(--muted); font-size: 12px; line-height: 1.3; margin-bottom: 1px; }
-.opt .n { color: var(--muted); font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; padding-left: 10px; }
-.opt:hover .note, .opt:hover .n, .opt:focus-visible .note, .opt:focus-visible .n { color: rgba(255,255,255,.82); }
+/* the current group: the kit's segmented control (k-seg). Its label (k-seg-label), then the options (flat) or a select
+   button with the pick (the other kinds). The pick sits on the kit's raised thumb. */
+.dv-grp { display: flex; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
+.dv-track.k-seg { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.od-dock.k-dock.dv-wrap .dv-track { border-radius: 18px; }
+.od-dock .dv-lab.k-seg-label { display: flex; align-items: center; gap: 7px; min-width: 0; max-width: 240px; padding: 6px 6px 6px 8px; background: none; }
+.dv-lab span:last-child { overflow: hidden; text-overflow: ellipsis; }
+.dv-lab .od-mini { width: 16px; height: 16px; font-size: 9px; }
+.od-dock .dv-lab:hover { background: none; color: var(--ink); }
+.od-dock .dv-o:not([aria-pressed="true"]):hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.od-dock .dv-sel, .od-dock .dv-sel:hover { background: var(--seg-on); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.od-dock .dv-sel { display: flex; align-items: center; gap: 8px; min-width: 150px; max-width: 280px; padding: 6px 10px 6px 12px; }
+.dv-sel span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.dv-sel svg { width: 11px; height: 11px; color: var(--od-muted); transition: rotate var(--od-open) var(--od-out); }
+.dv-sel[aria-expanded="true"] svg { rotate: 180deg; }
+
+/* minimized capsule and the corner handle */
+.dv-pill, .dv-handle { position: fixed; z-index: 2147483001; pointer-events: auto; display: flex; align-items: center; justify-content: center;
+  background: var(--od-dock); color: var(--od-ink); border: .5px solid var(--od-line); box-shadow: var(--od-shadow), inset 0 1px 0 var(--od-hi);
+  backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8); }
+.dv-pill { left: 0; right: 0; margin-inline: auto; width: max-content; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); gap: 8px;
+  height: 40px; padding: 0 12px 0 10px; border-radius: 999px; font: 600 14px/1 var(--od-font); font-variant-numeric: tabular-nums; }
+.dv-pill .od-mini { width: 16px; height: 16px; font-size: 9px; }
+.dv-pill svg { width: 11px; height: 11px; color: var(--od-muted); }
+.dv-handle { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: 32px; height: 32px; border-radius: 50%; color: var(--od-muted); }
+.dv-handle svg { width: 16px; height: 16px; }
+.dv-pill:hover, .dv-handle:hover { color: var(--od-ink); background: var(--od-pop); }
+.dv-in { animation: dv-in var(--od-open) var(--od-out); }
+@keyframes dv-in { from { opacity: 0; transform: translateY(6px) scale(.97); } }
+
+/* popover content: plain rows like a macOS menu, a filter for long lists, a thumbnail grid for images */
+.od-pop.dv-wide { max-width: min(660px, calc(100vw - 16px)); }
+.dv-list { display: grid; gap: 1px; margin: 0 -6px; }
+.dv-row { display: grid; grid-template-columns: 14px 1fr; column-gap: 8px; align-items: start; width: 100%; text-align: left;
+  padding: 7px 10px 7px 8px; border-radius: 8px; position: relative; overflow: hidden; }
+.dv-row:hover, .dv-row.on { background: var(--od-fill); }
+.dv-row .ck { font-size: 12px; font-weight: 700; line-height: 20px; color: var(--od-blue); visibility: hidden; }
+.dv-row[aria-selected="true"] .ck { visibility: visible; }
+.dv-row b { display: block; font: 500 14px/20px var(--od-font); }
+.dv-row[aria-selected="true"] b { font-weight: 600; }
+.dv-row .n, .dv-tile .n { color: var(--od-muted); font-variant-numeric: tabular-nums; margin-right: 6px; font-weight: 500; }
+.dv-row small { display: block; font: 12.5px/1.35 var(--od-font); color: var(--od-muted); }
+.dv-filter { position: sticky; top: -8px; z-index: 1; margin: -8px -14px 6px; padding: 8px 14px 6px; background: var(--od-pop); }
+.dv-filter input { width: 100%; height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--od-fill); font: 14px var(--od-font); color: var(--od-ink); }
+.dv-filter input::placeholder { color: var(--od-muted); }
+.dv-none { padding: 10px 4px; color: var(--od-muted); }
+.dv-imgs { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 14px; align-items: start; }
+.dv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.dv-tile { display: grid; gap: 4px; text-align: left; min-width: 0; padding: 3px; border-radius: 10px; position: relative; overflow: hidden; }
+.dv-tile .th { aspect-ratio: 4 / 3; border-radius: 7px; background: var(--od-fill) center / cover no-repeat; box-shadow: inset 0 0 0 .5px var(--od-line);
+  display: grid; place-items: center; font: 600 12px/1 var(--od-font); color: var(--od-muted); }
+.dv-tile span:last-child { font: 500 12px/1.3 var(--od-font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px 1px; }
+.dv-tile:hover, .dv-tile.on { background: var(--od-fill); }
+.dv-tile[aria-selected="true"] .th { box-shadow: 0 0 0 2px var(--od-blue); }
+.dv-tile[aria-selected="true"] span:last-child { font-weight: 600; }
+.dv-pv { margin: 0; position: sticky; top: 0; display: grid; gap: 6px; }
+.dv-pv .th { aspect-ratio: 4 / 3; border-radius: 10px; background: var(--od-fill) center / contain no-repeat; box-shadow: inset 0 0 0 .5px var(--od-line);
+  cursor: zoom-in; display: grid; place-items: center; color: var(--od-muted); font-weight: 600; }
+.dv-pv b { font: 600 14px/1.3 var(--od-font); }
+.dv-pv small { display: block; font: 12.5px/1.35 var(--od-font); color: var(--od-muted); }
+.od-body .k-comment { font-size: 15px; margin-top: 10px; min-height: 40px; padding: 9px 12px; box-shadow: none; background: var(--inset); }
+.od-body .k-hint { font-size: 13px; margin: 0 0 8px; line-height: 1.4; }
+.od-body .k-hint + .dv-list, .od-body .k-hint + .dv-imgs { margin-top: 2px; }
+.dv-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
+.dv-foot button { padding: 7px 12px; border-radius: 999px; font: 600 13px/1 var(--od-font); color: var(--od-muted); }
+.dv-foot button:hover { background: var(--od-fill); color: var(--od-ink); }
+.dv-foot button.armed { color: #ff3b30; }
+/* the list of every group: page heads, then a row per group with its pick as the note */
+.dv-ghead { padding: 8px 8px 4px; font: 600 12px/1.3 var(--od-font); color: var(--od-muted); }
+.dv-ghead i { font-style: normal; font-weight: 400; }
+.dv-row:disabled { cursor: default; opacity: .5; background: none; }
+/* full-size image */
+.dv-lb { position: fixed; inset: 0; z-index: 2147483005; pointer-events: auto; display: grid; place-items: center; gap: 10px; padding: 24px;
+  background: rgba(0,0,0,.7); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); cursor: zoom-out;
+  opacity: 0; transition: opacity var(--od-close) ease; }
+.dv-lb.show { opacity: 1; transition: opacity var(--od-open) ease; }
+.dv-lb img { max-width: 100%; max-height: calc(100vh - 90px); border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+.dv-lb p { margin: 0; color: #fff; font: 600 14px/1.3 var(--od-font); }
+/* loading sweep on the hovered option while its preview settles */
+.loading::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 60%; pointer-events: none;
+  animation: dv-sweep .8s linear infinite; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--od-blue) 16%, transparent), transparent); }
+.dv-o { position: relative; overflow: hidden; }
 @keyframes dv-sweep { from { transform: translateX(-100%); } to { transform: translateX(223%); } }
-.sep { height: 1px; margin: 6px 9px; background: var(--sep); }
-/* the list of every group: page path heads, the group's label, its pick as the note */
-.ghead { padding: 6px 9px 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
-.ghead .here { font-weight: 400; }
-.row .n { min-width: 22px; text-align: right; }
-.row:disabled { cursor: default; opacity: .55; }
-.row:disabled:hover { background: none; color: inherit; }
-.row:disabled:hover .note, .row:disabled:hover .n { color: var(--muted); }
-.od-dock > .picks.say { color: var(--ink); white-space: normal; max-width: 260px; }
 @media (max-width: 600px) {
-  .opt { padding: 9px 9px 9px 7px; }
-  .od-dock > .picks:not(.say) { display: none; } /* room for back and next at phone width */
-  .od-dock > button { padding: 8px 10px; }
-  .dv-head { flex-wrap: wrap; }
-  .dv-label { flex-basis: 100%; }
-  .dv-seg { flex: 1 1 100%; }
-  .dv-panel textarea { font-size: 16px; } /* 16 px stops iOS zoom on focus */
+  .od-dock .dv-grp { order: -1; flex: 1 1 100%; }
+  .dv-track { flex: 1; }
+  .od-dock .dv-sel { flex: 1; min-width: 0; max-width: none; }
+  .od-dock .dv-lab { max-width: 46%; }
+  .dv-imgs { grid-template-columns: 1fr; }
+  .dv-pv { position: static; order: -1; grid-template-columns: 112px 1fr; align-items: center; }
+  .dv-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dv-filter input, .od-body textarea { font-size: 16px; } /* 16 px stops iOS zoom on focus */
+  .dv-row { padding: 9px 10px 9px 8px; }
 }
-@media (prefers-reduced-motion: reduce) { .dv-seg button.loading::after { animation: none; left: 0; width: 100%; background: color-mix(in srgb, var(--blue) 8%, transparent); }
-  .dv-seg button { transition: none; } }`;
+@media (prefers-reduced-motion: reduce) { .loading::after { animation: none; width: 100%; background: color-mix(in srgb, var(--od-blue) 8%, transparent); }
+  .dv-in { animation: none; } .dv-sel svg, .dv-lb, .dv-lb.show { transition: none; } }`;
+
+  const mk = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html) n.innerHTML = html; return n; };
+  const ib = (cls, html, label, fn) => { const b = mk('button', cls, html); b.type = 'button'; b.setAttribute('aria-label', label); b.title = label; b.onclick = fn; return b; };
 
   function mount() {
     if (host || !document.body) return;
@@ -505,46 +617,92 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     // A page view transition lays a snapshot over everything and takes the pointer (the cursor flips to an
     // arrow and clicks hit <html>) until it ends. Let the pointer pass through to the real page and menu.
     document.head.append(Object.assign(document.createElement('style'), { textContent: '::view-transition { pointer-events: none; }' }));
-    sh.innerHTML = `<style>${CSS}</style><div class="hl"><div class="gl h"></div><div class="gl h"></div><div class="gl v"></div><div class="gl v"></div></div>`;
+    sh.innerHTML = `<style>${KIT_CSS}</style><style id="dv-css">${CSS}</style><div class="hl"><div class="gl h"></div><div class="gl h"></div><div class="gl v"></div><div class="gl v"></div></div>`;
     hl = sh.querySelector('.hl'); gls = sh.querySelectorAll('.gl');
-    if (Q.has('dv-clean')) host.style.display = 'none';
+    const clean = Q.has('dv-clean');
+    if (clean) host.style.display = 'none';
     document.body.appendChild(host);
+    // The end spacer: as tall as the dock and its margin, so the page's last line can scroll above the dock.
+    spacer = document.createElement('div'); spacer.setAttribute('aria-hidden', 'true'); spacer.dataset.devPanel = 'spacer';
+    spacer.style.cssText = 'display:block;height:0;margin:0;padding:0;border:0;flex:none;pointer-events:none';
+    if (!clean) document.body.appendChild(spacer);
     od = window.OptionDots({ root: sh, key: 'devpanel:hidden', step: go, count: () => posText,
-      list: () => (listOpen ? od.close() : showList()), select: (r) => { const g = groups.find((x) => x.rec === r); if (g) show(g); } });
-    od.count.setAttribute('aria-haspopup', 'dialog'); od.count.title = 'All groups on the site';
-    const b = (cls, text, fn) => { const n = document.createElement('button'); n.type = 'button'; n.className = cls; n.textContent = text; n.onclick = fn; return n; };
-    picksOut = document.createElement('output'); picksOut.className = 'picks';
-    copyBtn = b('od-primary', 'Copy choices', copy);
-    // Reset also forgets the site's group list; groups on other pages come back when their page is opened.
-    const reset = b('', 'Reset', () => {
-      st.picks = {}; st.notes = {}; st.groups = st.groups.filter((m) => groups.some((g) => g.id === m.id));
-      save(); od.close(); groups.forEach((g) => setVar(g, 1)); open = null; sync();
-    });
-    panel = document.createElement('div'); panel.className = 'dv-panel'; panel.hidden = true;
-    od.dock(panel, picksOut, reset, copyBtn);
+      list: () => (listOpen ? od.close() : showList()), select: (r) => { const g = groups.find((x) => x.rec === r); if (g) dotClick(g); } });
+    sh.append(sh.getElementById('dv-css')); // kit, then the shared overlay's style, then this one, so later wins ties
+    od.count.setAttribute('aria-haspopup', 'dialog'); od.count.title = 'Every group on the site';
+    sayOut = mk('output', 'dv-say'); sayOut.hidden = true;
+    copyBtn = mk('button', 'od-primary k-copy', 'Copy choices'); copyBtn.type = 'button'; copyBtn.onclick = copy;
+    copyBtn.title = 'Copies every pick and comment as a list, one line per group, to paste in chat';
+    grp = mk('div', 'dv-grp');
+    const min = ib('dv-ib dv-min', MIN, 'Minimize the dock', () => setDock('min'));
+    dockEl = od.dock(min, grp, sayOut, copyBtn); dockEl.classList.add('k-dock');
+    pill = ib('dv-pill', '', 'Open the dock', () => setDock('open'));
+    handle = ib('dv-handle', DOCKI, 'Show the dock  ( h )', () => setDock('open'));
+    sh.append(pill, handle);
+    try { const ro = new ResizeObserver(fit); ro.observe(dockEl); ro.observe(pill); } catch {}
     for (const g of groups) addDot(g);
+    setDock(dockState, true);
     sync();
+  }
+
+  // open: the full dock. min: a small capsule with the count. hide: only a corner handle. Kept after a reload.
+  function setDock(s, quiet) {
+    dockState = s; try { localStorage.setItem(DOCK_KEY, s); } catch {}
+    if (s !== 'open') od.close();
+    const show = { open: dockEl, min: pill, hide: handle }[s];
+    for (const n of [dockEl, pill, handle]) { n.hidden = n !== show; n.classList.remove('dv-in'); }
+    if (!quiet) { void show.offsetWidth; show.classList.add('dv-in'); }
+    fit();
+  }
+  function fit() {
+    if (!dockEl) return;
+    const n = dockState === 'open' ? dockEl : dockState === 'min' ? pill : null, h = n ? n.getBoundingClientRect().height : 0;
+    spacer.style.height = h ? Math.ceil(h + 32) + 'px' : '0'; // 16 px under the dock and 16 px of air above it
+    dockEl.classList.toggle('dv-wrap', dockEl.offsetHeight > 52);
   }
 
   function addDot(g) {
     g.rec = od.add({ target: () => sample(g), label: g.label, pick: g.opts.length > 0, pos: g.pos });
     g.el = g.rec.el;
     g.el.onpointerenter = (e) => { if (e.pointerType !== 'touch') glow(g); };
-    g.el.onpointerleave = unglow;
+  }
+  // A dot click does what back and next do: the group becomes current, its lines show, its popover opens.
+  function dotClick(g) {
+    if (popG === g) return od.close();
+    show(g); od.pulse(g.rec); glow(g);
+    if (kind(g) !== 'flat') popFor(g, kind(g) === 'note');
   }
 
-  // One pulse of the red glow on a group's target per hover: fade in, then out, never looping, never staying on.
-  // Reduced motion: a static faint glow while the pointer stays, then gone.
-  const still = matchMedia('(prefers-reduced-motion: reduce)');
+  // The guide lines run once, about 1 s: they shoot out from the target's edges (180 ms), glow up and settle (300 ms),
+  // then fade out fast (400 ms). A new hover on the same group starts them again only once they fade.
+  // Reduced motion: still, faint lines for the same time, then gone.
+  const still = matchMedia('(prefers-reduced-motion: reduce)'), GROW = 180, PEAK = 300, OUT = 400, T = GROW + PEAK + OUT;
+  const OUTQ = 'cubic-bezier(.22, 1, .36, 1)';
+  let glowAs = [];
   function glow(g, hold) {
-    if (glowA) glowA.cancel();
+    if (lit === g && glowAs.some((a) => a.playState === 'running' && a.currentTime < GROW + PEAK)) return; // fading: run again
     lit = g; place();
-    hl.classList.toggle('hold', !!hold || still.matches);
-    if (hold || still.matches) return;
-    glowA = hl.animate([{ opacity: 0 }, { opacity: 0.45, offset: 0.4 }, { opacity: 0 }], { duration: 800, easing: 'ease-in-out' });
-    const a = glowA; a.onfinish = () => { if (glowA === a) { glowA = null; lit = null; } };
+    glowAs.forEach((a) => a.cancel()); glowAs = []; clearTimeout(stillT); hl.classList.remove('hold');
+    if (hold || still.matches) {
+      hl.classList.add('hold');
+      if (!hold) stillT = setTimeout(() => { hl.classList.remove('hold'); lit = null; }, T);
+      return;
+    }
+    const r = g.r; if (!r || !r.width) return;
+    // each line starts as long as the target's side and grows to its full length (scale, so it is paint only)
+    gls.forEach((n, i) => {
+      const h = i < 2, full = h ? n.offsetWidth : n.offsetHeight, side = h ? r.width + 8 : r.height + 8, s = Math.min(1, side / Math.max(full, 1));
+      glowAs.push(n.animate([{ scale: h ? `${s} 1` : `1 ${s}`, easing: OUTQ }, { scale: '1 1', offset: GROW / T }, { scale: '1 1' }], { duration: T }));
+    });
+    const a = hl.animate([
+      { opacity: 0, filter: 'none', easing: 'ease-out' },
+      { opacity: .6, filter: 'none', offset: GROW / T, easing: 'ease-out' },
+      { opacity: .95, filter: 'drop-shadow(0 0 3px rgba(255,59,48,.9))', offset: (GROW + PEAK * .4) / T, easing: 'ease-in-out' },
+      { opacity: .6, filter: 'none', offset: (GROW + PEAK) / T, easing: 'cubic-bezier(.4, 0, 1, 1)' },
+      { opacity: 0, filter: 'none' }], { duration: T });
+    glowAs.push(a);
+    a.onfinish = () => { if (glowAs.includes(a)) { glowAs = []; lit = null; } };
   }
-  function unglow() { if (still.matches) { hl.classList.remove('hold'); lit = null; } }
 
   const pick = (g) => st.picks[g.id] || 1;
   function setVar(g, i, force) {
@@ -553,19 +711,20 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     g.cur = i;
     if (i === 1 && g.current !== false) root.removeAttribute(attr); else root.setAttribute(attr, String(i));
     try { g.apply && g.apply(i); } catch (e) { console.error('[dev artifacts]', g.id, e); }
-    if (changed) { previewT = performance.now(); if (od) od.freeze = previewT + 500; settle(g, i); }
+    if (changed) { if (od) od.freeze = performance.now() + 500; settle(g, i); }
     schedule();
   }
   // Hover previews wait 60 ms and apply only the last one, so a pass over the list doesn't flicker.
   const preview = (g, i) => { clearTimeout(hoverT); hoverT = setTimeout(() => setVar(g, i), 60); };
+  const unpreview = (g) => preview(g, pick(g));
 
   // The loading state shows until the change has settled: fonts loaded, 2 frames, and the target's
   // transitions (and a page view transition) finished, at most 600 ms.
   function settle(g, i) {
-    ++busyN;
-    const el = open === g && panel.querySelector(`[data-i="${i}"]`);
-    if (panel) panel.querySelectorAll('.loading').forEach((o) => o.classList.remove('loading'));
-    if (el) el.classList.add('loading');
+    if (!sh) return;
+    sh.querySelectorAll('.loading').forEach((o) => o.classList.remove('loading'));
+    const els = shownG === g ? [...sh.querySelectorAll(`.od-dock [data-i="${i}"], .od-body [data-i="${i}"]`)] : [];
+    els.forEach((n) => n.classList.add('loading'));
     const t = sample(g).t;
     const frames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     const finite = (a) => a.effect && a.effect.getComputedTiming().endTime !== Infinity;
@@ -573,70 +732,160 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
       ...document.getAnimations().filter((a) => /^::view-transition/.test(a.effect && a.effect.pseudoElement || ''))]
       .filter(finite).map((a) => a.finished.catch(() => {})));
     Promise.race([document.fonts.ready.then(frames).then(anims), new Promise((r) => setTimeout(r, 600))])
-      .then(() => { if (el) el.classList.remove('loading'); });
+      .then(() => els.forEach((n) => n.classList.remove('loading')));
+  }
+  function choose(g, i) {
+    clearTimeout(hoverT);
+    if (i === 1 && g.current !== false) delete st.picks[g.id]; else st.picks[g.id] = i;
+    save(); setVar(g, i, true);
+    sh.querySelectorAll('.od-dock [data-i], .od-body [data-i]').forEach((o) => o.setAttribute(o.hasAttribute('aria-pressed') ? 'aria-pressed' : 'aria-selected', String(+o.dataset.i === i)));
+    if (popG === g) pvShow(g, i);
+    sync();
   }
 
-  // The dock panel of the current group: name and note, options (hover previews and pulses the glow, click keeps),
-  // then the comment field. A green-dot group has only the comment field.
-  function fill(g) {
-    if (open !== g && open) { clearTimeout(hoverT); setVar(open, pick(open), true); } // drop the last group's preview
-    open = g;
-    const note = (i) => (g.opts[i - 1] && g.opts[i - 1].note) || (i === 1 && g.current !== false ? 'The site as it is now' : '');
-    panel.innerHTML = `<div class="dv-head"><span class="dv-label"><span class="od-dot od-mini" data-kind="${g.opts.length ? 'pick' : 'note'}"></span>`
-      + `<span><b>${esc(g.label)}</b><small class="dv-note"></small></span></span>`
-      + (g.opts.length ? `<div class="dv-seg" role="radiogroup" aria-label="${esc(g.label)}">${g.opts.map((o, k) =>
-        `<button type="button" role="radio" data-i="${k + 1}" aria-checked="${pick(g) === k + 1}" title="${esc(o.note || o.name)}"><span class="n">${k + 1}</span>${esc(o.name)}</button>`).join('')}</div>` : '')
-      + `</div><textarea rows="1" placeholder="Comment on ${esc(g.label)}"></textarea>`;
-    panel.hidden = false; panel.parentElement.classList.add('dv-has');
-    const mini = panel.querySelector('.od-mini'), noteEl = panel.querySelector('.dv-note');
-    mini.innerHTML = g.el ? g.el.innerHTML : '';
-    const say = (i) => { noteEl.textContent = g.opts.length ? note(i) : 'Comment only'; };
-    say(pick(g));
-    const seg = panel.querySelector('.dv-seg'), ta = panel.querySelector('textarea');
-    if (seg) {
-      seg.onpointerover = (e) => {
-        const b = e.target.closest('button'); if (!b || b.contains(e.relatedTarget)) return;
-        say(+b.dataset.i); preview(g, +b.dataset.i); if (e.pointerType !== 'touch') glow(g);
-      };
-      seg.onpointerleave = (e) => { if (!inRect(seg, e)) { say(pick(g)); preview(g, pick(g)); unglow(); } }; // a leave with the pointer still inside is not real
-      seg.onclick = (e) => {
-        const b = e.target.closest('button'); if (!b) return;
-        clearTimeout(hoverT);
-        const i = +b.dataset.i; if (i === 1) delete st.picks[g.id]; else st.picks[g.id] = i;
-        save(); setVar(g, i, true); say(i);
-        seg.querySelectorAll('button').forEach((o) => o.setAttribute('aria-checked', o === b));
-        sync();
-      };
-      // segments that do not fit in one row become a compact list
-      requestAnimationFrame(() => seg.classList.toggle('dv-list', g.opts.length > 6 || seg.scrollWidth > seg.clientWidth + 1));
+  // The dock part of the current group.
+  function fillDock(g) {
+    if (shownG && shownG !== g) { clearTimeout(hoverT); setVar(shownG, pick(shownG), true); } // drop the last group's preview
+    shownG = g;
+    const k = kind(g);
+    grp.innerHTML = `<div class="dv-track k-seg"><button type="button" class="dv-lab k-seg-label" title="${esc(g.label)}: ${k === 'note' ? 'click to comment' : k === 'flat' ? 'hover an option to preview it, click to pick, click here to comment' : 'click to see the options'}"><span class="od-dot od-mini" data-kind="${k === 'note' ? 'note' : 'pick'}"></span><span>${esc(g.label)}</span></button>`
+      + (k === 'flat' ? g.opts.map((o, j) => `<button type="button" class="dv-o" data-i="${j + 1}" aria-pressed="${pick(g) === j + 1}" title="${esc(o.note || o.name)}">${esc(o.name)}</button>`).join('')
+        : `<button type="button" class="dv-sel" aria-haspopup="dialog" aria-expanded="false"><span></span>${CHEV}</button>`)
+      + `</div>`;
+    const cm = ib('dv-ib dv-cm', BUBBLE, 'Comment', () => (popG === g ? focusNote() : popFor(g, true)));
+    if (k !== 'note') grp.append(cm);
+    const track = grp.firstChild, lab = track.firstChild, sel = track.querySelector('.dv-sel');
+    lab.onclick = () => (popG === g ? od.close() : popFor(g, k === 'note'));
+    if (sel) sel.onclick = () => (popG === g ? od.close() : popFor(g, k === 'note'));
+    if (k === 'flat') {
+      track.onpointerover = (e) => { const b = e.target.closest('.dv-o'); if (!b || b.contains(e.relatedTarget)) return; preview(g, +b.dataset.i); if (e.pointerType !== 'touch') glow(g); };
+      track.onpointerleave = () => unpreview(g);
+      track.onclick = (e) => { const b = e.target.closest('.dv-o'); if (b) choose(g, +b.dataset.i); };
     }
+    updDock(g);
+  }
+  function updDock(g) {
+    const mini = grp.querySelector('.od-mini'); if (mini) mini.innerHTML = g.el ? g.el.innerHTML : '';
+    const sel = grp.querySelector('.dv-sel span');
+    if (sel) { const o = g.opts[pick(g) - 1]; sel.textContent = g.opts.length ? o.name : (st.notes[g.id] || '').trim().split('\n')[0] || 'Add a comment'; }
+    const cm = grp.querySelector('.dv-cm'); if (cm) cm.dataset.on = String(!!st.notes[g.id]);
+    fit();
+  }
+  const anchorOf = () => grp.querySelector('.dv-track');
+  const focusNote = () => { const ta = od.body.querySelector('textarea'); if (ta) ta.focus({ preventScroll: true }); };
+
+  // The group's popover: options by kind, then the comment field. It grows up out of the dock's group.
+  function popFor(g, note) {
+    if (dockState !== 'open') setDock('open');
+    if (shownG !== g) show(g);
+    const k = kind(g);
+    od.pop.classList.toggle('dv-wide', k === 'images');
+    od.open({ label: g.label, anchor: anchorOf(), reveal: () => sample(g).r, render: (b) => fillPop(g, b, k),
+      onClose: () => { if (popG === g) popG = null; unpreview(g); grp.querySelector('.dv-sel')?.setAttribute('aria-expanded', 'false'); } });
+    popG = g; listOpen = false;
+    grp.querySelector('.dv-sel')?.setAttribute('aria-expanded', 'true');
+    const f = od.body.querySelector('.dv-filter input');
+    if (note) requestAnimationFrame(focusNote);
+    else if (f && matchMedia('(hover: hover)').matches) f.focus({ preventScroll: true });
+    else activate(g, od.body.querySelector(`[data-i="${pick(g)}"]`), false);
+  }
+  function fillPop(g, body, k) {
+    const p = pick(g), n = (j) => `<span class="n">${j}</span>`;
+    const row = (o, j) => `<button type="button" class="dv-row" role="option" data-i="${j}" aria-selected="${p === j}"><span class="ck">✓</span><span><b>${n(j)}${esc(o.name)}</b>${o.note || (j === 1 && g.current !== false) ? `<small>${esc(o.note || 'The site as it is now')}</small>` : ''}</span></button>`;
+    const tile = (o, j) => `<button type="button" class="dv-tile" role="option" data-i="${j}" aria-selected="${p === j}" title="${esc(o.note || o.name)}"><span class="th"${o.img ? ` style="background-image:url('${esc(o.img)}')"` : ''}>${o.img ? '' : esc(o.name)}</span><span>${n(j)}${esc(o.name)}</span></button>`;
+    // the kit's visible hint: one line on how this popover works
+    const hint = { select: 'Hover an option to see it on the page. Click to pick it. Arrow keys and Enter work too.',
+      many: 'Type to filter. Hover an option to see it on the page, click to pick it.',
+      images: 'Hover a picture to see it on the page. Click to pick it. Click the big picture to see it full size.',
+      note: 'Write what should change here. Copy choices puts it under this group.' }[k]
+      || 'Hover an option to see it on the page. Click to pick it. Arrow keys and Enter work too.';
+    body.innerHTML = `<p class="k-hint">${hint}</p>` + (k === 'many' ? `<div class="dv-filter"><input type="search" placeholder="Filter ${g.opts.length} options" aria-label="Filter options"></div>` : '')
+      + (k === 'images' ? `<div class="dv-imgs"><div class="dv-grid" role="listbox" aria-label="${esc(g.label)}">${g.opts.map((o, j) => tile(o, j + 1)).join('')}</div><figure class="dv-pv"><div class="th" title="Open full size"></div><figcaption><b></b><small></small></figcaption></figure></div>`
+        : k === 'note' ? '' : `<div class="dv-list" role="listbox" aria-label="${esc(g.label)}">${g.opts.map((o, j) => row(o, j + 1)).join('')}</div><div class="dv-none" hidden>No option matches.</div>`)
+      + `<textarea class="k-comment" rows="1" placeholder="Comment on ${esc(g.label)}"></textarea>`;
+    const list = body.querySelector('.dv-list, .dv-grid'), ta = body.querySelector('textarea');
+    if (list) {
+      list.onpointerover = (e) => { const b = e.target.closest('[data-i]'); if (!b || b.contains(e.relatedTarget)) return; activate(g, b, true); if (e.pointerType !== 'touch') glow(g); };
+      list.onpointerleave = () => { unpreview(g); pvShow(g, pick(g)); };
+      list.onclick = (e) => { const b = e.target.closest('[data-i]'); if (b) choose(g, +b.dataset.i); };
+    }
+    const pv = body.querySelector('.dv-pv .th');
+    if (pv) { pv.onclick = () => { const o = g.opts[(+pv.dataset.i || pick(g)) - 1]; if (o && o.img) lightbox(o); }; pvShow(g, p); }
+    const f = body.querySelector('.dv-filter input');
+    if (f) f.oninput = () => {
+      const q = f.value.trim().toLowerCase(); let first = null;
+      list.querySelectorAll('[data-i]').forEach((b) => { b.hidden = !!q && !b.textContent.toLowerCase().includes(q); if (!b.hidden && !first) first = b; });
+      body.querySelector('.dv-none').hidden = !!first; activate(g, first, false);
+    };
     ta.value = st.notes[g.id] || '';
     const grow = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
-    ta.oninput = () => { const v = ta.value; if (v.trim()) st.notes[g.id] = v; else delete st.notes[g.id]; save(); grow(); };
+    ta.oninput = () => { const v = ta.value; if (v.trim()) st.notes[g.id] = v; else delete st.notes[g.id]; save(); grow(); updDock(g); };
     requestAnimationFrame(grow);
   }
-  function show(g) { closeListFlag(); curId = g.id; sync(); }
-  const closeListFlag = () => { if (listOpen) od.close(); };
+  // The keyboard and hover spot in a popover list: highlighted, kept in view, previewed on the page.
+  function activate(g, b, prev) {
+    od.body.querySelectorAll('.on').forEach((x) => x.classList.remove('on'));
+    if (!b) return;
+    b.classList.add('on'); b.scrollIntoView({ block: 'nearest' });
+    if (prev) preview(g, +b.dataset.i);
+    pvShow(g, +b.dataset.i);
+  }
+  function pvShow(g, i) {
+    const pv = od.body.querySelector('.dv-pv'); if (!pv || popG !== g && popG) return;
+    const o = g.opts[i - 1] || {}, th = pv.querySelector('.th');
+    th.dataset.i = i; th.style.backgroundImage = o.img ? `url('${o.img.replace(/'/g, '%27')}')` : ''; th.textContent = o.img ? '' : o.name || '';
+    pv.querySelector('b').textContent = `${i} ${o.name || ''}`; pv.querySelector('small').textContent = o.note || (i === 1 && g.current !== false ? 'The site as it is now' : '');
+  }
+  function lightbox(o) {
+    if (lb) lb.remove();
+    lb = mk('div', 'dv-lb'); lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-label', o.name);
+    lb.innerHTML = `<img alt="${esc(o.name)}" src="${esc(o.img)}"><p>${esc(o.name)}</p>`;
+    const end = () => { const n = lb; if (!n) return; lb = null; n.classList.remove('show'); setTimeout(() => n.remove(), 200); };
+    lb.onclick = end; lb.end = end; sh.append(lb); requestAnimationFrame(() => lb && lb.classList.add('show'));
+  }
+  // Arrow keys move inside the open popover (a grid moves by row with up and down), Enter picks.
+  addEventListener('keydown', (e) => {
+    if (lb && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); return lb.end(); }
+    if (!popG || od.shown == null || e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.composedPath()[0];
+    if (t && t.tagName === 'TEXTAREA') return;
+    const items = [...od.body.querySelectorAll('[data-i]')].filter((b) => !b.hidden); if (!items.length) return;
+    const cur = items.findIndex((b) => b.classList.contains('on')), grid = od.body.querySelector('.dv-grid');
+    const cols = grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').length : 1;
+    const d = { ArrowDown: cols, ArrowUp: -cols, ArrowRight: grid ? 1 : 0, ArrowLeft: grid ? -1 : 0 }[e.key];
+    if (d) { e.preventDefault(); activate(popG, items[Math.min(Math.max((cur < 0 ? (d > 0 ? -1 : items.length) : cur) + d, 0), items.length - 1)], true); glow(popG); }
+    else if (e.key === 'Enter' && cur >= 0) { e.preventDefault(); choose(popG, +items[cur].dataset.i); }
+  }, true);
 
-  // The count button opens every group on the site, one head per page. A row goes to its group and opens its menu.
+  function show(g) { curId = g.id; sync(); }
+
+  // The count button opens every group on the site, one head per page. A row goes to its group and opens its popover.
   function showList() {
-    od.open({ label: 'All groups', onClose: () => { listOpen = false; od.count.setAttribute('aria-expanded', 'false'); }, render: (body) => {
+    if (dockState !== 'open') setDock('open');
+    od.pop.classList.remove('dv-wide');
+    od.open({ label: 'Every group', anchor: od.count, onClose: () => { listOpen = false; }, render: (body) => {
       const all = site(), pages = [...new Set(all.map(home))];
-      body.innerHTML = pages.map((p) => `<div class="ghead">${p === null ? 'Page not seen yet' : esc(p)}${p !== null && p === here() ? '<span class="here"> · this page</span>' : ''}</div>`
+      body.innerHTML = `<p class="k-hint">Click a group to go to it. Copy choices copies every pick and comment as a list to paste in chat.</p><div class="dv-list">${pages.map((p) => `<div class="dv-ghead">${p === null ? 'Page not seen yet' : esc(p)}${p !== null && p === here() ? '<i> · this page</i>' : ''}</div>`
         + all.filter((m) => home(m) === p).map((m) => {
           const i = st.picks[m.id] || 1, name = m.opts && m.opts[i - 1];
-          return `<button type="button" class="opt row" data-id="${esc(m.id)}" aria-selected="${m.id === curId}"${p === null ? ' disabled title="Open its page once so the dock knows where it is"' : ''}><span class="ck">✓</span><span><span class="name">${esc(m.label)}</span><span class="note">${m.opts && m.opts.length ? `${i} ${esc(name || '?')}` : 'Comment'}</span></span><span class="n">${all.indexOf(m) + 1}</span></button>`;
-        }).join('')).join('<div class="sep"></div>');
-      body.onclick = (e) => { const b = e.target.closest('.row'); if (b && !b.disabled) goTo(b.dataset.id, true); };
+          return `<button type="button" class="dv-row" data-id="${esc(m.id)}" aria-selected="${m.id === curId}"${p === null ? ' disabled title="Open its page once so the dock knows where it is"' : ''}><span class="ck">✓</span><span><b>${esc(m.label)}</b><small>${m.opts && m.opts.length ? `${i} ${esc(name || '?')}` : 'Comment'}</small></span></button>`;
+        }).join('')).join('')}</div><div class="dv-foot"><button type="button" class="dv-reset">Reset every pick</button></div>`;
+      body.querySelector('.dv-list').onclick = (e) => { const b = e.target.closest('.dv-row'); if (b && !b.disabled) goTo(b.dataset.id, true); };
+      // Two clicks within 3 s: picks and comments go; groups on other pages come back when their page is opened.
+      const r = body.querySelector('.dv-reset'); let armed = 0;
+      r.onclick = () => {
+        if (!armed) { r.textContent = 'Click again to reset'; r.classList.add('armed'); armed = setTimeout(() => { armed = 0; r.textContent = 'Reset every pick'; r.classList.remove('armed'); }, 3000); return; }
+        clearTimeout(armed);
+        st.picks = {}; st.notes = {}; st.groups = st.groups.filter((m) => groups.some((g) => g.id === m.id));
+        save(); od.close(); groups.forEach((g) => setVar(g, 1)); shownG = null; sync();
+      };
     } });
-    listOpen = true; od.count.setAttribute('aria-expanded', 'true');
+    listOpen = true; popG = null;
   }
 
   function sync() {
     if (!od) return;
-    const all = site(), n = all.filter((m) => (st.picks[m.id] || 1) !== 1).length;
-    const blue = all.filter((m) => m.opts && m.opts.length), k = blue.findIndex((m) => m.id === curId);
-    if (!sayT) { picksOut.textContent = `${n} ${n === 1 ? 'pick' : 'picks'}`; picksOut.classList.remove('say'); }
+    const all = site(), blue = all.filter((m) => m.opts && m.opts.length), k = blue.findIndex((m) => m.id === curId);
     posText = `${k < 0 ? '–' : k + 1} / ${blue.length}`;
     for (const g of groups) if (g.rec) g.rec.n = blue.findIndex((m) => m.id === g.id) + 1;
     od.sync();
@@ -644,19 +893,19 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     if (curId === null && groups.length) curId = (groups.find((x) => x.opts.length) || groups[0]).id;
     const g = groups.find((x) => x.id === curId);
     for (const x of groups) if (x.el) x.el.setAttribute('aria-current', String(x === g));
-    if (!g) { panel.hidden = true; panel.parentElement.classList.remove('dv-has'); open = null; }
-    else if (open !== g) fill(g);
-    else panel.querySelector('.od-mini').innerHTML = g.el ? g.el.innerHTML : '';
+    pill.innerHTML = `<span class="od-dot od-mini" data-kind="pick">${g && g.el && g.opts.length ? g.el.innerHTML : ''}</span><span>${posText}</span>${UP}`;
+    if (!g) { grp.hidden = true; shownG = null; }
+    else { grp.hidden = false; if (shownG !== g) fillDock(g); else updDock(g); }
   }
-  // A short message in the dock's picks slot, such as a group that never showed up.
+  // A short message in the dock, such as a group that never showed up.
   function say(text) {
-    clearTimeout(sayT); picksOut.textContent = text; picksOut.classList.add('say');
-    sayT = setTimeout(() => { sayT = 0; sync(); }, 4000);
+    clearTimeout(sayT); sayOut.textContent = text; sayOut.hidden = false; fit();
+    sayT = setTimeout(() => { sayT = 0; sayOut.hidden = true; fit(); }, 4000);
   }
 
   // Back and next walk every blue-dot group on the site in site order and wrap at the ends. A group on another page
-  // navigates there first. A group already on screen only flashes; one off screen scrolls to the middle first.
-  // The popover opens on the group it lands on.
+  // navigates there first. On arrival the group becomes current, its popover opens, and the page scrolls the target
+  // smoothly into the free part above the popover (only when it is not already in view there).
   function go(d) {
     const list = site().filter((m) => m.page && m.opts && m.opts.length); if (!list.length) return;
     let k = list.findIndex((m) => m.id === curId);
@@ -684,7 +933,11 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     const check = () => {
       if (n !== goN) return end();
       const g = groups.find((x) => x.id === id), s = g && sample(g);
-      if (s && s.r && s.r.width > 0 && g.rec) { end(); return od.go(g.rec, false).then(() => { if (n !== goN) return; spot(g); if (reopen) show(g); }); }
+      if (s && s.r && s.r.width > 0 && g.rec) {
+        end(); show(g);
+        if (reopen && kind(g) !== 'flat') { popFor(g); od.pulse(g.rec); glow(g); return; } // the popover's reveal scrolls
+        return od.go(g.rec, false).then(() => { if (n === goN) glow(g); });
+      }
       const t = performance.now() - t0;
       if (routed && !moved && !cfg.navigate && t > 600) { clearInterval(iv); mo.disconnect(); return location.reload(); }
       if (t > 5000) { end(); const m = meta(id); say(`${m ? m.label : id} is not on ${here()}`); }
@@ -693,11 +946,10 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     const iv = setInterval(check, 100);
     check();
   }
-  const spot = (g) => glow(g);
 
-  // A target that matches many elements (every card) gets its dot, outline, and menu on one sample:
+  // A target that matches many elements (every card) gets its dot, lines, and popover on one sample:
   // the first match in view, picked again on every frame. The options still style every match.
-  // sample: 'all' outlines the box around all matches instead.
+  // sample: 'all' frames the box around all matches instead.
   const inView = (r) => r.width > 0 && r.bottom > 36 && r.top < innerHeight - 20 && r.right > 0 && r.left < innerWidth;
   function sample(g) {
     const els = [...document.querySelectorAll(g.target)], rs = els.map((t) => t.getBoundingClientRect());
@@ -713,9 +965,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   }
 
   const box = (el, x, y, w, h) => { el.style.transform = `translate(${x}px, ${y}px)`; el.style.width = w + 'px'; el.style.height = h + 'px'; };
-  const inRect = (el, e) => { const r = el.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
-
-  // The glow lines follow the pulsing group's target; a group's page is the first page its target shows on.
+  // The guide lines follow the lit group's target; a group's page is the first page its target shows on.
   function place() {
     raf = 0;
     for (const g of groups) {
@@ -726,11 +976,17 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     const r = lit && lit.r;
     hl.hidden = !(r && r.width > 0);
     if (hl.hidden) return;
-    const P = 4, E = 24; // lines sit 4 px outside the edges and run 24 px past the corners, fading at the ends
-    box(gls[0], r.left - P - E, r.top - P, r.width + 2 * (P + E), 1);
-    box(gls[1], r.left - P - E, r.bottom + P - 1, r.width + 2 * (P + E), 1);
-    box(gls[2], r.left - P, r.top - P - E, 1, r.height + 2 * (P + E));
-    box(gls[3], r.right + P - 1, r.top - P - E, 1, r.height + 2 * (P + E));
+    // Lines run 35% of the window past each corner and fade over that last 35%. A target off screen gets lines long
+    // enough to cross the whole window, so the lines in view still point at it.
+    const P = 4, W = innerWidth, H = innerHeight, fx = Math.round(W * 0.35), fy = Math.round(H * 0.35);
+    const ex = Math.max(fx, r.left > W ? r.left + 40 : 0, r.right < 0 ? W - r.right + 40 : 0);
+    const ey = Math.max(fy, r.top > H ? r.top + 40 : 0, r.bottom < 0 ? H - r.bottom + 40 : 0);
+    gls[0].style.setProperty('--e', fx + 'px'); gls[1].style.setProperty('--e', fx + 'px');
+    gls[2].style.setProperty('--e', fy + 'px'); gls[3].style.setProperty('--e', fy + 'px');
+    box(gls[0], r.left - P - ex, r.top - P, r.width + 2 * (P + ex), 1);
+    box(gls[1], r.left - P - ex, r.bottom + P - 1, r.width + 2 * (P + ex), 1);
+    box(gls[2], r.left - P, r.top - P - ey, 1, r.height + 2 * (P + ey));
+    box(gls[3], r.right + P - 1, r.top - P - ey, 1, r.height + 2 * (P + ey));
   }
   const schedule = () => { if (!raf && od) raf = requestAnimationFrame(place); };
 
@@ -754,11 +1010,17 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   }
 
   addEventListener('scroll', () => schedule(), { passive: true, capture: true });
-  addEventListener('resize', () => schedule());
-  // While a page view transition runs, Chrome sends every click to <html>. Hand it to the option or dot under the pointer.
+  addEventListener('resize', () => { schedule(); fit(); });
+  addEventListener('keydown', (e) => {
+    const t = e.composedPath()[0];
+    if (e.key !== 'h' || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || !od || (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))) return;
+    setDock(dockState === 'hide' ? 'open' : 'hide');
+  });
+  // While a page view transition runs, Chrome sends every click to <html>. Hand it to the button under the pointer.
   addEventListener('click', (e) => {
-    if (!open || e.composedPath()[0] !== document.documentElement) return;
-    const b = [...panel.querySelectorAll('[data-i]'), ...od.body.querySelectorAll('.opt'), ...od.layer.children].find((el) => !el.hidden && inRect(el, e));
+    if (!od || e.composedPath()[0] !== document.documentElement) return;
+    const inR = (el) => { const r = el.getBoundingClientRect(); return r.width && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
+    const b = [...sh.querySelectorAll('.od-body [data-i], .od-dock button, .dv-pill, .dv-handle'), ...od.layer.children].find((el) => !el.hidden && inR(el));
     if (b) b.click();
   }, true);
   const boot = () => {
@@ -768,7 +1030,7 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
     new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
     const find = (id) => id && groups.find((x) => x.id === id);
     const g = find(Q.get('dv-open')), h = find(Q.get('dv-hl'));
-    if (g) setTimeout(() => show(g), 50);
+    if (g) setTimeout(() => (kind(g) === 'flat' ? show(g) : popFor(g, kind(g) === 'note')), 50);
     if (h) setTimeout(() => glow(h, true), 50);
     // back or next loaded this page: finish the trip to its group
     let go = null; try { go = JSON.parse(sessionStorage.getItem(GO)); } catch {}
@@ -777,42 +1039,46 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   addEventListener('popstate', () => { sync(); }); // an SPA route change: "this page" moved
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else setTimeout(boot);
 
-  // The tab title lives only in this injected code; an SPA that rewrites <title> gets it set back.
+  // The tab title '<prefix> > <topic>' lives only in this injected code; an SPA that rewrites <title> gets it set back.
   let titleMo;
-  function setTitle(t) {
+  function setTitle() {
+    const topic = cfg.topic || (cfg.title && PREFIX ? String(cfg.title).split(' > ').pop() : cfg.title);
+    if (!topic) return;
+    const t = PREFIX ? `${PREFIX} > ${topic}` : topic;
     const put = () => { if (document.title !== t) document.title = t; };
     put();
     if (titleMo) titleMo.disconnect();
     titleMo = new MutationObserver(put);
     titleMo.observe(document.head, { childList: true, subtree: true, characterData: true });
   }
-  setTimeout(() => cfg.title || console.warn("DevPanel: no title. Add DevPanel.config({ title: '<project> > <topic>' }) to variants.js"), 1500);
+  setTimeout(() => cfg.topic || cfg.title || console.warn("DevPanel: no topic. Add DevPanel.config({ topic: 'buy dialog' }) to variants.js"), 1500);
 
+  const KINDS = ['flat', 'select', 'many', 'images'];
   window.DevPanel = {
-    group(cfg) {
-      if (!cfg || !cfg.id || !cfg.target || !Array.isArray(cfg.options)) throw new Error('DevPanel.group needs id, target, options');
-      if (!/^[a-z0-9-]+$/.test(cfg.id)) throw new Error('DevPanel id must be lowercase letters, digits, or dashes: ' + cfg.id);
-      if (base && cfg.page && ![].concat(cfg.page).some(inBase)) return null; // a group of another site on this server
-      const g = { ...cfg, label: cfg.label || cfg.id, pos: cfg.dot || 'tr',
-        opts: cfg.current === false ? cfg.options : [{ name: 'Current' }, ...cfg.options] };
+    group(c) {
+      if (!c || !c.id || !c.target || !Array.isArray(c.options)) throw new Error('DevPanel.group needs id, target, options');
+      if (!/^[a-z0-9-]+$/.test(c.id)) throw new Error('DevPanel id must be lowercase letters, digits, or dashes: ' + c.id);
+      if (c.kind && !KINDS.includes(c.kind)) throw new Error(`DevPanel kind must be one of ${KINDS.join(', ')}: ${c.kind}`);
+      if (base && c.page && ![].concat(c.page).some(inBase)) return null; // a group of another site on this server
+      const g = { ...c, label: c.label || c.id, pos: c.dot || 'tr',
+        opts: c.current === false ? c.options : [{ name: 'Current' }, ...c.options] };
       if (forced[g.id]) st.picks[g.id] = forced[g.id];
       if (pick(g) > g.opts.length) delete st.picks[g.id];
       g.cur = 1; // the page starts on option 1
       groups.push(g);
       let m = meta(g.id); if (!m) st.groups.push(m = { id: g.id, page: null });
       Object.assign(m, { label: g.label, opts: g.opts.map((o) => o.name) });
-      if (cfg.page) m.page = [].concat(cfg.page);
+      if (c.page) m.page = [].concat(c.page);
       save();
       if (g.opts.length && pick(g) !== 1) setVar(g, pick(g));
       if (od) { addDot(g); sync(); }
       return g;
     },
-    // title: '<project> > <topic>' for the browser tab, kept while the overlay runs (the site's own <title> returns on reload).
-    // site: a base path such as '/memory/', or a list of them: each base is its own site with its own store,
-    // count, back and next, and Copy choices. A page outside every base uses the whole-origin store.
+    // topic: names the page for the tab title. site: a base path such as '/memory/', or a list of them: each base is its
+    // own site with its own store, count, back and next, and Copy choices. A page outside every base uses the whole-origin store.
     config(c) {
       Object.assign(cfg, c);
-      if (c.title) setTitle(c.title);
+      if (c.topic || c.title) setTitle();
       if (!('site' in c)) return;
       if (groups.length) throw new Error('Call DevPanel.config({ site }) before DevPanel.group');
       base = [].concat(c.site || []).map((b) => norm(b).replace(/\/?$/, '/')).filter((b) => (here() + '/').startsWith(b))
@@ -820,8 +1086,8 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
       key = base ? KEY + '@' + base : KEY; load(); sync();
     },
     markdown: md,
-    open: (id) => { const g = groups.find((x) => x.id === id); if (g) show(g); },
-    next: () => go(1), back: () => go(-1), list: () => showList(),
+    open: (id) => { const g = groups.find((x) => x.id === id); if (g) (kind(g) === 'flat' ? show(g) : popFor(g, kind(g) === 'note')); },
+    next: () => go(1), back: () => go(-1), list: () => showList(), dock: (s) => setDock(s),
     groups: () => groups.map((g) => ({ id: g.id, label: g.label, target: g.target, page: meta(g.id).page, options: g.opts.map((o) => o.name) })),
   };
 })();

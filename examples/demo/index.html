@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dev artifacts demo</title>
+<style>
+  :root { --d-bg: #fbfbfd; --d-ink: #1d1d1f; --d-muted: #6e6e73; --d-line: rgba(0,0,0,.1); --d-card: #fff; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --d-bg: #000; --d-ink: #f5f5f7; --d-muted: #a1a1a6; --d-line: rgba(255,255,255,.14); --d-card: #1c1c1e; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--d-bg); color: var(--d-ink); font: 17px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif; }
+  .d-wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  .d-hero { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; padding: 96px 0 72px; }
+  .d-hero h1 { margin: 0 0 16px; font-size: 56px; line-height: 1.05; font-weight: 650; letter-spacing: -.03em; }
+  .d-hero p { margin: 0 0 28px; color: var(--d-muted); font-size: 20px; max-width: 34ch; }
+  .d-cta { display: inline-block; padding: 13px 24px; border-radius: 999px; background: var(--d-accent, var(--d-ink)); color: var(--d-bg);
+    font-weight: 600; text-decoration: none; }
+  .d-photo { aspect-ratio: 4 / 3; border-radius: 22px; background: linear-gradient(135deg, #e3e3e8, #c7c7cc) center / cover; box-shadow: 0 20px 50px rgba(0,0,0,.12); }
+  .d-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 24px 0 120px; }
+  .d-cards article { background: var(--d-card); border: .5px solid var(--d-line); border-radius: 18px; padding: 22px; }
+  .d-cards h3 { margin: 0 0 6px; font-size: 18px; }
+  .d-cards p { margin: 0; color: var(--d-muted); font-size: 15px; }
+  .d-long { height: 60vh; display: grid; place-items: center; color: var(--d-muted); border-top: .5px solid var(--d-line); }
+  .d-foot { display: flex; flex-direction: column; gap: 10px; padding: 28px 24px 32px; border-top: .5px solid var(--d-line); color: var(--d-muted); font-size: 14px; }
+  .d-foot nav { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+  .d-foot a { color: inherit; text-decoration: none; }
+  @media (max-width: 700px) {
+    .d-hero { grid-template-columns: 1fr; gap: 28px; padding: 48px 0 40px; }
+    .d-hero h1 { font-size: 40px; }
+    .d-cards { grid-template-columns: 1fr; padding-bottom: 60px; }
+  }
+</style>
+</head>
+<body>
+  <main class="d-wrap">
+    <section class="d-hero">
+      <div>
+        <h1>See every process. End the slow ones.</h1>
+        <p>A small Mac app that shows what uses your memory and battery, and ends it with one click.</p>
+        <a class="d-cta" href="#">Buy</a>
+      </div>
+      <div class="d-photo" role="img" aria-label="Hero picture"></div>
+    </section>
+    <section class="d-cards">
+      <article><h3>Live list</h3><p>Every process with its memory, CPU, and energy, updated each second.</p></article>
+      <article><h3>One click</h3><p>End a process from the list or the menu bar.</p></article>
+      <article><h3>Private</h3><p>Nothing leaves your Mac.</p></article>
+    </section>
+    <section class="d-long">More page content, so the footer sits far below.</section>
+  </main>
+  <footer class="d-wrap d-foot">
+    <nav><a href="#">Download</a><a href="#">Pricing</a><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Refunds</a><a href="#">Contact</a></nav>
+    <span>© 2026 samhq</span>
+  </footer>
+</body>
+</html>

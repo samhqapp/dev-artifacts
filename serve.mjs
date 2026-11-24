@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { titlePrefix } from './title.mjs';
 
 const args = process.argv.slice(2);
 const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
@@ -25,6 +26,7 @@ const proxyHeaders = JSON.parse(process.env.DV_PROXY_HEADERS || '{}');
 const root = path.resolve(args[0] || '.');
 if (!fs.statSync(root, { throwIfNoEntry: false })?.isDirectory()) { console.error(`Not a folder: ${root}`); process.exit(1); }
 const own = path.dirname(fileURLToPath(import.meta.url));
+const PREFIX = titlePrefix(); // '<project> > <Orca tab>', or the repo folder name
 
 const DEV = {
   '/__dev/devpanel.js': path.join(own, 'devpanel.js'),
@@ -88,6 +90,7 @@ function handle(req, res) {
   if (!p) { res.writeHead(404, { 'Content-Type': 'text/plain' }).end('404'); return; }
   const type = TYPES[path.extname(p).toLowerCase()] || 'application/octet-stream';
   let body = fs.readFileSync(p);
+  if (url === '/__dev/devpanel.js') body = `window.__dvTitlePrefix=${JSON.stringify(PREFIX)};\n` + body; // the overlay's tab title
   if (type.startsWith('text/html')) {
     const html = body.toString('utf8'), at = html.toLowerCase().lastIndexOf('</body>');
     body = at < 0 ? html + INJECT : html.slice(0, at) + INJECT + '\n' + html.slice(at);

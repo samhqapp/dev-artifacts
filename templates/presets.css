@@ -1,0 +1,6 @@
+/* presets.css: what each option in presets.js looks like on the demo page. */
+html[data-dv-title="2"] .d-hero h1 { font-weight: 300; font-size: 64px; letter-spacing: -.02em; }
+html[data-dv-title="3"] .d-hero h1 { font-weight: 800; letter-spacing: -.045em; }
+html[data-dv-footer="2"] .d-foot nav { flex-wrap: nowrap; }
+html[data-dv-footer="2"] .d-foot { flex-direction: row; justify-content: space-between; }
+html[data-dv-footer="3"] .d-foot nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 40px; }
