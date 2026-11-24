@@ -469,7 +469,10 @@ const KIT_CSS = String.raw`
     return pages.flatMap((p) => live.filter((m) => home(m) === p));
   }
   // Groups the owner can use on this page right now: in the current view (Open or Archived) and with a target here.
-  const usable = () => groups.filter((g) => { const m = meta(g.id); return inSet(g) && (m && m.page ? isHere(m) : !!document.querySelector(g.target)); });
+  const onPage = (g) => { const m = meta(g.id); return m && m.page ? isHere(m) : !!document.querySelector(g.target); };
+  const usable = () => groups.filter((g) => inSet(g) && onPage(g));
+  // Every dock count (pager, Open, Archived) counts this one set: blue groups on this page. Green comment dots never count.
+  const browsable = () => groups.filter((g) => g.opts.length && onPage(g));
   // Drop stored picks, comments and Final marks of groups the variants file no longer has.
   function prune() {
     const ids = new Set(groups.map((g) => g.id)), keep = (o) => Object.fromEntries(Object.entries(o || {}).filter(([k]) => ids.has(k)));
@@ -716,7 +719,7 @@ svg { display: block; flex: none; }
   }
   function updX() {
     if (!sh) return;
-    const all = site(), n = all.filter((m) => fin(m.id)).length;
+    const all = browsable(), n = all.filter((g) => fin(g.id)).length;
     sh.querySelectorAll('.dv-arch').forEach((s) => {
       s.children[0].textContent = 'Open ' + (all.length - n); s.children[1].textContent = 'Archived ' + n;
       s.children[0].setAttribute('aria-pressed', String(!arch)); s.children[1].setAttribute('aria-pressed', String(arch));

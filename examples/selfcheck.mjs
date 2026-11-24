@@ -29,5 +29,16 @@ try {
   await p.evaluate(() => { localStorage.setItem('devpanel', JSON.stringify({ ...JSON.parse(localStorage.getItem('devpanel')), picks: { two: 3 } })); });
   put(['one']); await p.reload(); await p.waitForTimeout(400); s = await state();
   assert.ok(s.count === '1 / 1' && !s.md.includes('two') && !s.store.includes('"two"'), 'removed group: gone from count, copy and store ' + JSON.stringify(s));
-  console.log('ok: 0 groups, 1 group, removed group');
+  // one rule for every count: pager total = Open, Open + Archived = blue groups here; a green comment-only group never counts
+  writeFileSync(v, `DevPanel.group({ id: 'a', label: 'a', target: '.d-hero h1', options: [{ name: 'A' }, { name: 'B' }] });
+DevPanel.group({ id: 'b', label: 'b', target: '.d-hero h1', options: [{ name: 'A' }, { name: 'B' }] });
+DevPanel.group({ id: 'c', label: 'c', target: '.d-hero p' });`);
+  await p.reload(); await p.waitForTimeout(400);
+  const counts = () => p.evaluate(() => { const s = document.querySelector('dev-panel').shadowRoot, b = s.querySelectorAll('.od-dock .dv-arch button');
+    return [s.querySelector('.od-count').textContent.trim(), b[0].textContent, b[1].textContent, s.querySelectorAll('.od-dock .k-dots button').length]; });
+  assert.deepEqual(await counts(), ['1 / 2', 'Open 2', 'Archived 0', 2], 'counts agree');
+  await p.evaluate(() => { localStorage.setItem('devpanel', JSON.stringify({ ...JSON.parse(localStorage.getItem('devpanel')), fin: { b: true } })); });
+  await p.reload(); await p.waitForTimeout(400);
+  assert.deepEqual(await counts(), ['1 / 1', 'Open 1', 'Archived 1', 1], 'counts agree after Final');
+  console.log('ok: 0 groups, 1 group, removed group, counts agree');
 } finally { await b.close(); srv.kill(); rmSync(dir, { recursive: true, force: true }); }
