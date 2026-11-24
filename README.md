@@ -55,18 +55,26 @@ To see every kind of group on a demo page: `node serve.mjs examples/demo --varia
 - The dots and dock are `dots.js`, shared with other tools. Edit it there and run `node dots-sync.mjs devpanel.js`.
 - The dock, popovers, comment fields and hints use the artifact kit's own classes and tokens (`k-dock`, `k-seg`,
   `k-comment`, `k-hint`), copied in by `dots-sync.mjs` from `kit.css` (`$KIT_CSS`, else `~/.agents/artifact-kit/kit.css`).
-- The **dock** holds one select button for the current group: its name and its pick. How it opens depends on the kind,
-  picked from the options (set `kind` to force one; `templates/presets.js` has one example of each):
+- The **dock** shows the current group's name and its first 3 options inline, as a segmented control (hover one for
+  its note). With more options, a 4th item "…" (it shows the pick when the pick is further down) opens the popover
+  with the full list; a click on the group's name opens it too. Options never show twice, and nothing has a number.
+  The popover depends on the kind, picked from the options (set `kind` to force one; `templates/presets.js` has one of each):
 
-  | Kind | When | Shows as |
+  | Kind | When | Popover |
   |---|---|---|
-  | `flat` | 2-3 short options | the options right in the dock, as a segmented control |
-  | `select` | 4-7 options | a popover list |
-  | `many` | 8 or more | a popover list with a filter field |
+  | `select` | up to 7 options | a list |
+  | `many` | 8 or more | a list with a filter field |
   | `images` | any option has `img` | a thumbnail grid and a big preview; click the preview for full size |
   | note | `options: [], current: false` | a green dot and a comment field |
 
-- Hover an option to preview it. Click it to keep it. Arrow keys and Enter work in the popover; Esc closes it.
+- Hover an option to preview it. Click it to keep it. Arrow keys change the pick at once (in the dock row and in the
+  popover). Enter closes the popover; Esc closes it and keeps the pick. The popover grows to 70% of the window, then
+  scrolls with a thin overlay knob, and the pick scrolls into view when it opens.
+- Comments save on every key. A group whose option names change starts fresh (a new round); its old pick and comment
+  go to "Restore last round" in the "…" menu. Groups that did not change keep theirs.
+- `DevPanel.config({ markers: 'dot' | 'none' | 'dock', arrows: 'groups' | 'options', inline: 3 | 'fit' | 'all',
+  rounds: 'auto' | 'ask' })` changes the markers, what back and next step through, the inline count, and whether a new
+  round asks first. `?dv-set={json}` sets them for one page load with its own store (options mode uses it).
 - Hovering an option or a dot draws thin, faint red guide lines along the section's four edges. They grow out past the
   section (to the screen edge when it is off screen), glow once and fade, about 1 second. No fill; the page never moves.
 - **Back** and **next** (keys `[` and `]`) and a click on a blue dot scroll smoothly to the group and open its popover.
@@ -204,6 +212,21 @@ The result is one HTML file: Preact and htm (JSX-like templates) inlined, no bui
 one-pick groups, tables of switches, a comment per group, Light and Dark, and a Copy choices dock.
 Picks are kept in the browser while you work. Preact (MIT) and htm (Apache-2.0) are vendored in
 `templates/preact-htm.js`.
+
+## Options mode
+
+Live mode decides about a website. Options mode decides about a component or tool: a kit page with one panel per
+option, side by side, recommended first, and each panel holds the real page in two frames (Light and Dark) running
+the real `devpanel.js` with that option's setting. Each group has a comment field and a Final switch; the dock has
+Copy choices and Focus.
+
+```sh
+node options.mjs examples/dock-options.mjs --out /tmp/dock-options --port 0   # prints the page URL
+```
+
+The spec names the site, variants, frame size, and groups; each option has `set` (config values), `params`
+(URL params such as `dv-hl`), and `seed` (a starting store, such as the last round). It needs the artifact kit
+(`KIT_DIR`, default `~/.agents/artifact-kit`). `serve.mjs` never adds the overlay to a kit page.
 
 ## Why not a separate options page
 

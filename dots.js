@@ -9,6 +9,7 @@
      root: where the dots, popover and dock go (default document.body; a shadow root works).
      theme: the element that gets data-od-dark (default <html>, or the shadow host). key: localStorage key for Hide dots.
      step(d), list(): replace the in-page back and next, and make the count a button (dev-artifacts walks a whole site).
+     plain: true draws blue dots without a number.
      select(rec): a dot click calls it instead of opening the popover (dev-artifacts shows the group in the dock).
    od.add({ target, label, pick, render(body, rec), onClose(), pos: 'tr'|'tl', n }) -> rec
      target: an element, or a function that returns { t: element, r: rect }. pick: true blue, false green.
@@ -39,6 +40,7 @@
   -webkit-tap-highlight-color: transparent; }
 .od-dot[data-kind="note"] { --od-c: var(--od-green); }
 .od-dot[hidden] { display: none; }
+.od-dot.od-plain { width: 14px; height: 14px; margin: 4px; font-size: 0; } /* no number: a small plain dot in the 22 px spot */
 .od-dot svg { width: 11px; height: 11px; display: block; }
 .od-dot::before { content: ""; position: absolute; inset: -9px; border-radius: 50%; } /* 40 px hit area for touch */
 .od-dot::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; pointer-events: none; }
@@ -50,7 +52,7 @@
 .od-mini svg { width: 10px; height: 10px; }
 
 .od-pop { position: fixed; left: 0; top: 0; z-index: 2147483002; box-sizing: border-box; display: flex; flex-direction: column;
-  width: max-content; min-width: 260px; max-width: min(380px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: hidden;
+  width: max-content; min-width: 260px; max-width: min(380px, calc(100vw - 16px)); max-height: 70vh; overflow: hidden;
   border-radius: 14px; background: var(--od-pop); color: var(--od-ink); border: .5px solid var(--od-line); box-shadow: 0 12px 32px rgba(0,0,0,.2);
   backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6); font: 14px/1.45 var(--od-font); text-align: left;
   transform-origin: top left; opacity: 0; transform: translateY(-4px) scale(.98); visibility: hidden; pointer-events: none;
@@ -119,7 +121,7 @@
 
 @media (max-width: 600px) {
   .od-pop { left: 8px !important; right: 8px; top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); width: auto !important;
-    min-width: 0; max-width: none; max-height: 60vh !important; border-radius: 18px; transform-origin: bottom center; transform: translateY(16px); }
+    min-width: 0; max-width: none; max-height: 70vh !important; border-radius: 18px; transform-origin: bottom center; transform: translateY(16px); }
   .od-body textarea:not(.k-comment) { font-size: 16px; } /* 16 px stops iOS zoom on focus */
 }
 @media (prefers-reduced-motion: reduce) {
@@ -171,7 +173,8 @@
       recs.forEach((r) => {
         r.el.dataset.kind = r.pick ? 'pick' : 'note';
         r.el.setAttribute('aria-label', (r.pick ? 'Options for ' : 'Comment on ') + r.label);
-        if (r.pick) r.el.textContent = r.n != null ? r.n : list.indexOf(r) + 1; else r.el.innerHTML = BUBBLE;
+        r.el.classList.toggle('od-plain', !!(o.plain && r.pick));
+        if (r.pick) r.el.textContent = o.plain ? '' : r.n != null ? r.n : list.indexOf(r) + 1; else r.el.innerHTML = BUBBLE;
       });
       eye.setAttribute('aria-checked', String(hidden)); eye.innerHTML = hidden ? EYE_OFF : EYE;
       eye.title = (hidden ? 'Show dots' : 'Hide dots') + '  ( . )';

@@ -36,6 +36,7 @@
      root: where the dots, popover and dock go (default document.body; a shadow root works).
      theme: the element that gets data-od-dark (default <html>, or the shadow host). key: localStorage key for Hide dots.
      step(d), list(): replace the in-page back and next, and make the count a button (dev-artifacts walks a whole site).
+     plain: true draws blue dots without a number.
      select(rec): a dot click calls it instead of opening the popover (dev-artifacts shows the group in the dock).
    od.add({ target, label, pick, render(body, rec), onClose(), pos: 'tr'|'tl', n }) -> rec
      target: an element, or a function that returns { t: element, r: rect }. pick: true blue, false green.
@@ -66,6 +67,7 @@
   -webkit-tap-highlight-color: transparent; }
 .od-dot[data-kind="note"] { --od-c: var(--od-green); }
 .od-dot[hidden] { display: none; }
+.od-dot.od-plain { width: 14px; height: 14px; margin: 4px; font-size: 0; } /* no number: a small plain dot in the 22 px spot */
 .od-dot svg { width: 11px; height: 11px; display: block; }
 .od-dot::before { content: ""; position: absolute; inset: -9px; border-radius: 50%; } /* 40 px hit area for touch */
 .od-dot::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; pointer-events: none; }
@@ -77,7 +79,7 @@
 .od-mini svg { width: 10px; height: 10px; }
 
 .od-pop { position: fixed; left: 0; top: 0; z-index: 2147483002; box-sizing: border-box; display: flex; flex-direction: column;
-  width: max-content; min-width: 260px; max-width: min(380px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: hidden;
+  width: max-content; min-width: 260px; max-width: min(380px, calc(100vw - 16px)); max-height: 70vh; overflow: hidden;
   border-radius: 14px; background: var(--od-pop); color: var(--od-ink); border: .5px solid var(--od-line); box-shadow: 0 12px 32px rgba(0,0,0,.2);
   backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6); font: 14px/1.45 var(--od-font); text-align: left;
   transform-origin: top left; opacity: 0; transform: translateY(-4px) scale(.98); visibility: hidden; pointer-events: none;
@@ -146,7 +148,7 @@
 
 @media (max-width: 600px) {
   .od-pop { left: 8px !important; right: 8px; top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); width: auto !important;
-    min-width: 0; max-width: none; max-height: 60vh !important; border-radius: 18px; transform-origin: bottom center; transform: translateY(16px); }
+    min-width: 0; max-width: none; max-height: 70vh !important; border-radius: 18px; transform-origin: bottom center; transform: translateY(16px); }
   .od-body textarea:not(.k-comment) { font-size: 16px; } /* 16 px stops iOS zoom on focus */
 }
 @media (prefers-reduced-motion: reduce) {
@@ -198,7 +200,8 @@
       recs.forEach((r) => {
         r.el.dataset.kind = r.pick ? 'pick' : 'note';
         r.el.setAttribute('aria-label', (r.pick ? 'Options for ' : 'Comment on ') + r.label);
-        if (r.pick) r.el.textContent = r.n != null ? r.n : list.indexOf(r) + 1; else r.el.innerHTML = BUBBLE;
+        r.el.classList.toggle('od-plain', !!(o.plain && r.pick));
+        if (r.pick) r.el.textContent = o.plain ? '' : r.n != null ? r.n : list.indexOf(r) + 1; else r.el.innerHTML = BUBBLE;
       });
       eye.setAttribute('aria-checked', String(hidden)); eye.innerHTML = hidden ? EYE_OFF : EYE;
       eye.title = (hidden ? 'Show dots' : 'Hide dots') + '  ( . )';
@@ -431,15 +434,22 @@ const KIT_CSS = String.raw`
 .k-seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
 .k-dock .k-copy { background: var(--blue); color: #fff; }`;
 /* kit-css:end */
-  const KEY = 'devpanel', GO = 'devpanel:go', DOCK_KEY = 'devpanel:dock', FOCUS_KEY = 'devpanel:focus', Q = new URLSearchParams(location.search);
+  const Q = new URLSearchParams(location.search), SET = Q.has('dv-set') ? ':' + Q.get('dv-set') : ''; // ?dv-set: a frame's own store
+  const KEY = 'devpanel', GO = 'devpanel:go', DOCK_KEY = 'devpanel:dock' + SET, FOCUS_KEY = 'devpanel:focus' + SET;
   // Loaded from another origin (serve.mjs on 4799 inside a Vite app): the page is an SPA that routes itself.
   const me = document.currentScript, spa = !!me && new URL(me.src, location.href).origin !== location.origin;
   const PREFIX = String(window.__dvTitlePrefix || ''); // '<project> > <Orca tab>', set by serve.mjs in front of this file
   const forced = Object.fromEntries((Q.get('dv-pick') || '').split(',').map((s) => s.split(':')).filter((p) => p[1] > 0).map(([k, v]) => [k, +v]));
-  const st = { picks: {}, notes: {}, groups: [], fin: {} }, cfg = {};
-  let key = KEY, base = ''; // base: the site this page belongs to (DevPanel.config({ site })), '' = the whole origin
+  const st = { picks: {}, notes: {}, groups: [], fin: {}, last: {} };
+  // Look and behavior settings (DevPanel.config). markers: 'dot' (a small plain dot), 'none' (only the guide lines), 'dock'
+  // (dots only while the dock is open). arrows: 'groups', or 'options' (back and next change the pick; Shift for groups).
+  // inline: options shown in the dock, 3 (then "…"), 'fit' (one row) or 'all'. rounds: 'auto' or 'ask'.
+  // ?dv-set={json} sets them for one page (the options page frames), with its own store.
+  const cfg = { markers: 'dot', arrows: 'groups', inline: 3, rounds: 'auto' };
+  try { Object.assign(cfg, JSON.parse(Q.get('dv-set') || '{}')); } catch {}
+  let key = KEY + SET, base = ''; // base: the site this page belongs to (DevPanel.config({ site })), '' = the whole origin
   function load() {
-    Object.assign(st, { picks: {}, notes: {}, groups: [], fin: {} });
+    Object.assign(st, { picks: {}, notes: {}, groups: [], fin: {}, last: {} });
     try {
       const saved = JSON.parse(localStorage.getItem(key));
       if (saved) Object.assign(st, saved);
@@ -474,10 +484,31 @@ const KIT_CSS = String.raw`
   // Every dock count, the pager, the list, back and next use this one set: blue groups the variants file defines now that
   // the owner can reach (a known page, or a target on this page), in site order. Green comment dots never count.
   const browsable = () => site().filter((m) => m.opts && m.opts.length && (m.page || document.querySelector(groups.find((g) => g.id === m.id).target)));
-  // Drop stored picks, comments and Final marks of groups the variants file no longer has.
+  // Rounds: a group whose options changed (or that is gone) starts fresh; its old pick and comment move to st.last,
+  // which "Restore last round" in the "…" menu puts back. Untouched groups keep theirs.
+  let round = null, pending = [];
+  function retire(id, oldOpts) {
+    if (!round) { round = []; st.last = {}; }
+    round.push(id);
+    if (st.picks[id] || st.notes[id]) st.last[id] = { pick: st.picks[id] ? (oldOpts || [])[st.picks[id] - 1] || null : null, note: st.notes[id] || '' };
+    delete st.picks[id]; delete st.notes[id]; delete st.fin[id];
+  }
+  const lastLive = () => Object.keys(st.last || {}).filter((id) => groups.some((g) => g.id === id));
+  function restoreLast() {
+    let n = 0;
+    for (const id of lastLive()) {
+      const g = groups.find((x) => x.id === id), l = st.last[id], i = l.pick ? g.opts.findIndex((o) => o.name === l.pick) + 1 : 0;
+      if (l.note && !st.notes[id]) st.notes[id] = l.note;
+      if (i > 0) { if (i === 1 && g.current !== false) delete st.picks[id]; else st.picks[id] = i; setVar(g, i, true); }
+      n++;
+    }
+    st.last = {}; save(); od.close(); shownG = null; sync(); say(`Last round is back for ${n} group${n === 1 ? '' : 's'}.`);
+  }
+  // Drop everything stored for groups the variants file no longer has (also from the last round).
   function prune() {
     const ids = new Set(groups.map((g) => g.id)), keep = (o) => Object.fromEntries(Object.entries(o || {}).filter(([k]) => ids.has(k)));
-    st.groups = st.groups.filter((m) => ids.has(m.id)); st.picks = keep(st.picks); st.notes = keep(st.notes); st.fin = keep(st.fin); save();
+    st.groups = st.groups.filter((m) => ids.has(m.id));
+    st.picks = keep(st.picks); st.notes = keep(st.notes); st.fin = keep(st.fin); st.last = keep(st.last); save();
   }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   let host, sh, od, hl, gls, dockEl, grp, pill, handle, spacer, lb, sayOut, copyBtn, shownG = null, popG = null;
@@ -492,6 +523,14 @@ const KIT_CSS = String.raw`
   // How the dock shows a group's options; see the header.
   const kind = (g) => !g.opts.length ? 'note' : g.kind || (g.opts.some((o) => o.img) ? 'images' : g.opts.length >= 8 ? 'many'
     : g.opts.length <= 3 && g.opts.reduce((n, o) => n + o.name.length, 0) <= 36 ? 'flat' : 'select');
+  // How many options sit inline in the dock (cfg.inline); the rest are behind "…". 'fit' keeps one row (about 40 letters).
+  function inlineN(g) {
+    if (cfg.inline === 'all') return g.opts.length;
+    if (cfg.inline !== 'fit') return Math.min(g.opts.length, +cfg.inline || 3);
+    let n = 0, w = 0; for (const o of g.opts) { w += o.name.length + 3; if (w > 40 && n) break; n++; } return n;
+  }
+  const hasMore = (g) => g.opts.length > inlineN(g);
+  const needsPop = (g) => kind(g) === 'note' || hasMore(g);
 
   const svg = (d, w = 1.6) => `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const CHEV = svg('M3 4.5 6 7.5l3-3'), UP = svg('M3 7.5 6 4.5l3 3'), MIN = svg('M3 6h6');
@@ -534,6 +573,17 @@ svg { display: block; flex: none; }
 .od-dock .dv-focus { order: 4; } .od-dock .od-eye { order: 5; } .od-dock .dv-clear { order: 6; } .od-dock .dv-more { order: 7; }
 .od-dock .dv-say { order: 8; } .od-dock .od-primary { order: 9; }
 .od-dock .dv-ib.dv-more { display: none; font-size: 18px; letter-spacing: 1px; }
+:host([data-last]) .od-dock .dv-ib.dv-more { display: grid; } /* "Restore last round" lives there */
+/* markers: 'none' hides the dots (the guide lines still show), 'dock' shows them only while the dock is open */
+:host([data-markers="none"]) .od-dot, :host([data-markers="dock"]:not([data-dock="open"])) .od-dot { display: none !important; }
+.dv-ask { all: unset; cursor: pointer; margin-left: 8px; padding: 4px 10px; border-radius: 999px; background: var(--od-fill); font-weight: 600; }
+.dv-ask:hover { background: var(--seg); }
+.od-dock .dv-moreo { letter-spacing: .5px; }
+/* the tooltip over an inline option: its one-line note */
+.dv-tip { position: fixed; left: 0; top: 0; z-index: 2147483003; max-width: 260px; padding: 6px 9px; border-radius: 8px; pointer-events: none;
+  background: var(--od-pop); color: var(--od-ink); border: .5px solid var(--od-line); box-shadow: var(--od-shadow);
+  font: 500 12px/1.3 var(--od-font); opacity: 0; transition: opacity .12s ease; }
+.dv-tip.on { opacity: 1; transition-delay: .25s; }
 .od-ctl .od-step { background: none; padding: 0; gap: 0; }
 .od-step .k-dots { display: flex; gap: 2px; margin: 0 2px; }
 .od-step .k-dots[hidden] { display: none; }
@@ -567,7 +617,6 @@ svg { display: block; flex: none; }
 .od-dock.k-dock.dv-wrap .dv-track { border-radius: 18px; }
 .od-dock .dv-lab.k-seg-label { display: flex; align-items: center; gap: 7px; min-width: 0; max-width: 240px; padding: 6px 6px 6px 8px; background: none; }
 .dv-lab span:last-child { overflow: hidden; text-overflow: ellipsis; }
-.dv-lab .od-mini { width: 16px; height: 16px; font-size: 9px; }
 .od-dock .dv-lab:hover { background: none; color: var(--ink); }
 .od-dock .dv-sel, .od-dock .dv-sel:hover { background: var(--seg-on); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
 .od-dock .dv-sel { display: flex; align-items: center; gap: 8px; min-width: 150px; max-width: 280px; padding: 6px 10px 6px 12px; }
@@ -581,7 +630,6 @@ svg { display: block; flex: none; }
   backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8); }
 .dv-pill { left: 0; right: 0; margin-inline: auto; width: max-content; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); gap: 8px;
   height: 40px; padding: 0 12px 0 10px; border-radius: 999px; font: 600 14px/1 var(--od-font); font-variant-numeric: tabular-nums; }
-.dv-pill .od-mini { width: 16px; height: 16px; font-size: 9px; }
 .dv-pill svg { width: 11px; height: 11px; color: var(--od-muted); }
 .dv-handle { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: 32px; height: 32px; border-radius: 50%; color: var(--od-muted); }
 .dv-handle svg { width: 16px; height: 16px; }
@@ -599,7 +647,6 @@ svg { display: block; flex: none; }
 .dv-row[aria-selected="true"] .ck { visibility: visible; }
 .dv-row b { display: block; font: 500 14px/20px var(--od-font); }
 .dv-row[aria-selected="true"] b { font-weight: 600; }
-.dv-row .n, .dv-tile .n { color: var(--od-muted); font-variant-numeric: tabular-nums; margin-right: 6px; font-weight: 500; }
 .dv-row small { display: block; font: 12.5px/1.35 var(--od-font); color: var(--od-muted); }
 .dv-filter { position: sticky; top: -8px; z-index: 1; margin: -8px -14px 6px; padding: 8px 14px 6px; background: var(--od-pop); }
 .dv-filter input { width: 100%; height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--od-fill); font: 14px var(--od-font); color: var(--od-ink); }
@@ -673,7 +720,8 @@ svg { display: block; flex: none; }
     spacer = document.createElement('div'); spacer.setAttribute('aria-hidden', 'true'); spacer.dataset.devPanel = 'spacer';
     spacer.style.cssText = 'display:block;height:0;margin:0;padding:0;border:0;flex:none;pointer-events:none';
     if (!clean) document.body.appendChild(spacer);
-    od = window.OptionDots({ root: sh, key: 'devpanel:hidden', step: go, count: () => posText,
+    host.dataset.markers = cfg.markers;
+    od = window.OptionDots({ root: sh, key: 'devpanel:hidden', step: go, count: () => posText, plain: true,
       list: () => (listOpen ? od.close() : showList()), select: (r) => { const g = groups.find((x) => x.rec === r); if (g) dotClick(g); } });
     sh.append(sh.getElementById('dv-css')); // kit, then the shared overlay's style, then this one, so later wins ties
     od.count.setAttribute('aria-haspopup', 'dialog'); od.count.title = 'Every group on the site';
@@ -686,8 +734,16 @@ svg { display: block; flex: none; }
     const step = od.controls.querySelector('.od-step');
     pager = mk('div', 'k-dots'); step.insertBefore(pager, step.lastChild);
     pager.onclick = (e) => { const b = e.target.closest('button'); if (b) goTo(b.dataset.id, true); };
-    more = ib('dv-ib dv-more', '…', 'More: Open or Archived, Focus, Clear', () => (more.getAttribute('aria-expanded') === 'true' ? od.close() : od.open({
-      label: 'More', anchor: more, render: (b) => { b.innerHTML = '<p class="k-hint">Final groups move to Archived. Focus dims the rest of the page. Clear empties every pick and comment.</p>'; const x = mk('div', 'dv-xs'); x.append(...extras()); b.append(x); updX(); } })));
+    // "…": on a phone Open/Archived, Focus and Clear; on every width "Restore last round" after a new round
+    more = ib('dv-ib dv-more', '…', 'More', () => (more.getAttribute('aria-expanded') === 'true' ? od.close() : od.open({
+      label: 'More', anchor: more, render: (b) => {
+        const phone = matchMedia('(max-width: 600px)').matches, n = lastLive().length, x = mk('div', 'dv-xs');
+        b.innerHTML = `<p class="k-hint">${[phone && 'Final groups move to Archived. Focus dims the rest of the page. Clear empties every pick and comment.',
+          n && `The options of ${n} group${n === 1 ? '' : 's'} changed, so ${n === 1 ? 'it' : 'they'} started fresh. Restore puts the last round's picks and comments back.`].filter(Boolean).join(' ')}</p>`;
+        if (phone) x.append(...extras());
+        if (n) { const r = mk('button', 'k-clear dv-restore', 'Restore last round'); r.type = 'button'; r.onclick = restoreLast; x.append(r); }
+        b.append(x); updX();
+      } })));
     dockEl = od.dock(min, grp, ...extras(), more, sayOut, copyBtn); dockEl.classList.add('k-dock');
     updX();
     pill = ib('dv-pill', '', 'Open the dock', () => setDock('open'));
@@ -727,6 +783,7 @@ svg { display: block; flex: none; }
     });
     sh.querySelectorAll('.dv-focus button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === focusOn)));
     sh.querySelectorAll('.dv-clear').forEach((b) => { b.textContent = clearText; });
+    host.toggleAttribute('data-last', lastLive().length > 0);
   }
   // Clear: two clicks within 3 s (the kit's "Clear all?"), then Undo for 5 s. Never a browser confirm.
   let clearText = 'Clear', clearArm = 0, undo = null, undoT = 0;
@@ -747,6 +804,7 @@ svg { display: block; flex: none; }
     if (s !== 'open') od.close();
     const show = { open: dockEl, min: pill, hide: handle }[s];
     for (const n of [dockEl, pill, handle]) { n.hidden = n !== show; n.classList.remove('dv-in'); }
+    host.dataset.dock = s; // markers: 'dock' shows the dots only while the dock is open
     if (!quiet) { void show.offsetWidth; show.classList.add('dv-in'); }
     fit(); schedule();
   }
@@ -767,7 +825,7 @@ svg { display: block; flex: none; }
   function dotClick(g) {
     if (popG === g) return od.close();
     show(g); od.pulse(g.rec); glow(g);
-    if (kind(g) !== 'flat') popFor(g, kind(g) === 'note');
+    if (kind(g) === 'note') popFor(g, true); // the options are in the dock; only a comment group needs the popover
   }
 
   // The guide lines run once, about 1 s: they shoot out from the target's edges (180 ms), glow up and settle (300 ms),
@@ -835,34 +893,65 @@ svg { display: block; flex: none; }
     clearTimeout(hoverT);
     if (i === 1 && g.current !== false) delete st.picks[g.id]; else st.picks[g.id] = i;
     save(); setVar(g, i, true);
+    if (!sayT && !pending.length && sayOut && !sayOut.hidden) { sayOut.hidden = true; fit(); } // a lasting message goes on the next pick
     sh.querySelectorAll('.od-dock [data-i], .od-body [data-i]').forEach((o) => o.setAttribute(o.hasAttribute('aria-pressed') ? 'aria-pressed' : 'aria-selected', String(+o.dataset.i === i)));
     if (popG === g) pvShow(g, i);
+    if (shownG === g && hasMore(g)) fillDock(g); // the "…" item carries a pick past the inline ones
     sync();
+  }
+  // One step through a group's options: picks it at once (saved, applied, guide lines), the same as a click.
+  function stepPick(g, d) {
+    const i = Math.min(Math.max(pick(g) + d, 1), g.opts.length);
+    if (i !== pick(g)) choose(g, i);
+    glow(g);
+    if (popG === g) activate(g, od.body.querySelector(`[data-i="${i}"]`), false);
   }
 
   // The dock part of the current group.
   function fillDock(g) {
     if (shownG && shownG !== g) { clearTimeout(hoverT); setVar(shownG, pick(shownG), true); } // drop the last group's preview
     shownG = g;
-    const k = kind(g);
-    grp.innerHTML = `<div class="dv-track k-seg"><button type="button" class="dv-lab k-seg-label" title="${esc(g.label)}: ${k === 'note' ? 'click to comment' : k === 'flat' ? 'hover an option to preview it, click to pick, click here to comment' : 'click to see the options'}"><span class="od-dot od-mini" data-kind="${k === 'note' ? 'note' : 'pick'}"></span><span>${esc(g.label)}</span></button>`
-      + (k === 'flat' ? g.opts.map((o, j) => `<button type="button" class="dv-o" data-i="${j + 1}" aria-pressed="${pick(g) === j + 1}" title="${esc(o.note || o.name)}">${esc(o.name)}</button>`).join('')
-        : `<button type="button" class="dv-sel" aria-haspopup="dialog" aria-expanded="false"><span></span>${CHEV}</button>`)
+    const k = kind(g), n = inlineN(g), p = pick(g), focused = sh.activeElement && grp.contains(sh.activeElement);
+    // Options show once: the first n inline here, the rest behind "…" (the popover's full list). The "…" item carries the
+    // pick when it is past n, so the pick always shows.
+    const o = (j) => `<button type="button" class="dv-o" data-i="${j}" aria-pressed="${p === j}">${esc(g.opts[j - 1].name)}</button>`;
+    grp.innerHTML = `<div class="dv-track k-seg"><button type="button" class="dv-lab k-seg-label" aria-haspopup="dialog" title="${k === 'note' ? 'Click to comment' : 'Click for the comment' + (hasMore(g) ? ', every option' : '') + ' and Final'}"><span>${esc(g.label)}</span></button>`
+      + (k === 'note' ? `<button type="button" class="dv-sel" aria-haspopup="dialog" aria-expanded="false"><span></span>${CHEV}</button>`
+        : g.opts.slice(0, n).map((_, j) => o(j + 1)).join('')
+          + (hasMore(g) ? `<button type="button" class="dv-o dv-moreo" aria-haspopup="dialog" aria-pressed="${p > n}" data-tip="All ${g.opts.length} options">${p > n ? esc(g.opts[p - 1].name) + ' ' : ''}…</button>` : ''))
       + `</div>`;
     const cm = ib('dv-ib dv-cm', BUBBLE, 'Comment', () => (popG === g ? focusNote() : popFor(g, true)));
     if (k !== 'note') grp.append(cm);
     const track = grp.firstChild, lab = track.firstChild, sel = track.querySelector('.dv-sel');
     lab.onclick = () => (popG === g ? od.close() : popFor(g, k === 'note'));
-    if (sel) sel.onclick = () => (popG === g ? od.close() : popFor(g, k === 'note'));
-    if (k === 'flat') {
-      track.onpointerover = (e) => { const b = e.target.closest('.dv-o'); if (!b || b.contains(e.relatedTarget)) return; preview(g, +b.dataset.i); if (e.pointerType !== 'touch') glow(g); };
-      track.onpointerleave = () => unpreview(g);
-      track.onclick = (e) => { const b = e.target.closest('.dv-o'); if (b) choose(g, +b.dataset.i); };
+    lab.onpointerenter = (e) => { if (e.pointerType !== 'touch') glow(g); };
+    if (sel) sel.onclick = () => (popG === g ? od.close() : popFor(g, true));
+    if (k !== 'note') {
+      track.onpointerover = (e) => {
+        const b = e.target.closest('.dv-o'); if (!b || b.contains(e.relatedTarget)) return;
+        tipFor(b, b.dataset.tip || optNote(g, +b.dataset.i));
+        if (b.dataset.i) preview(g, +b.dataset.i);
+        if (e.pointerType !== 'touch') glow(g);
+      };
+      track.onpointerleave = () => { tipFor(null); unpreview(g); };
+      track.onclick = (e) => { const b = e.target.closest('.dv-o'); if (!b) return; tipFor(null); if (b.dataset.i) choose(g, +b.dataset.i); else popG === g ? od.close() : popFor(g); };
     }
+    if (focused) (grp.querySelector(`.dv-o[data-i="${p}"]`) || grp.querySelector('.dv-moreo') || lab).focus({ preventScroll: true });
     updDock(g);
   }
+  // One line about an option: its note, or for option 1 "The site as it is now".
+  const optNote = (g, i) => (g.opts[i - 1] || {}).note || (i === 1 && g.current !== false ? 'The site as it is now' : '');
+  // The small tooltip over an inline dock option (its one-line note), so the popover is not needed to read it.
+  let tip;
+  function tipFor(b, text) {
+    if (!tip) { tip = mk('div', 'dv-tip'); tip.setAttribute('role', 'tooltip'); sh.append(tip); }
+    if (!b || !text) return tip.classList.remove('on');
+    tip.textContent = text; tip.classList.add('on');
+    const r = b.getBoundingClientRect(), w = tip.offsetWidth;
+    tip.style.left = Math.min(Math.max(r.left + r.width / 2 - w / 2, 8), innerWidth - w - 8) + 'px';
+    tip.style.top = r.top - tip.offsetHeight - 8 + 'px';
+  }
   function updDock(g) {
-    const mini = grp.querySelector('.od-mini'); if (mini) mini.innerHTML = g.el ? g.el.innerHTML : '';
     const sel = grp.querySelector('.dv-sel span');
     if (sel) { const o = g.opts[pick(g) - 1]; sel.textContent = g.opts.length ? o.name : (st.notes[g.id] || '').trim().split('\n')[0] || 'Add a comment'; }
     const cm = grp.querySelector('.dv-cm'); if (cm) cm.dataset.on = String(!!st.notes[g.id]);
@@ -875,6 +964,7 @@ svg { display: block; flex: none; }
   function popFor(g, note) {
     if (dockState !== 'open') setDock('open');
     if (shownG !== g) show(g);
+    tipFor(null);
     const k = kind(g);
     od.pop.classList.toggle('dv-wide', k === 'images');
     od.open({ label: g.label, anchor: anchorOf(), reveal: () => sample(g).r, render: (b) => fillPop(g, b, k),
@@ -887,15 +977,14 @@ svg { display: block; flex: none; }
     else activate(g, od.body.querySelector(`[data-i="${pick(g)}"]`), false);
   }
   function fillPop(g, body, k) {
-    const p = pick(g), n = (j) => `<span class="n">${j}</span>`;
-    const row = (o, j) => `<button type="button" class="dv-row" role="option" data-i="${j}" aria-selected="${p === j}"><span class="ck">✓</span><span><b>${n(j)}${esc(o.name)}</b>${o.note || (j === 1 && g.current !== false) ? `<small>${esc(o.note || 'The site as it is now')}</small>` : ''}</span></button>`;
-    const tile = (o, j) => `<button type="button" class="dv-tile" role="option" data-i="${j}" aria-selected="${p === j}" title="${esc(o.note || o.name)}"><span class="th"${o.img ? ` style="background-image:url('${esc(o.img)}')"` : ''}>${o.img ? '' : esc(o.name)}</span><span>${n(j)}${esc(o.name)}</span></button>`;
+    const p = pick(g);
+    const row = (o, j) => `<button type="button" class="dv-row" role="option" data-i="${j}" aria-selected="${p === j}"><span class="ck">✓</span><span><b>${esc(o.name)}</b>${optNote(g, j) ? `<small>${esc(optNote(g, j))}</small>` : ''}</span></button>`;
+    const tile = (o, j) => `<button type="button" class="dv-tile" role="option" data-i="${j}" aria-selected="${p === j}" title="${esc(o.note || o.name)}"><span class="th"${o.img ? ` style="background-image:url('${esc(o.img)}')"` : ''}>${o.img ? '' : esc(o.name)}</span><span>${esc(o.name)}</span></button>`;
     // the kit's visible hint: one line on how this popover works
-    const hint = { select: 'Hover an option to see it on the page. Click to pick it. Arrow keys and Enter work too.',
-      many: 'Type to filter. Hover an option to see it on the page, click to pick it.',
-      images: 'Hover a picture to see it on the page. Click to pick it. Click the big picture to see it full size.',
+    const hint = { many: 'Type to filter. Hover an option to see it on the page. Click or an arrow key picks it, Enter closes.',
+      images: 'Hover a picture to see it on the page. Click or an arrow key picks it. Click the big picture to see it full size.',
       note: 'Write what should change here. Copy choices puts it under this group.' }[k]
-      || 'Hover an option to see it on the page. Click to pick it. Arrow keys and Enter work too.';
+      || 'Hover an option to see it on the page. Click or an arrow key picks it, Enter closes.';
     body.innerHTML = `<p class="k-hint">${hint}</p>` + (k === 'many' ? `<div class="dv-filter"><input type="search" placeholder="Filter ${g.opts.length} options" aria-label="Filter options"></div>` : '')
       + (k === 'images' ? `<div class="dv-imgs"><div class="dv-grid" role="listbox" aria-label="${esc(g.label)}">${g.opts.map((o, j) => tile(o, j + 1)).join('')}</div><figure class="dv-pv"><div class="th" title="Open full size"></div><figcaption><b></b><small></small></figcaption></figure></div>`
         : k === 'note' ? '' : `<div class="dv-list" role="listbox" aria-label="${esc(g.label)}">${g.opts.map((o, j) => row(o, j + 1)).join('')}</div><div class="dv-none" hidden>No option matches.</div>`)
@@ -938,7 +1027,7 @@ svg { display: block; flex: none; }
     const pv = od.body.querySelector('.dv-pv'); if (!pv || popG !== g && popG) return;
     const o = g.opts[i - 1] || {}, th = pv.querySelector('.th');
     th.dataset.i = i; th.style.backgroundImage = o.img ? `url('${o.img.replace(/'/g, '%27')}')` : ''; th.textContent = o.img ? '' : o.name || '';
-    pv.querySelector('b').textContent = `${i} ${o.name || ''}`; pv.querySelector('small').textContent = o.note || (i === 1 && g.current !== false ? 'The site as it is now' : '');
+    pv.querySelector('b').textContent = o.name || ''; pv.querySelector('small').textContent = optNote(g, i);
   }
   function lightbox(o) {
     if (lb) lb.remove();
@@ -947,18 +1036,32 @@ svg { display: block; flex: none; }
     const end = () => { const n = lb; if (!n) return; lb = null; n.classList.remove('show'); setTimeout(() => n.remove(), 200); };
     lb.onclick = end; lb.end = end; sh.append(lb); requestAnimationFrame(() => lb && lb.classList.add('show'));
   }
-  // Arrow keys move inside the open popover (a grid moves by row with up and down), Enter picks.
+  // Arrow keys change the pick at once, in the open popover (a grid moves by row with up and down) and in the dock's
+  // option row. Enter closes the popover (after picking a filtered match); Escape closes it and keeps the pick.
   addEventListener('keydown', (e) => {
     if (lb && e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); return lb.end(); }
-    if (!popG || e.metaKey || e.ctrlKey || e.altKey) return;
-    const t = e.composedPath()[0];
+    if (e.metaKey || e.ctrlKey || e.altKey || !sh) return;
+    const t = e.composedPath()[0], arrow = /^Arrow/.test(e.key);
     if (t && t.tagName === 'TEXTAREA') return;
+    if (!popG) {
+      // focus on the dock's group: every arrow steps through its options
+      const g = shownG; if (!arrow || !g || !g.opts.length || !t || !grp.contains(t)) return;
+      e.preventDefault(); return stepPick(g, /Right|Down/.test(e.key) ? 1 : -1);
+    }
+    if (t && t.closest && t.closest('.k-final, .k-clear')) return;
     const items = [...od.body.querySelectorAll('[data-i]')].filter((b) => !b.hidden); if (!items.length) return;
-    const cur = items.findIndex((b) => b.classList.contains('on')), grid = od.body.querySelector('.dv-grid');
+    const cur = items.findIndex((b) => b.classList.contains('on')), grid = od.body.querySelector('.dv-grid'), typing = t && t.tagName === 'INPUT';
     const cols = grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').length : 1;
-    const d = { ArrowDown: cols, ArrowUp: -cols, ArrowRight: grid ? 1 : 0, ArrowLeft: grid ? -1 : 0 }[e.key];
-    if (d) { e.preventDefault(); activate(popG, items[Math.min(Math.max((cur < 0 ? (d > 0 ? -1 : items.length) : cur) + d, 0), items.length - 1)], true); glow(popG); }
-    else if (e.key === 'Enter' && cur >= 0) { e.preventDefault(); choose(popG, +items[cur].dataset.i); }
+    const d = { ArrowDown: cols, ArrowUp: -cols, ArrowRight: typing ? 0 : 1, ArrowLeft: typing ? 0 : -1 }[e.key];
+    if (d) {
+      e.preventDefault();
+      const b = items[Math.min(Math.max((cur < 0 ? (d > 0 ? -1 : items.length) : cur) + d, 0), items.length - 1)];
+      activate(popG, b, false); choose(popG, +b.dataset.i); glow(popG);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (cur >= 0 && +items[cur].dataset.i !== pick(popG)) choose(popG, +items[cur].dataset.i);
+      od.close();
+    }
   }, true);
 
   function show(g) { curId = g.id; sync(); }
@@ -972,7 +1075,7 @@ svg { display: block; flex: none; }
       body.innerHTML = `<p class="k-hint">Click a group to go to it. Copy choices copies every pick and comment as a list to paste in chat.</p><div class="dv-list">${pages.map((p) => `<div class="dv-ghead">${p === null ? 'Page not seen yet' : esc(p)}${p !== null && p === here() ? '<i> · this page</i>' : ''}</div>`
         + all.filter((m) => home(m) === p).map((m) => {
           const i = st.picks[m.id] || 1, name = m.opts && m.opts[i - 1];
-          return `<button type="button" class="dv-row" data-id="${esc(m.id)}" aria-selected="${m.id === curId}"${p === null ? ' disabled title="Open its page once so the dock knows where it is"' : ''}><span class="ck">✓</span><span><b>${esc(m.label)}</b><small>${m.opts && m.opts.length ? `${i} ${esc(name || '?')}` : 'Comment'}</small></span></button>`;
+          return `<button type="button" class="dv-row" data-id="${esc(m.id)}" aria-selected="${m.id === curId}"${p === null ? ' disabled title="Open its page once so the dock knows where it is"' : ''}><span class="ck">✓</span><span><b>${esc(m.label)}</b><small>${m.opts && m.opts.length ? esc(name || '?') : 'Comment'}</small></span></button>`;
         }).join('')).join('')}</div>`;
       body.querySelector('.dv-list').onclick = (e) => { const b = e.target.closest('.dv-row'); if (b && !b.disabled) goTo(b.dataset.id, true); };
     } });
@@ -998,20 +1101,32 @@ svg { display: block; flex: none; }
     handle.title = none ? 'No option groups on this page' : 'Show the dock  ( h )'; nUsable = here_.length;
     const g = groups.find((x) => x.id === curId);
     for (const x of groups) if (x.el) x.el.setAttribute('aria-current', String(x === g));
-    pill.innerHTML = `<span class="od-dot od-mini" data-kind="pick">${g && g.el && g.opts.length ? g.el.innerHTML : ''}</span><span>${posText}</span>${UP}`;
+    pill.innerHTML = `<span>${posText}</span>${UP}`;
     if (!g) { grp.hidden = true; shownG = null; }
     else { grp.hidden = false; if (shownG !== g) fillDock(g); else updDock(g); }
   }
   // A short message in the dock, such as a group that never showed up.
-  function say(text) {
+  // ms 0: it stays until the next message or a pick
+  function say(text, ms = 4000) {
     clearTimeout(sayT); sayOut.textContent = text; sayOut.hidden = false; fit();
-    sayT = setTimeout(() => { sayT = 0; sayOut.hidden = true; fit(); }, 4000);
+    if (ms) sayT = setTimeout(() => { sayT = 0; sayOut.hidden = true; fit(); }, ms);
+  }
+  // rounds: 'ask': a small bar in the dock instead of the automatic fresh start
+  function askRound() {
+    clearTimeout(sayT); sayOut.textContent = 'New round. Clear old comments?'; sayOut.hidden = false;
+    const b = (t, fn) => { const x = mk('button', 'dv-ask', t); x.type = 'button'; x.onclick = () => { fn(); pending = []; sayOut.hidden = true; fit(); }; return x; };
+    sayOut.append(b('Clear', () => { for (const [id, old] of pending) retire(id, old); save(); groups.forEach((g) => setVar(g, pick(g), true)); shownG = null; sync(); }), b('Keep', () => {}));
+    fit();
   }
 
   // Back and next walk every blue-dot group on the site in site order and wrap at the ends. A group on another page
   // navigates there first. On arrival the group becomes current, its popover opens, and the page scrolls the target
   // smoothly into the free part above the popover (only when it is not already in view there).
+  // arrows: 'options': back and next step the current group's options; with Shift they step groups.
+  let shiftOn = false;
+  for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, (e) => { shiftOn = e.shiftKey; }, true);
   function go(d) {
+    if (cfg.arrows === 'options' && !shiftOn && shownG && shownG.opts.length) return stepPick(shownG, d);
     const list = browsable().filter(inSet); if (!list.length) return;
     let k = list.findIndex((m) => m.id === curId);
     if (k < 0) { const f = list.findIndex((m) => !m.page || isHere(m)); k = Math.max(f, 0) - d; } // start on this page
@@ -1040,7 +1155,7 @@ svg { display: block; flex: none; }
       const g = groups.find((x) => x.id === id), s = g && sample(g);
       if (s && s.r && s.r.width > 0 && g.rec) {
         end(); show(g);
-        if (reopen && kind(g) !== 'flat') { popFor(g); od.pulse(g.rec); glow(g); return; } // the popover's reveal scrolls
+        if (reopen && kind(g) === 'note') { popFor(g, true); od.pulse(g.rec); glow(g); return; } // the popover's reveal scrolls
         return od.go(g.rec, false).then(() => { if (n === goN) glow(g); });
       }
       const t = performance.now() - t0;
@@ -1145,13 +1260,15 @@ svg { display: block; flex: none; }
   const boot = () => {
     prune(); // the variants file ran before boot: anything stored for a group it no longer has goes
     mount(); veil();
+    if (round) { const n = round.length; say(`New round: ${n} group${n === 1 ? '' : 's'} changed and started fresh. Restore last round is in the … menu.`, 0); }
+    if (pending.length) askRound();
     try { new ResizeObserver(schedule).observe(document.body); } catch {}
     // targets an app renders later (board cards after a fetch) get their dot as soon as they appear
     new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
     const find = (id) => id && groups.find((x) => x.id === id);
     const g = find(Q.get('dv-open')), h = find(Q.get('dv-hl'));
     if (g) setTimeout(() => (kind(g) === 'flat' ? show(g) : popFor(g, kind(g) === 'note')), 50);
-    if (h) setTimeout(() => glow(h, true), 50);
+    if (h) setTimeout(() => { show(h); glow(h, true); }, 50);
     // back or next loaded this page: finish the trip to its group
     let go = null; try { go = JSON.parse(sessionStorage.getItem(GO)); } catch {}
     if (go && Date.now() - go.t < 15000) { curId = go.id; sync(); arrive(go.id, go.open); }
@@ -1187,7 +1304,12 @@ svg { display: block; flex: none; }
       g.cur = 1; // the page starts on option 1
       groups.push(g);
       let m = meta(g.id); if (!m) st.groups.push(m = { id: g.id, page: null });
-      Object.assign(m, { label: g.label, opts: g.opts.map((o) => o.name) });
+      // a new round for this group when its options changed since the last load (no sig yet: an old store, keep it)
+      const sig = g.opts.map((o) => o.name).join('\n');
+      if (m.sig && m.sig !== sig && (st.picks[g.id] || st.notes[g.id] || fin(g.id))) {
+        if (cfg.rounds === 'ask') pending.push([g.id, m.opts]); else retire(g.id, m.opts);
+      }
+      Object.assign(m, { label: g.label, opts: g.opts.map((o) => o.name), sig });
       if (c.page) m.page = [].concat(c.page);
       save();
       if (g.opts.length && pick(g) !== 1) setVar(g, pick(g));

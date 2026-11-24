@@ -91,7 +91,8 @@ function handle(req, res) {
   const type = TYPES[path.extname(p).toLowerCase()] || 'application/octet-stream';
   let body = fs.readFileSync(p);
   if (url === '/__dev/devpanel.js') body = `window.__dvTitlePrefix=${JSON.stringify(PREFIX)};\n` + body; // the overlay's tab title
-  if (type.startsWith('text/html')) {
+  // a kit page (options.mjs) has its own dock, so it gets no overlay
+  if (type.startsWith('text/html') && !/<main[^>]*\bdata-kit\b/.test(body.toString('utf8'))) {
     const html = body.toString('utf8'), at = html.toLowerCase().lastIndexOf('</body>');
     body = at < 0 ? html + INJECT : html.slice(0, at) + INJECT + '\n' + html.slice(at);
   }

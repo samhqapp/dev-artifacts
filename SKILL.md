@@ -10,7 +10,16 @@ Options shown on the real page, beside the real content. Cheaper than a separate
 
 ## Which way
 
-- Website or web app that runs locally: use this skill.
+There are two modes:
+
+- **Live mode** (the steps below): deciding about a website. The options sit on the real site in the dock.
+- **Options mode**: deciding about a component or tool, such as the dock itself. One kit panel per option, side by
+  side, recommended first, each with the real page in a frame (Light and Dark) set to that option. Write a spec like
+  `<repo>/examples/dock-options.mjs`, run `node <repo>/options.mjs spec.mjs --out <scratch>/opts --port 0` in the
+  background with a deadline, and open the printed URL. Each option sets `DevPanel.config` values (`set`), URL
+  params (`params`), and an optional starting store (`seed`). Frames are real renders, never drawn copies.
+
+- Website or web app that runs locally: live mode.
 - A quick one-time pick with no site behind it (which repos, which items, a short list of choices):
   write a `page.js` like `<repo>/templates/quick-page.js`, run `node <repo>/quick.mjs page.js out.html`,
   and open the file. One HTML file, Preact + htm (JSX-like) inlined, no build, no network, Copy choices included.
@@ -76,10 +85,15 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 - Dots and dock come from `<repo>/dots.js`, the one shared overlay (the artifact kit uses it too). Edit only
   that file, then run `node <repo>/dots-sync.mjs <file>` for each copy (devpanel.js and any other file with its markers).
 - It is built from the artifact kit's classes and hints (`dots-sync.mjs` copies the kit.css rules in). Do not restyle it per site.
-- The dock shows one select button for the current group. 2-3 short options sit right in the dock as a segmented
-  control; more open a popover (a list, a list with a filter at 8+, or a picture grid when options have `img`).
+- The dock shows the current group's first 3 options inline (hover one for its note). With more, a 4th item "…"
+  opens the popover with the full list (a list, a list with a filter at 8+, or a picture grid when options have
+  `img`); the group's name opens it too. Options never show twice, and nothing carries a number.
   A blue dot is a group to pick; a green dot is a comment-only group (`options: [], current: false`).
-- Back, next (`[` `]`) and a blue dot click scroll smoothly to the group and open its popover. Arrow keys work inside.
+- Back, next (`[` `]`) and a blue dot click scroll smoothly to the group. Arrow keys change the pick at once, in
+  the dock row and in the popover; Enter closes the popover, Escape closes it and keeps the pick.
+- The popover grows to 70% of the window, then scrolls with a thin overlay knob; the pick scrolls into view.
+- Comments save on every key. When a group's options change, that group starts fresh (a new round); "…" offers
+  Restore last round. `DevPanel.config({ markers, arrows, inline, rounds })` changes these (see devpanel.js).
 - Hovering an option or a dot draws faint red guide lines past the section's edges for about 1 second (no fill, no shift).
 - `-` shrinks the dock to a capsule; `h` hides it, a corner handle brings it back. A spacer keeps the footer above the dock.
 - The "2 / 5" count is the site total of blue dots. Clicking it lists every group by page with its pick; a row goes there.
