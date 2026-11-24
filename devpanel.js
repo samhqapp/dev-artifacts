@@ -507,7 +507,7 @@ const KIT_CSS = String.raw`
     st.picks = keep(st.picks); st.notes = keep(st.notes); st.fin = keep(st.fin); save();
   }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-  let host, sh, od, hl, gls, dockEl, rows, overall, knob, handle, spacer, lb, sayOut, copyBtn, popG = null, hovG = null;
+  let host, sh, od, hl, gls, dockEl, rows, overall, knob, handle, spacer, lb, sayOut, copyBtn, copyT = 0, popG = null, hovG = null;
   let lit = null, stillT = 0, raf = 0, hoverT = 0, curId = null, goN = 0, sayT = 0, posText = '', listOpen = false, rowsKey = '', rowsCur = null;
   let dockState = 'open', focusOn = 'on', arch = false, pager, more, fz, nUsable = -1;
   try { dockState = localStorage.getItem(DOCK_KEY) === 'hide' ? 'hide' : 'open'; } catch {}
@@ -529,6 +529,9 @@ const KIT_CSS = String.raw`
   const EYEI = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8S3.9 3.5 8 3.5 14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2.1"/></svg>';
   // "…" drawn as three dots on the middle line: the text glyph sits on the baseline and looks low
   const DOTS = '<svg class="dv-dots" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="13" cy="8" r="1.4" fill="currentColor"/></svg>';
+
+  const CHECK = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2.8 7.4l2.7 2.7L11.2 4.4" pathLength="1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const EASE2 = 'cubic-bezier(.2, .8, .2, 1)'; // the kit's easing for every move below
 
   const CSS = `
 :host { all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; color-scheme: dark; --dv-red: #ff453a;
@@ -587,9 +590,10 @@ svg { display: block; flex: none; }
 .od-dock .dv-g > .dv-o { min-width: 36px; text-overflow: ellipsis; white-space: nowrap; }
 .od-dock .dv-g > .dv-moreo, .od-dock .dv-g.dv-fit > * { flex: none; } /* dv-fit: measuring the row's full width */
 /* the current group: its name bolder and full white (a text stroke, so the width never changes), the other groups at 60% */
-.od-dock .dv-g { transition: opacity 160ms ease; }
+.od-dock .dv-g { transition: opacity 220ms ease; }
 .od-dock .dv-g:not([aria-current="true"]) { opacity: .6; }
-.od-dock .dv-g[aria-current="true"] .dv-lab { color: var(--od-ink); -webkit-text-stroke: .4px currentColor; }
+.od-dock .dv-g .dv-lab { -webkit-text-stroke: .4px transparent; transition: color 220ms ease, -webkit-text-stroke-color 220ms ease; }
+.od-dock .dv-g[aria-current="true"] .dv-lab { color: var(--od-ink); -webkit-text-stroke-color: currentColor; }
 .dv-lab[data-note]::after { content: ""; flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--od-blue); }
 .dv-oldt { padding: 0 8px; font: 500 13px/1.3 var(--od-font); max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .od-dock .dv-unarch { background: var(--seg-on); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
@@ -652,19 +656,20 @@ svg { display: block; flex: none; }
 
 /* popover content: plain rows like a macOS menu, a filter for long lists, a thumbnail grid for images */
 .od-pop.dv-wide { max-width: min(660px, calc(100vw - 16px)); }
-.dv-list { display: grid; gap: 1px; margin: 0 -6px; }
-.dv-row { display: grid; grid-template-columns: 14px 1fr; column-gap: 8px; align-items: start; width: 100%; text-align: left;
-  padding: 7px 10px 7px 8px; border-radius: 8px; position: relative; overflow: hidden; }
-.dv-row:hover, .dv-row.on { background: var(--od-fill); }
-.dv-row .ck { font-size: 12px; font-weight: 700; line-height: 20px; color: var(--od-blue); visibility: hidden; }
+.dv-list { display: grid; gap: 2px; margin: 0 -8px; }
+.dv-row { display: grid; grid-template-columns: 16px 1fr; column-gap: 10px; align-items: start; width: 100%; text-align: left;
+  padding: 8px 12px 8px 10px; border-radius: 10px; position: relative; overflow: hidden; transition: background-color 120ms ease; }
+.dv-row:hover, .dv-row.on { background: var(--dv-hov); }
+.dv-row[aria-selected="true"] { background: var(--dv-sel); }
+.dv-row .ck { height: 20px; display: grid; place-items: center; color: var(--od-ink); visibility: hidden; }
+.dv-row .ck svg { width: 12px; height: 12px; }
 .dv-row[aria-selected="true"] .ck { visibility: visible; }
-.dv-row b { display: block; font: 500 14px/20px var(--od-font); }
+.dv-row b { display: block; font: 500 15px/20px var(--od-font); letter-spacing: -.01em; }
 .dv-sw { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 50%; vertical-align: -0.5px;
   box-shadow: inset 0 0 0 .5px rgba(0,0,0,.2); }
-.dv-row[aria-selected="true"] b { font-weight: 600; }
-.dv-row small { display: block; font: 12.5px/1.35 var(--od-font); color: var(--od-muted); }
-.dv-filter { position: sticky; top: -8px; z-index: 1; margin: -8px -14px 6px; padding: 8px 14px 6px; background: var(--od-pop); }
-.dv-filter input { width: 100%; height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--od-fill); font: 14px var(--od-font); color: var(--od-ink); }
+.dv-row small { display: block; margin-top: 1px; font: 400 13px/18px var(--od-font); color: var(--od-muted); }
+.dv-filter { position: sticky; top: -8px; z-index: 1; margin: -8px -14px 6px; padding: 8px 14px 6px; background: rgb(30,30,33); }
+.dv-filter input { width: 100%; height: 34px; padding: 0 12px; border: .5px solid rgba(255,255,255,.08); border-radius: 10px; background: rgba(255,255,255,.06); font: 14px var(--od-font); color: var(--od-ink); }
 .dv-filter input::placeholder { color: var(--od-muted); }
 .dv-none { padding: 10px 4px; color: var(--od-muted); }
 .dv-imgs { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 14px; align-items: start; }
@@ -673,15 +678,38 @@ svg { display: block; flex: none; }
 .dv-tile .th { aspect-ratio: 4 / 3; border-radius: 7px; background: var(--od-fill) center / cover no-repeat; box-shadow: inset 0 0 0 .5px var(--od-line);
   display: grid; place-items: center; font: 600 12px/1 var(--od-font); color: var(--od-muted); }
 .dv-tile span:last-child { font: 500 12px/1.3 var(--od-font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px 1px; }
-.dv-tile:hover, .dv-tile.on { background: var(--od-fill); }
-.dv-tile[aria-selected="true"] .th { box-shadow: 0 0 0 2px var(--od-blue); }
-.dv-tile[aria-selected="true"] span:last-child { font-weight: 600; }
+.dv-tile { transition: background-color 120ms ease; }
+.dv-tile:hover, .dv-tile.on { background: var(--dv-hov); }
+.dv-tile[aria-selected="true"] { background: var(--dv-sel); }
 .dv-pv { margin: 0; position: sticky; top: 0; display: grid; gap: 6px; }
 .dv-pv .th { aspect-ratio: 4 / 3; border-radius: 10px; background: var(--od-fill) center / contain no-repeat; box-shadow: inset 0 0 0 .5px var(--od-line);
   cursor: zoom-in; display: grid; place-items: center; color: var(--od-muted); font-weight: 600; }
 .dv-pv b { font: 600 14px/1.3 var(--od-font); }
 .dv-pv small { display: block; font: 12.5px/1.35 var(--od-font); color: var(--od-muted); }
-.od-body .k-comment { font-size: 15px; margin-top: 10px; min-height: 40px; padding: 9px 12px; box-shadow: none; background: var(--inset); }
+.od-body .k-comment { font-size: 15px; margin-top: 10px; min-height: 40px; padding: 9px 12px; box-shadow: none; border-radius: 12px;
+  background: rgba(255,255,255,.05); border: .5px solid rgba(255,255,255,.08); }
+.od-body .k-comment:focus { border-color: rgba(255,255,255,.22); }
+
+/* The popover: a deep, dark glass like a macOS Control Center menu. It grows out of its group in 220 ms (scale .96 and a
+   fade) and shrinks back in 150 ms. A hairline highlight on the top edge, a layered soft shadow. */
+:host([data-od-dark]) { --od-pop: rgba(24,24,27,.82); --dv-ease: cubic-bezier(.2,.8,.2,1); --dv-sel: rgba(255,255,255,.1); --dv-hov: rgba(255,255,255,.055); }
+.od-pop { border-radius: 18px; border: .5px solid rgba(255,255,255,.1);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 .5px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.2), 0 14px 32px rgba(0,0,0,.32), 0 32px 80px rgba(0,0,0,.4);
+  backdrop-filter: blur(44px) saturate(1.9); -webkit-backdrop-filter: blur(44px) saturate(1.9);
+  transform: scale(.96); transition: opacity 150ms ease, transform 150ms var(--dv-ease), visibility 0s linear 150ms; }
+.od-pop.od-up:not(.od-show) { transform: scale(.96); }
+.od-pop.od-show { transition: opacity 160ms ease, transform 220ms var(--dv-ease), visibility 0s; }
+.od-head { padding: 14px 16px 2px; font-size: 12px; letter-spacing: .02em; }
+/* the pick's fill slides between options: one ghost fill under the content (glide()) */
+.k-seg, .dv-list, .dv-grid { position: relative; isolation: isolate; }
+.dv-ghost { position: absolute; left: 0; top: 0; z-index: -1; pointer-events: none; transform-origin: 0 0; }
+.dv-gliding, .dv-gliding:hover { background: transparent !important; box-shadow: none !important; }
+/* the pager number rolls: the new index slides in, the old one (data-old) slides out */
+.dv-roll { display: inline-block; overflow: hidden; line-height: 1; height: 1em; }
+.dv-num { display: inline-block; position: relative; }
+.dv-num::after { content: attr(data-old); position: absolute; left: 0; right: 0; top: 0; text-align: center; opacity: 0; }
+.dv-ok { display: inline-flex; align-items: center; gap: 5px; }
+.dv-ok svg { width: 14px; height: 14px; }
 .od-body .k-hint { font-size: 13px; margin: 0 0 8px; line-height: 1.4; }
 .od-body .k-hint + .dv-list, .od-body .k-hint + .dv-imgs { margin-top: 2px; }
 /* the list of every group: page heads, then a row per group with its pick as the note */
@@ -710,10 +738,15 @@ svg { display: block; flex: none; }
   .dv-pv { position: static; order: -1; grid-template-columns: 112px 1fr; align-items: center; }
   .dv-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dv-filter input, .od-body textarea { font-size: 16px; } /* 16 px stops iOS zoom on focus */
-  .dv-row { padding: 9px 10px 9px 8px; }
+  .dv-row { padding: 9px 12px 9px 10px; }
+  .od-pop, .od-pop.od-up:not(.od-show) { border-radius: 20px; transform: translateY(12px); }
 }
 @media (prefers-reduced-motion: reduce) { .loading::after { animation: none; width: 100%; background: color-mix(in srgb, var(--od-blue) 8%, transparent); }
-  .dv-sel svg, .dv-lb, .dv-lb.show { transition: none; } }`;
+  .dv-sel svg, .dv-lb, .dv-lb.show { transition: none; }
+  /* every move becomes a plain fade */
+  .od-pop, .od-pop.od-up:not(.od-show), .od-pop.od-show { transform: none !important; }
+  .od-pop { transition: opacity 150ms ease, visibility 0s linear 150ms !important; }
+  .od-pop.od-show { transition: opacity 160ms ease, visibility 0s !important; } }`;
 
   const mk = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html) n.innerHTML = html; return n; };
   const ib = (cls, html, label, fn) => { const b = mk('button', cls, html); b.type = 'button'; b.setAttribute('aria-label', label); b.title = label; b.onclick = fn; return b; };
@@ -771,8 +804,12 @@ svg { display: block; flex: none; }
     // a new dock size (shown again, or the window resized) refits the rows to the width
     try { new ResizeObserver(() => { renderRows(); updX(); fit(); }).observe(dockEl); } catch {}
     for (const g of groups) addDot(g);
+    rollCount();
     setDock(dockState, true);
     sync();
+    // the dock enters with a short rise and fade, once per page load
+    if (!clean && !dockEl.hidden) dockEl.animate(still.matches ? [{ opacity: 0 }, { opacity: 1 }]
+      : [{ opacity: 0, transform: 'translateY(14px) scale(.985)' }, { opacity: 1, transform: 'none' }], { duration: 360, easing: EASE2 });
   }
 
   // The kit's Open/Archived switch, Focus switch and Clear button. Built twice: in the dock, and in the phone's "…" menu.
@@ -783,13 +820,14 @@ svg { display: block; flex: none; }
       for (const [v, t] of items) { const b = mk('button', '', t); b.type = 'button'; b.dataset.v = v; b.onclick = () => onPick(v); s.append(b); }
       return s;
     };
-    const a = seg('dv-arch', 'Groups', [['open', 'Open'], ['archived', 'Archived']], (v) => {
+    const segs = (cls) => [...sh.querySelectorAll('.' + cls)].map((s) => [s, '[aria-pressed="true"]']);
+    const a = seg('dv-arch', 'Groups', [['open', 'Open'], ['archived', 'Archived']], (v) => glide(segs('dv-arch'), () => {
       arch = v === 'archived'; curId = null; od.close(); sync(); od.sync();
       if (!site().some(inSet) && !(arch && st.old.length)) say(arch ? 'Nothing is archived yet.' : 'Everything is final. See Archived.');
-    });
-    const f = seg('dv-focus', 'Focus', [['on', 'On'], ['off', 'Off']], (v) => {
+    }));
+    const f = seg('dv-focus', 'Focus', [['on', 'On'], ['off', 'Off']], (v) => glide(segs('dv-focus'), () => {
       focusOn = v; try { localStorage.setItem(FOCUS_KEY, v); } catch {} updX(); schedule();
-    }, 'Focus');
+    }), 'Focus');
     const c = mk('button', 'k-clear dv-clear', clearText); c.type = 'button'; c.onclick = clearAll;
     c.title = 'Two clicks empty every pick, comment and Final. Undo shows for 5 seconds after.';
     return [a, f, c];
@@ -812,8 +850,50 @@ svg { display: block; flex: none; }
   }
   function lockW(b, texts) {
     if (!b.offsetParent) return; // hidden: measured again when the dock shows
-    const t = b.textContent; b.style.minWidth = '';
-    b.style.minWidth = Math.max(...texts.map((x) => ((b.textContent = x), b.offsetWidth))) + 'px'; b.textContent = t;
+    const t = b.innerHTML; b.style.minWidth = '';
+    b.style.minWidth = Math.max(...texts.map((x) => ((b.textContent = x), b.offsetWidth))) + 'px'; b.innerHTML = t;
+  }
+  // The pick's fill slides from the old option to the new one: one ghost fill under the content moves with FLIP
+  // (transform only). pairs: [box, selector of the picked element]. Reduced motion: the fill fades in.
+  function glide(pairs, change) {
+    const vis = (a) => a && a.offsetParent && a.getBoundingClientRect().width > 0;
+    const before = pairs.map(([box, sel]) => { const a = box && box.querySelector(sel); return vis(a) ? a.getBoundingClientRect() : null; });
+    change();
+    pairs.forEach(([box, sel], k) => {
+      const r0 = before[k], b = box && box.isConnected && box.querySelector(sel);
+      if (!r0 || !vis(b)) return;
+      const r1 = b.getBoundingClientRect(); if (Math.abs(r0.left - r1.left) < 1 && Math.abs(r0.top - r1.top) < 1) return;
+      box.querySelectorAll(':scope > .dv-ghost').forEach((n) => n.remove());
+      box.querySelectorAll('.dv-gliding').forEach((n) => n.classList.remove('dv-gliding'));
+      const p = box.getBoundingClientRect(), cs = getComputedStyle(b), gh = mk('i', 'dv-ghost');
+      Object.assign(gh.style, { left: r1.left - p.left - box.clientLeft + box.scrollLeft + 'px', top: r1.top - p.top - box.clientTop + box.scrollTop + 'px',
+        width: r1.width + 'px', height: r1.height + 'px', background: cs.backgroundColor, boxShadow: cs.boxShadow, borderRadius: cs.borderRadius });
+      box.prepend(gh); b.classList.add('dv-gliding');
+      const a = still.matches ? gh.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160 })
+        : gh.animate([{ transform: `translate(${r0.left - r1.left}px, ${r0.top - r1.top}px) scale(${r0.width / r1.width}, ${r0.height / r1.height})` },
+          { transform: 'none' }], { duration: 260, easing: EASE2 });
+      a.onfinish = a.oncancel = () => { gh.remove(); b.classList.remove('dv-gliding'); };
+    });
+  }
+  // The pager number rolls: the new index slides in, the old one slides out. The count's text stays "2 / 5".
+  function rollCount() {
+    let last = null;
+    const c = od.count, OBS = { childList: true, characterData: true, subtree: true };
+    const mo = new MutationObserver(() => {
+      if (c.querySelector('.dv-num')) return; // our own wrap, or lockW putting it back
+      const m = c.textContent.match(/^(\d+)( \/ .*)$/); if (!m) { last = null; return; }
+      mo.disconnect(); c.innerHTML = `<span class="dv-roll"><span class="dv-num">${m[1]}</span></span>${esc(m[2])}`; mo.observe(c, OBS);
+      const n = +m[1], was = last; last = n;
+      if (was === null || was === n || !c.offsetParent) return;
+      const sp = c.querySelector('.dv-num'), y = (n > was ? 1 : -1) * 14; // one line of the 1em clip (14 px)
+      sp.dataset.old = was;
+      if (still.matches) return sp.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160 });
+      const T = { duration: 280, easing: EASE2 };
+      sp.animate([{ transform: `translateY(${y}px)`, opacity: 0 }, { transform: 'none', opacity: 1 }], T);
+      // the old number rides on the new one's span, so a fixed -y offset carries it from the spot up and out
+      sp.animate([{ transform: `translateY(${-y}px)`, opacity: 1 }, { transform: `translateY(${-y}px)`, opacity: 0 }], { ...T, pseudoElement: '::after' });
+    });
+    mo.observe(c, OBS);
   }
   // Clear: two clicks within 3 s (the kit's "Clear all?"), then Undo for 5 s. Never a browser confirm.
   let clearText = 'Clear', clearArm = 0, undo = null, undoT = 0;
@@ -933,8 +1013,10 @@ svg { display: block; flex: none; }
     if (i === 1 && g.current !== false) delete st.picks[g.id]; else st.picks[g.id] = i;
     save();
     if (!sayT && sayOut && !sayOut.hidden) { sayOut.hidden = true; fit(); } // a lasting message goes on the next pick
-    if (popG === g) { od.body.querySelectorAll('[data-i]').forEach((o) => o.setAttribute('aria-selected', String(+o.dataset.i === i))); pvShow(g, i); }
-    sync(); // the row first, so the loading state lands on its new buttons
+    glide([[rowEls.get(g.id), '.dv-o[aria-pressed="true"]'], [popG === g && od.body.querySelector('.dv-list, .dv-grid'), '[aria-selected="true"]']], () => {
+      if (popG === g) { od.body.querySelectorAll('[data-i]').forEach((o) => { o.setAttribute('aria-selected', String(+o.dataset.i === i)); o.classList.toggle('on', +o.dataset.i === i); }); pvShow(g, i); }
+      sync(); // the row first, so the loading state lands on its new buttons
+    });
     setVar(g, i, true);
   }
   // One step through a group's options: picks it at once (saved, applied, guide lines), the same as a click.
@@ -1057,12 +1139,18 @@ svg { display: block; flex: none; }
     if (dockState !== 'open') setDock('open');
     if (curId !== g.id) show(g);
     tipFor(null);
-    const k = kind(g), row = rowEls.get(g.id);
+    const k = kind(g), row = rowEls.get(g.id), swap = !!popG && popG !== g && od.pop.classList.contains('od-show');
     od.pop.classList.toggle('dv-wide', k === 'images');
     od.open({ label: g.label, anchor: row && row.isConnected ? row : dockEl, reveal: () => sample(g).r, render: (b) => fillPop(g, b, k),
       onClose: () => { if (popG === g) popG = null; unpreview(g); row?.querySelector('.dv-sel')?.setAttribute('aria-expanded', 'false'); } });
     popG = g; listOpen = false;
     row?.querySelector('.dv-sel')?.setAttribute('aria-expanded', 'true');
+    // one group's popover to the next: a quick re-grow from the new group; the rows stagger in, 15 ms apart, at most 8
+    if (!still.matches) {
+      if (swap) od.pop.animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: EASE2 });
+      [...od.body.querySelectorAll('.dv-row, .dv-tile')].slice(0, 8).forEach((n, j) => n.animate([{ opacity: 0, transform: 'translateY(5px)' },
+        { opacity: 1, transform: 'none' }], { duration: 240, delay: 50 + j * 15, easing: EASE2, fill: 'backwards' }));
+    }
     const f = od.body.querySelector('.dv-filter input');
     if (note) requestAnimationFrame(focusNote);
     else if (f && matchMedia('(hover: hover)').matches) f.focus({ preventScroll: true });
@@ -1070,7 +1158,7 @@ svg { display: block; flex: none; }
   }
   function fillPop(g, body, k) {
     const p = pick(g);
-    const row = (o, j) => `<button type="button" class="dv-row" role="option" data-i="${j}" aria-selected="${p === j}"><span class="ck">✓</span><span><b>${swatch(g, j)}${esc(o.name)}</b>${optNote(g, j) ? `<small>${esc(optNote(g, j))}</small>` : ''}</span></button>`;
+    const row = (o, j) => `<button type="button" class="dv-row" role="option" data-i="${j}" aria-selected="${p === j}"><span class="ck">${CHECK}</span><span><b>${swatch(g, j)}${esc(o.name)}</b>${optNote(g, j) ? `<small>${esc(optNote(g, j))}</small>` : ''}</span></button>`;
     const tile = (o, j) => `<button type="button" class="dv-tile" role="option" data-i="${j}" aria-selected="${p === j}" title="${esc(o.note || o.name)}"><span class="th"${o.img ? ` style="background-image:url('${esc(o.img)}')"` : ''}>${o.img ? '' : esc(o.name)}</span><span>${esc(o.name)}</span></button>`;
     // the kit's visible hint: one line on how this popover works
     const hint = { many: 'Type to filter. Hover an option to see it on the page. Click or an arrow key picks it, Enter closes.',
@@ -1314,7 +1402,13 @@ svg { display: block; flex: none; }
       const ta = document.createElement('textarea'); ta.value = text; sh.appendChild(ta); ta.select();
       try { document.execCommand('copy'); } catch {} ta.remove();
     }
-    copyBtn.textContent = 'Copied'; setTimeout(() => (copyBtn.textContent = 'Copy choices'), 1200);
+    // a short check morph: the check draws itself while "Copied" fades in, then the label fades back
+    clearTimeout(copyT);
+    copyBtn.innerHTML = `<span class="dv-ok">${CHECK}Copied</span>`;
+    const ok = copyBtn.firstChild, path = ok.querySelector('path');
+    ok.animate([{ opacity: 0, transform: still.matches ? 'none' : 'scale(.92)' }, { opacity: 1, transform: 'none' }], { duration: 200, easing: EASE2 });
+    if (!still.matches) path.animate([{ strokeDasharray: 1, strokeDashoffset: 1 }, { strokeDasharray: 1, strokeDashoffset: 0 }], { duration: 260, delay: 60, easing: EASE2, fill: 'backwards' });
+    copyT = setTimeout(() => { copyBtn.innerHTML = '<span>Copy choices</span>'; copyBtn.firstChild.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180 }); }, 1400);
   }
 
   addEventListener('scroll', () => schedule(), { passive: true, capture: true });
