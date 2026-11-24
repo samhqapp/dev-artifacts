@@ -42,9 +42,6 @@ DevPanel.group({
   apply(i) { document.querySelector('.d-photo').style.backgroundImage = i > 1 ? `url("${pic(SKY[i - 2])}")` : ''; },
 });
 
-// Comment only: a green dot, no options. For a part that needs words, not picks.
-DevPanel.group({ id: 'intro', label: 'Intro text', target: '.d-hero p', options: [], current: false });
-
 // A footer at the very bottom: the dock's end spacer lets the page scroll it above the dock.
 DevPanel.group({
   id: 'footer', label: 'Footer', target: '.d-foot',

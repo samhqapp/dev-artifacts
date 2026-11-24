@@ -2,7 +2,7 @@
    DevPanel.group({ id, label, target, options: [{ name, note?, img? }], kind?, page?: '/about' | ['/a', '/b'], dot?: 'tr'|'tl',
      current?: false, sample?: 'first'|'all', apply?(i) })
    Option 1 is "Current" (no attribute) unless current: false. Picking option i > 1 sets data-dv-<id>="<i>" on <html>.
-   No markers on the page. `options: [], current: false` makes a comment-only group with a green dot.
+   No markers on the page. A group with `options: []` is skipped (comments go in the dock's overall comment).
    Every group sits in the dock at once: its name, the first 3 options, "…" for the rest. kind picks the popover
    (default: chosen from the options):
      'flat'   2-3 short options, no popover list,
@@ -17,14 +17,14 @@
    each with its own store; groups whose `page` is on another site are skipped. Call it before DevPanel.group.
    DevPanel.config({ navigate(path) }) lets an app route itself; otherwise an SPA gets pushState + popstate and a
    static site a normal page load. Everything lives in one shadow root, so no style leaks in or out. Never ship this file.
-   The dock comes from the shared option-dots overlay (dots.js, copied in below). Row 1: minimize, back, count, next,
-   the overall comment, Open/Archived, Focus, Hide dots, Clear, "…", Copy choices; then one row per group. Minimized it
-   is a small capsule; hidden (key h) only a corner handle shows. An empty spacer the dock's height ends the page, so
+   The dock comes from the shared option-dots overlay (dots.js, copied in below). Row 1: the eye, back, count, next,
+   the overall comment, Open/Archived, Focus, Clear, "…", Copy choices; then one row per group. The eye (or key h)
+   morphs the dock into a round glass eye button at the bottom right; a click on it morphs it back. An empty spacer the dock's height ends the page, so
    its footer can scroll above the dock. Hovering a dock row, or arriving at a group, shows faint red guide lines once.
    A group whose options changed, or that is gone, moves its old pick and comment to Archived.
    URL params: ?dv-open=<id> opens a group, ?dv-hl=<id> holds the guide lines (for screenshots),
    ?dv-pick=<id>:<i>[,<id>:<i>] forces options (nothing is saved), ?dv-clean hides the whole overlay.
-   Keys: . hides the dots, h hides the dock, ] and [ go to the next and previous group on any page, arrows and Enter
+   Keys: h hides the dock, ] and [ go to the next and previous group on any page, arrows and Enter
    move and pick inside a popover, Escape closes it. */
 /* option-dots:start: a copy of dev-artifacts/dots.js. Edit that file, then run dots-sync.mjs. */
 /* Option dots: one shared overlay of option dots, with the artifact kit's look and motion.
@@ -509,10 +509,10 @@ const KIT_CSS = String.raw`
     st.picks = keep(st.picks); st.notes = keep(st.notes); st.fin = keep(st.fin); save();
   }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-  let host, sh, od, hl, gls, dockEl, rows, overall, knob, pill, handle, spacer, lb, sayOut, copyBtn, popG = null, hovG = null;
+  let host, sh, od, hl, gls, dockEl, rows, overall, knob, handle, spacer, lb, sayOut, copyBtn, popG = null, hovG = null;
   let lit = null, stillT = 0, raf = 0, hoverT = 0, curId = null, goN = 0, sayT = 0, posText = '', listOpen = false, rowsKey = '', rowsCur = null;
   let dockState = 'open', focusOn = 'on', arch = false, pager, more, fz, nUsable = -1;
-  try { dockState = ['open', 'min', 'hide'].includes(localStorage.getItem(DOCK_KEY)) ? localStorage.getItem(DOCK_KEY) : 'open'; } catch {}
+  try { dockState = localStorage.getItem(DOCK_KEY) === 'hide' ? 'hide' : 'open'; } catch {}
   try { focusOn = localStorage.getItem(FOCUS_KEY) === 'off' ? 'off' : 'on'; } catch {}
   // Open shows the groups not yet final, Archived the final ones (the kit's Final switch). Copy choices takes only open ones.
   const fin = (id) => !!(st.fin && st.fin[id]);
@@ -527,10 +527,10 @@ const KIT_CSS = String.raw`
   const hasMore = (g) => g.opts.length > inlineN(g);
 
   const svg = (d, w = 1.6) => `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const CHEV = svg('M3 4.5 6 7.5l3-3'), UP = svg('M3 7.5 6 4.5l3 3'), MIN = svg('M3 6h6');
+  const CHEV = svg('M3 4.5 6 7.5l3-3');
+  const EYEI = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8S3.9 3.5 8 3.5 14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2.1"/></svg>';
   // "…" drawn as three dots on the middle line: the text glyph sits on the baseline and looks low
   const DOTS = '<svg class="dv-dots" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="13" cy="8" r="1.4" fill="currentColor"/></svg>';
-  const DOCKI = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="9.5" width="11" height="4" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 6.5 8 4.5l2 2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   const CSS = `
 :host { all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483646; color-scheme: light; --dv-red: #ff3b30;
@@ -558,18 +558,18 @@ svg { display: block; flex: none; }
 .fz { position: absolute; left: 0; top: 0; border-radius: 10px; box-shadow: 0 0 0 200vmax var(--fz); opacity: 0; transition: opacity 160ms ease; }
 .fz.on { opacity: 1; }
 
-/* the dock: almost the full width (16 px gutters). Row 1 is fixed: minimize, pager (back, count, dots, next), the
-   overall comment, Open/Archived, Focus, Hide dots (only with green comment groups), Clear, "…", Copy choices at the
-   right. Below it every group of the page, "Name  opt opt opt …", wrapping; past 40% of the window they scroll.
+/* the dock: almost the full width (16 px gutters). Row 1 is fixed: the eye (hides the dock), pager (back, count,
+   dots, next), the overall comment, Open/Archived, Focus, Clear, "…", Copy choices at the right. Below it every group of the page, "Name  opt opt opt …", wrapping; past 40% of the window they scroll.
    On a phone row 1 keeps back and next, "…" and Copy choices; the comment takes its own line. */
 .od-dock.k-dock { left: var(--gutter-l); right: var(--gutter-r); width: auto; max-width: none; margin: 0; border-radius: 22px;
   justify-content: flex-start; gap: 6px; }
 .od-ctl { display: contents; }
 /* two classes each: the shared overlay's ".od-ctl button { all: unset }" would reset a one-class order */
-.od-dock .dv-min { order: 0; } .od-dock .od-step { order: 1; } .od-dock .dv-overall { order: 2; } .od-dock .dv-arch { order: 3; }
-.od-dock .dv-focus { order: 4; } .od-dock .od-eye { order: 5; } .od-dock .dv-clear { order: 6; } .od-dock .dv-more { order: 7; }
+.od-dock .od-eye { display: none !important; } /* no dots on the page: the dock's own eye (dv-eye) hides the dock */
+.od-dock .dv-eye { order: 0; } .od-dock .od-step { order: 1; } .od-dock .dv-overall { order: 2; } .od-dock .dv-arch { order: 3; }
+.od-dock .dv-focus { order: 4; } .od-dock .dv-clear { order: 6; } .od-dock .dv-more { order: 7; }
 .od-dock .dv-say { order: 8; } .od-dock .od-primary { order: 9; } .od-dock .dv-rows { order: 10; }
-/* no blue dots on the page: the guide lines point at each group. Green comment dots stay. */
+/* no dots on the page: the guide lines point at each group */
 .od-dot.od-plain { display: none !important; }
 .od-dock .dv-overall { flex: 1 1 220px; min-width: 160px; margin: 0; min-height: 32px; max-height: 108px; overflow-y: auto; padding: 5px 12px;
   font: 400 14px/20px var(--od-font); border-radius: 16px; background: var(--seg); border-color: transparent; box-shadow: none; scrollbar-width: none; }
@@ -622,7 +622,6 @@ svg { display: block; flex: none; }
 .od-ctl .od-count::before { content: none; }
 .od-ctl .od-eye { transition: none; }
 .dv-ib svg { width: 16px; height: 16px; }
-.dv-min svg { width: 13px; height: 13px; }
 .od-ctl .od-count[aria-expanded="true"] { color: var(--od-blue); }
 .od-dock > .od-primary:hover { background: var(--od-blue); filter: brightness(1.08); }
 .dv-ib[data-on="true"] { color: var(--od-blue); }
@@ -639,18 +638,14 @@ svg { display: block; flex: none; }
 .dv-sel svg { width: 11px; height: 11px; color: var(--od-muted); transition: rotate var(--od-open) var(--od-out); }
 .dv-sel[aria-expanded="true"] svg { rotate: 180deg; }
 
-/* minimized capsule and the corner handle */
-.dv-pill, .dv-handle { position: fixed; z-index: 2147483001; pointer-events: auto; display: flex; align-items: center; justify-content: center;
+/* the hidden dock: a round glass eye button in the dock's bottom-right corner; the dock morphs into it and back */
+.dv-handle { position: fixed; z-index: 2147483001; pointer-events: auto; display: grid; place-items: center;
+  right: var(--gutter-r); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: 44px; height: 44px; border-radius: 50%;
   background: var(--od-dock); color: var(--od-ink); border: .5px solid var(--od-line); box-shadow: var(--od-shadow), inset 0 1px 0 var(--od-hi);
   backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8); }
-.dv-pill { left: 0; right: 0; margin-inline: auto; width: max-content; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); gap: 8px;
-  height: 40px; padding: 0 12px 0 10px; border-radius: 999px; font: 600 14px/1 var(--od-font); font-variant-numeric: tabular-nums; }
-.dv-pill svg { width: 11px; height: 11px; color: var(--od-muted); }
-.dv-handle { right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: 32px; height: 32px; border-radius: 50%; color: var(--od-muted); }
-.dv-handle svg { width: 16px; height: 16px; }
-.dv-pill:hover, .dv-handle:hover { color: var(--od-ink); background: var(--od-pop); }
-.dv-in { animation: dv-in var(--od-open) var(--od-out); }
-@keyframes dv-in { from { opacity: 0; transform: translateY(6px) scale(.97); } }
+.dv-handle svg { width: 20px; height: 20px; }
+.dv-handle:hover { color: var(--od-blue); }
+.dv-eye svg { width: 18px; height: 18px; }
 
 /* popover content: plain rows like a macOS menu, a filter for long lists, a thumbnail grid for images */
 .od-pop.dv-wide { max-width: min(660px, calc(100vw - 16px)); }
@@ -703,7 +698,7 @@ svg { display: block; flex: none; }
 .dv-o { position: relative; overflow: hidden; }
 @keyframes dv-sweep { from { transform: translateX(-100%); } to { transform: translateX(223%); } }
 @media (max-width: 600px) {
-  .od-dock .dv-arch, .od-dock .dv-focus, .od-dock .dv-clear, .od-dock .dv-min, .od-dock .od-eye, .od-step .k-dots { display: none; }
+  .od-dock .dv-arch, .od-dock .dv-focus, .od-dock .dv-clear, .od-step .k-dots { display: none; }
   .od-dock .dv-ib.dv-more { margin-left: auto; }
   .od-dock .dv-overall { order: 9; flex-basis: 100%; }
   .od-dock .od-primary { order: 8; }
@@ -715,7 +710,7 @@ svg { display: block; flex: none; }
   .dv-row { padding: 9px 10px 9px 8px; }
 }
 @media (prefers-reduced-motion: reduce) { .loading::after { animation: none; width: 100%; background: color-mix(in srgb, var(--od-blue) 8%, transparent); }
-  .dv-in { animation: none; } .dv-sel svg, .dv-lb, .dv-lb.show { transition: none; } }`;
+  .dv-sel svg, .dv-lb, .dv-lb.show { transition: none; } }`;
 
   const mk = (tag, cls, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html) n.innerHTML = html; return n; };
   const ib = (cls, html, label, fn) => { const b = mk('button', cls, html); b.type = 'button'; b.setAttribute('aria-label', label); b.title = label; b.onclick = fn; return b; };
@@ -750,30 +745,27 @@ svg { display: block; flex: none; }
     rows = mk('div', 'dv-rows'); rows.setAttribute('role', 'group'); rows.setAttribute('aria-label', 'Option groups');
     knob = mk('div', 'dv-knob');
     wireRows();
-    const min = ib('dv-ib dv-min', MIN, 'Minimize the dock', () => setDock('min'));
+    const eye = ib('dv-ib dv-eye', EYEI, 'Hide the dock  ( h )', () => setDock('hide'));
     // the kit's pager: one small dot per group between the count and next; a click goes to that group
     const step = od.controls.querySelector('.od-step');
     pager = mk('div', 'k-dots'); step.insertBefore(pager, step.lastChild);
     pager.onclick = (e) => { const b = e.target.closest('button'); if (b) goTo(b.dataset.id, true); };
-    // "…": the keys and Hide the dock; on a phone also Open/Archived, Focus, Clear, Minimize and Hide dots
+    // "…": the keys; on a phone also Open/Archived, Focus and Clear
     const act = (t, fn) => { const b = mk('button', 'k-clear', t); b.type = 'button'; b.onclick = () => { od.close(); fn(); }; return b; };
     more = ib('dv-ib dv-more', DOTS, 'More', () => (more.getAttribute('aria-expanded') === 'true' ? od.close() : od.open({
       label: 'More', anchor: more, render: (b) => {
         const phone = matchMedia('(max-width: 600px)').matches, x = mk('div', 'dv-xs');
         b.innerHTML = `<p class="k-hint">${phone ? 'Final groups move to Archived. Focus dims the rest of the page. Clear empties every pick and comment.'
           : 'Keys: [ and ] go to the last or next group. Arrow keys change the pick of the group in focus. h hides the dock.'}</p>`;
-        if (phone) {
-          x.append(...extras(), act('Make the dock small', () => setDock('min')));
-          if (groups.some((g) => !g.opts.length)) x.append(act(od.hidden ? 'Show comment dots' : 'Hide comment dots', () => od.setHidden(!od.hidden)));
-        } else x.append(act('Hide the dock', () => setDock('hide')));
-        b.append(x); updX();
+        if (phone) { x.append(...extras()); b.append(x); }
+        updX();
       } })));
-    dockEl = od.dock(min, overall, ...extras(), more, sayOut, copyBtn, rows, knob); dockEl.classList.add('k-dock');
+    dockEl = od.dock(eye, overall, ...extras(), more, sayOut, copyBtn, rows, knob); dockEl.classList.add('k-dock');
     updX();
-    pill = ib('dv-pill', '', 'Open the dock', () => setDock('open'));
-    handle = ib('dv-handle', DOCKI, 'Show the dock  ( h )', () => setDock('open'));
-    sh.append(pill, handle);
-    try { const ro = new ResizeObserver(fit); ro.observe(dockEl); ro.observe(pill); } catch {}
+    handle = ib('dv-handle', EYEI, 'Show the dock  ( h )', () => setDock('open'));
+    sh.append(handle);
+    // a new dock size (shown again, or the window resized) refits the rows to the width
+    try { new ResizeObserver(() => { renderRows(); fit(); }).observe(dockEl); } catch {}
     for (const g of groups) addDot(g);
     setDock(dockState, true);
     sync();
@@ -820,20 +812,31 @@ svg { display: block; flex: none; }
     set('Undo'); undoT = setTimeout(() => { undo = null; set('Clear'); }, 5000);
   }
 
-  // open: the full dock. min: a small capsule with the count. hide: only a corner handle. Kept after a reload.
+  // open: the full dock. hide: only the round eye button in the dock's bottom-right corner. Kept after a reload.
+  // The dock morphs into the button and back: a clip shrinks it into its own corner (they share that corner) while it
+  // fades into the button. Reduced motion: a plain fade.
   function setDock(s, quiet, temp) {
-    if (host.hasAttribute('data-empty') && !temp) return; // no groups here: only the handle shows
+    if (host.hasAttribute('data-empty') && !temp) return; // no groups here: only the button shows
     if (!temp) { dockState = s; try { localStorage.setItem(DOCK_KEY, s); } catch {} }
     if (s !== 'open') od.close();
-    const show = { open: dockEl, min: pill, hide: handle }[s];
-    for (const n of [dockEl, pill, handle]) { n.hidden = n !== show; n.classList.remove('dv-in'); }
-    if (!quiet) { void show.offsetWidth; show.classList.add('dv-in'); }
-    fit(); schedule();
+    const open = s === 'open', moving = !quiet && dockEl.hidden === open;
+    for (const n of [dockEl, handle]) n.getAnimations().forEach((a) => a.cancel());
+    const done = () => { dockEl.hidden = !open; handle.hidden = open; fit(); schedule(); };
+    if (!moving) return done();
+    dockEl.hidden = handle.hidden = false;
+    const r = dockEl.getBoundingClientRect(), T = { duration: 260, easing: getComputedStyle(dockEl).getPropertyValue('--od-ease').trim() || 'ease-out' };
+    const full = 'inset(0px 0px 0px 0px round 22px)', dot = `inset(${r.height - 44}px 0px 0px ${r.width - 44}px round 22px)`;
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const d = still ? [{ opacity: 1 }, { opacity: 0 }] : [{ clipPath: full, opacity: 1 }, { opacity: 1, offset: .55 }, { clipPath: dot, opacity: 0 }];
+    const b = still ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0 }, { opacity: 0, offset: .45 }, { opacity: 1 }];
+    if (open) { d.reverse(); b.reverse(); d.forEach((k) => k.offset && (k.offset = 1 - k.offset)); b.forEach((k) => k.offset && (k.offset = 1 - k.offset)); }
+    dockEl.animate(d, T).onfinish = done; handle.animate(b, T);
+    fit();
   }
   function fit() {
     if (!dockEl) return;
     const s = host.hasAttribute('data-empty') ? 'hide' : dockState;
-    const n = s === 'open' ? dockEl : s === 'min' ? pill : null, h = n ? n.getBoundingClientRect().height : 0;
+    const n = s === 'open' ? dockEl : null, h = n ? n.getBoundingClientRect().height : 0;
     spacer.style.height = h ? Math.ceil(h + 32) + 'px' : '0'; // 16 px under the dock and 16 px of air above it
   }
 
@@ -1177,9 +1180,6 @@ svg { display: block; flex: none; }
     handle.title = none ? 'No option groups on this page' : 'Show the dock  ( h )'; nUsable = here_.length;
     const g = groups.find((x) => x.id === curId);
     for (const x of groups) if (x.el) x.el.setAttribute('aria-current', String(x === g));
-    pill.innerHTML = `<span>${posText}</span>${UP}`;
-    // the eye hides the green comment dots; with no comment group there is nothing for it to hide
-    od.controls.querySelector('.od-eye').style.display = groups.some((x) => !x.opts.length) ? '' : 'none';
     renderRows(); fit();
   }
   // A short message in the dock, such as a group that never showed up.
@@ -1313,7 +1313,7 @@ svg { display: block; flex: none; }
   addEventListener('click', (e) => {
     if (!od || e.composedPath()[0] !== document.documentElement) return;
     const inR = (el) => { const r = el.getBoundingClientRect(); return r.width && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
-    const b = [...sh.querySelectorAll('.od-body [data-i], .od-dock button, .dv-pill, .dv-handle'), ...od.layer.children].find((el) => !el.hidden && inR(el));
+    const b = [...sh.querySelectorAll('.od-body [data-i], .od-dock button, .dv-handle'), ...od.layer.children].find((el) => !el.hidden && inR(el));
     if (b) b.click();
   }, true);
   // The Focus veil takes the page's own background color, so the rest of the page fades toward it (the kit dims to .8).
@@ -1362,6 +1362,7 @@ svg { display: block; flex: none; }
       if (!/^[a-z0-9-]+$/.test(c.id)) throw new Error('DevPanel id must be lowercase letters, digits, or dashes: ' + c.id);
       if (c.kind && !KINDS.includes(c.kind)) throw new Error(`DevPanel kind must be one of ${KINDS.join(', ')}: ${c.kind}`);
       if (base && c.page && ![].concat(c.page).some(inBase)) return null; // a group of another site on this server
+      if (!c.options.length) return null; // comment-only groups are gone (the overall comment covers it): skip quietly
       const g = { ...c, label: c.label || c.id, pos: c.dot || 'tr',
         opts: c.current === false ? c.options : [{ name: 'Current' }, ...c.options] };
       g.cur = 1; // the page starts on option 1

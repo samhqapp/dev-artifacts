@@ -50,13 +50,13 @@ To see every kind of group on a demo page: `node serve.mjs examples/demo --varia
 ## How it works
 
 - The page gets no markers. Hover a group's row in the dock, or step to it, and thin red guide lines point at its
-  section. Only a group with just a comment field (`options: [], current: false`) gets a small green dot, and the
-  eye button (shown only then) hides those dots.
+  section. There are no dots and no comment-only groups: a group with `options: []` is skipped, and comments go in
+  the overall comment.
 - The dots and dock are `dots.js`, shared with other tools. Edit it there and run `node dots-sync.mjs devpanel.js`.
 - The dock, popovers, comment fields and hints use the artifact kit's own classes and tokens (`k-dock`, `k-seg`,
   `k-comment`, `k-hint`), copied in by `dots-sync.mjs` from `kit.css` (`$KIT_CSS`, else `~/.agents/artifact-kit/kit.css`).
-- The **dock** spans the window with 16 px gutters. Row 1 is fixed: minimize, back / count / next, an **overall
-  comment** on the whole page, Open / Archived, Focus, the eye, Clear, "…" and Copy choices at the right. Below it
+- The **dock** spans the window with 16 px gutters. Row 1 is fixed: the eye, back / count / next, an **overall
+  comment** on the whole page, Open / Archived, Focus, Clear, "…" and Copy choices at the right. Below it
   sits every group of the page at once: its name and its first 3 options as a segmented control (hover one for its
   note). With more options, a 4th item "…" (it shows the pick when the pick is further down) opens the popover with
   the full list; a click on the group's name opens it too. The groups wrap onto more rows; past 40% of the window
@@ -68,7 +68,6 @@ To see every kind of group on a demo page: `node serve.mjs examples/demo --varia
   | `select` | up to 7 options | a list |
   | `many` | 8 or more | a list with a filter field |
   | `images` | any option has `img` | a thumbnail grid and a big preview; click the preview for full size |
-  | note | `options: [], current: false` | a green dot and a comment field |
 
 - Hover an option to preview it. Click it to keep it. Arrow keys change the pick at once (in the dock row and in the
   popover). Enter closes the popover; Esc closes it and keeps the pick. The popover grows to 70% of the window, then
@@ -81,15 +80,15 @@ To see every kind of group on a demo page: `node serve.mjs examples/demo --varia
   section (to the screen edge when it is off screen), glow once and fade, about 1 second. No fill; the page never moves.
 - **Back** and **next** (keys `[` and `]`) only move the focus: the group's row is marked, the page scrolls smoothly to
   it, and its lines flash. A group on another page takes you to that page first.
-- `-` shrinks the dock to a small capsule (count and chevron). Key `h` hides it fully; a small corner handle brings it
-  back. Both are kept after a reload. An empty block the height of the dock is added after the page, so the footer
+- The eye at the left of row 1 (or key `h`) morphs the dock into a round glass eye button, 44 px, at the bottom right
+  (260 ms, a plain fade with reduced motion). A click on it morphs it back. The state is kept after a reload. An empty block the height of the dock is added after the page, so the footer
   always scrolls above it.
 - The dock is the artifact kit's dock: the pager (one dot per group, click to go there), the overall comment,
   **Open / Archived** (the **Final** switch at the end of each popover moves a group to Archived), **Focus On / Off**
-  (dims the rest of the page, paint only, kept after a reload), the eye button (hide the green dots, key `.`), **Clear**
+  (dims the rest of the page, paint only, kept after a reload), **Clear**
   (two clicks, then Undo for 5 seconds) and **Copy choices** (open groups only). On a phone, Open / Archived, Focus,
-  Clear, minimize and the eye sit in the `…` menu, and the overall comment takes its own line.
-- The count covers only groups you can use on this page now. With no groups, only the corner handle shows. Stored
+  Clear sit in the `…` menu, and the overall comment takes its own line.
+- The count covers only groups you can use on this page now. With no groups, only the eye button shows. Stored
   picks of a group the variants file no longer has move to Archived. `examples/selfcheck.mjs` checks this.
 - The "2 / 5" count opens the list of every group. Click it to see **every group**, grouped by page, with each one's current pick.
   Click a row to go there. Your picks and comments stay in your browser, for the whole site.

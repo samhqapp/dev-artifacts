@@ -1,6 +1,6 @@
 ---
 name: dev-artifacts
-description: Show design options live on a local website or web app with the dev-artifacts overlay (blue and green dots, options in the dock, Copy choices) instead of building a separate options page. Use when asked to give options or variations for a local website, web app, landing page, or site section, or to preview looks on the dev server.
+description: Show design options live on a local website or web app with the dev-artifacts overlay (every option group in the dock, Copy choices) instead of building a separate options page. Use when asked to give options or variations for a local website, web app, landing page, or site section, or to preview looks on the dev server.
 ---
 
 # dev-artifacts
@@ -85,21 +85,21 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 - Dots and dock come from `<repo>/dots.js`, the one shared overlay (the artifact kit uses it too). Edit only
   that file, then run `node <repo>/dots-sync.mjs <file>` for each copy (devpanel.js and any other file with its markers).
 - It is built from the artifact kit's classes and hints (`dots-sync.mjs` copies the kit.css rules in). Do not restyle it per site.
-- The dock spans the window (16 px gutters). Row 1 is fixed: minimize, back / count / next, the overall comment,
-  Open/Archived, Focus, the eye (only with comment groups), Clear, "…", Copy choices. Below it every group of the
+- The dock spans the window (16 px gutters). Row 1 is fixed: the eye, back / count / next, the overall comment,
+  Open/Archived, Focus, Clear, "…", Copy choices. Below it every group of the
   page sits at once, "Name  opt opt opt …", wrapping; past 40% of the window the rows scroll. On a phone row 1 keeps
   back, next, "…" and Copy choices; the rest is in "…". "…" in a row, or the group's name, opens the popover with
   the full list (a list, a list with a filter at 8+, or a picture grid when options have `img`). Options never
   show twice, and nothing carries a number.
-- No markers on the page: the red guide lines point at a group when you hover its dock row or step to it. Only a
-  comment-only group (`options: [], current: false`) gets a green dot.
+- No markers or dots on the page: the red guide lines point at a group when you hover its dock row or step to it.
+  There are no comment-only groups; a group with `options: []` is skipped. Comments go in the overall comment.
 - Back and next (`[` `]`) only move the focus: they mark the group's row, scroll the page to it and flash its lines.
   Arrow keys change the pick at once, in a dock row and in the popover; Enter closes the popover, Escape keeps the pick.
 - The popover grows to 70% of the window, then scrolls with a thin overlay knob; the pick scrolls into view.
 - Comments and the overall comment save on every key; Copy choices starts with `- Overall: ...`. When a group's
   options change (or the group goes), its old pick and comment move to Archived with no notice; Unarchive puts them back.
 - Hovering a dock row draws faint red guide lines past the section's edges for about 1 second (no fill, no shift).
-- `-` shrinks the dock to a capsule; `h` hides it, a corner handle brings it back. A spacer keeps the footer above the dock.
+- The eye (or `h`) morphs the dock into a round glass eye button at the bottom right; a click morphs it back. A spacer keeps the footer above the dock.
 - The "2 / 5" count is the site total of groups to pick. Clicking it lists every group by page with its pick; a row goes there.
 - Picks, comments, and Copy choices cover the whole site (one store per origin, or per `site`, see below).
 
