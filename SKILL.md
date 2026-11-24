@@ -25,6 +25,8 @@ the overlay. Generic improvements go into this repo; user-specific notes stay in
 
 1. Copy `<repo>/templates/variants.js` and `variants.css` into a scratch folder outside the site repo.
 2. Write the options. One group per section; option 1 is "Current". Patterns: `<repo>/recipes.md`.
+   Always set the tab title first in `variants.js`: `DevPanel.config({ title: 'samhq_backend > buy dialog' })`
+   (`<repo folder name> > <topic of 1-3 words>`, never a bare "ui", "site", or "options").
 3. Check every option in one call, then look at every shot:
    `node <repo>/serve.mjs <site dir> --variants v.js --css v.css --shot <scratch>/shots --each --sizes 1440x900,390x844`
    Add `--open <group>` to check one group's menu. Fix what looks wrong and shoot again only after a change.

@@ -7,6 +7,8 @@
    groups are kept for the whole site (one localStorage key per origin), so the dock counts and walks every page.
    DevPanel.config({ site: '/memory/' | ['/a/', '/b/'] }) splits one server into separate sites, each with its own store;
    groups whose `page` is on another site are skipped. Call it before DevPanel.group.
+   DevPanel.config({ title: '<project> > <topic>' }) sets the browser tab title while the overlay runs, such as
+   'samhq_backend > buy dialog'. Without it the title stays and the console warns once.
    DevPanel.config({ navigate(path) }) lets an app route itself; otherwise an SPA gets pushState + popstate and a
    static site a normal page load. Everything lives in one shadow root, so no style leaks in or out. Never ship this file.
    The dots, popover, and dock come from the shared option-dots overlay (dots.js, copied in below).
@@ -720,6 +722,17 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
   addEventListener('popstate', () => { sync(); }); // an SPA route change: "this page" moved
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else setTimeout(boot);
 
+  // The tab title lives only in this injected code; an SPA that rewrites <title> gets it set back.
+  let titleMo;
+  function setTitle(t) {
+    const put = () => { if (document.title !== t) document.title = t; };
+    put();
+    if (titleMo) titleMo.disconnect();
+    titleMo = new MutationObserver(put);
+    titleMo.observe(document.head, { childList: true, subtree: true, characterData: true });
+  }
+  setTimeout(() => cfg.title || console.warn("DevPanel: no title. Add DevPanel.config({ title: '<project> > <topic>' }) to variants.js"), 1500);
+
   window.DevPanel = {
     group(cfg) {
       if (!cfg || !cfg.id || !cfg.target || !Array.isArray(cfg.options)) throw new Error('DevPanel.group needs id, target, options');
@@ -739,10 +752,12 @@ button { cursor: pointer; border: 0; background: none; padding: 0; }
       if (od) { addDot(g); sync(); }
       return g;
     },
+    // title: '<project> > <topic>' for the browser tab, kept while the overlay runs (the site's own <title> returns on reload).
     // site: a base path such as '/memory/', or a list of them: each base is its own site with its own store,
     // count, back and next, and Copy choices. A page outside every base uses the whole-origin store.
     config(c) {
       Object.assign(cfg, c);
+      if (c.title) setTitle(c.title);
       if (!('site' in c)) return;
       if (groups.length) throw new Error('Call DevPanel.config({ site }) before DevPanel.group');
       base = [].concat(c.site || []).map((b) => norm(b).replace(/\/?$/, '/')).filter((b) => (here() + '/').startsWith(b))

@@ -96,6 +96,10 @@ When `target` matches many elements, such as every card, the dot and outline sit
 Your options still change every card. `sample: 'all'` outlines all of them in one box instead.
 `apply(i)` runs your own code for changes that CSS cannot do, such as new text. More ready examples are in `recipes.md`.
 
+`DevPanel.config({ title: 'my-site > email field' })` sets the browser tab title (`<project> > <topic>`) while the overlay
+runs. It lives only in the injected code, and it is set again if the site rewrites its own title. Without it, the title
+stays and the console warns once.
+
 One server, several separate sites (such as `/memory/` and `/throttlecontrol/`): put this first in `variants.js`, so
 each site gets its own picks, count, back and next, and Copy choices. Groups whose `page` is on another site are skipped.
 

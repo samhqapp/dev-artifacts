@@ -3,8 +3,11 @@
 // Picking option i sets data-dv-<id>="<i>" on <html>; style each option in variants.css with that attribute.
 // Put the recommended option first (option 2). Give every option a one-line note that says what it looks like.
 
+// Always set the tab title: '<repo folder> > <topic, 1-3 words>'. Never a bare "ui", "site", or "options".
+DevPanel.config({ title: 'my-site > email field' });
+
 DevPanel.group({
-  id: 'input',                 // lowercase letters, digits, dashes; used in data-dv-input and in --open input
+  id: 'input',                // lowercase letters, digits, dashes; used in data-dv-input and in --open input
   label: 'Email field',        // shown in the menu and in Copy choices
   target: '.hero input',       // the element the badge sits on; scrolled into view by --shot
   options: [
