@@ -522,7 +522,8 @@ const KIT_CSS = String.raw`
   const kind = (g) => !g.opts.length ? 'note' : g.kind || (g.opts.some((o) => o.img) ? 'images' : g.opts.length >= 8 ? 'many'
     : g.opts.length <= 3 && g.opts.reduce((n, o) => n + o.name.length, 0) <= 36 ? 'flat' : 'select');
   // The first 3 options sit inline in the dock; the rest are behind "…".
-  const inlineN = (g) => Math.min(g.opts.length, 3);
+  // (fewer when the row is too narrow, see renderRows)
+  const inlineN = (g) => Math.min(g.opts.length, g.fitN || 3);
   const hasMore = (g) => g.opts.length > inlineN(g);
 
   const svg = (d, w = 1.6) => `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -580,10 +581,13 @@ svg { display: block; flex: none; }
   overscroll-behavior: contain; scrollbar-width: none; padding: 6px 0 0; border-top: .5px solid var(--sep); }
 .dv-rows::-webkit-scrollbar { display: none; }
 .dv-rows[hidden] { display: none; }
-/* a group never breaks over two lines: a long one scrolls sideways inside its own capsule (a phone) */
-.od-dock .dv-g.k-seg { flex: 0 1 auto; flex-wrap: nowrap; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
-.dv-g::-webkit-scrollbar { display: none; }
-.od-dock .dv-g > * { flex: none; }
+/* a group never breaks over two lines and never clips: when it is too wide (a phone) its long labels end in "…"
+   (the tooltip shows the full name), and "…" for the rest always stays whole */
+.od-dock .dv-g.k-seg { flex: 0 1 auto; flex-wrap: nowrap; min-width: 0; max-width: 100%; overflow: hidden; }
+.od-dock .dv-g > * { flex: 0 1 auto; min-width: 0; }
+.od-dock .dv-g > .dv-lab { flex-shrink: 2; min-width: 48px; }
+.od-dock .dv-g > .dv-o { min-width: 36px; text-overflow: ellipsis; white-space: nowrap; }
+.od-dock .dv-g > .dv-moreo, .od-dock .dv-g.dv-fit > * { flex: none; } /* dv-fit: measuring the row's full width */
 .od-dock .dv-g[aria-current="true"] { box-shadow: inset 0 0 0 1px var(--od-blue); }
 .dv-lab[data-note]::after { content: ""; flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--od-blue); }
 .dv-oldt { padding: 0 8px; font: 500 13px/1.3 var(--od-font); max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -949,12 +953,20 @@ svg { display: block; flex: none; }
     const want = [];
     for (const g of usable().filter(inSet)) {
       let el = rowEls.get(g.id); if (!el) { el = mk('div', 'dv-g k-seg'); el.dataset.id = g.id; rowEls.set(g.id, el); }
+      if (g.fitW !== rows.clientWidth) { g.fitW = rows.clientWidth; g.fitN = 3; } // a new width: try 3 again
       const h = rowHTML(g); if (el._h !== h) { el.innerHTML = h; el._h = h; }
       el.setAttribute('aria-current', String(g.id === curId)); want.push(el);
     }
     if (arch) st.old.forEach((o, k) => want.push(oldEl(o, k)));
     if (want.length !== rows.children.length || want.some((el, i) => rows.children[i] !== el)) rows.replaceChildren(...want);
     rows.hidden = !want.length;
+    // a row too wide for the dock moves its last inline options behind "…"; only then do labels end in "…"
+    for (const el of want) {
+      const g = el.dataset.id && groups.find((x) => x.id === el.dataset.id); if (!g || !g.opts.length) continue;
+      el.classList.add('dv-fit');
+      while (g.fitN > 1 && el.scrollWidth > el.clientWidth + 1) { g.fitN--; el.innerHTML = el._h = rowHTML(g); }
+      el.classList.remove('dv-fit');
+    }
     if (fid && !(a && a.isConnected)) { const r = rowEls.get(fid); (r && (r.querySelector(fi) || r.querySelector('.dv-lab')))?.focus({ preventScroll: true }); }
     // back and next: keep the current row in view inside the rows (never scrollIntoView: it would move the page)
     if (rowsCur !== curId) {
@@ -976,7 +988,9 @@ svg { display: block; flex: none; }
       if (e.pointerType !== 'touch') glow(g);
       const b = e.target.closest('button'); if (!b || b.contains(e.relatedTarget)) return;
       if (!b.classList.contains('dv-o')) return tipFor(null);
-      tipFor(b, b.dataset.tip || optNote(g, +b.dataset.i));
+      // a label cut with "…" on a narrow dock: the tooltip names it in full
+      const cut = b.scrollWidth > b.clientWidth + 1, nm = b.dataset.i ? g.opts[b.dataset.i - 1].name : '';
+      tipFor(b, b.dataset.tip || [cut && nm, optNote(g, +b.dataset.i)].filter(Boolean).join(' - '));
       if (b.dataset.i) preview(g, +b.dataset.i);
     };
     rows.onpointerleave = () => { tipFor(null); if (hovG && popG !== hovG) unpreview(hovG); hovG = null; };
