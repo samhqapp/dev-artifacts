@@ -49,15 +49,18 @@ To see every kind of group on a demo page: `node serve.mjs examples/demo --varia
 
 ## How it works
 
-- Each section with options gets a small blue **dot** just outside its top-right corner. A group with only a comment
-  field (`options: [], current: false`) gets a green dot, so the blue dots are the ones that still need a pick.
-  Back and next step through the blue dots only. The eye button hides the dots, and a reload keeps it.
+- The page gets no markers. Hover a group's row in the dock, or step to it, and thin red guide lines point at its
+  section. Only a group with just a comment field (`options: [], current: false`) gets a small green dot, and the
+  eye button (shown only then) hides those dots.
 - The dots and dock are `dots.js`, shared with other tools. Edit it there and run `node dots-sync.mjs devpanel.js`.
 - The dock, popovers, comment fields and hints use the artifact kit's own classes and tokens (`k-dock`, `k-seg`,
   `k-comment`, `k-hint`), copied in by `dots-sync.mjs` from `kit.css` (`$KIT_CSS`, else `~/.agents/artifact-kit/kit.css`).
-- The **dock** shows the current group's name and its first 3 options inline, as a segmented control (hover one for
-  its note). With more options, a 4th item "…" (it shows the pick when the pick is further down) opens the popover
-  with the full list; a click on the group's name opens it too. Options never show twice, and nothing has a number.
+- The **dock** spans the window with 16 px gutters. Row 1 is fixed: minimize, back / count / next, an **overall
+  comment** on the whole page, Open / Archived, Focus, the eye, Clear, "…" and Copy choices at the right. Below it
+  sits every group of the page at once: its name and its first 3 options as a segmented control (hover one for its
+  note). With more options, a 4th item "…" (it shows the pick when the pick is further down) opens the popover with
+  the full list; a click on the group's name opens it too. The groups wrap onto more rows; past 40% of the window
+  they scroll. Options never show twice, and nothing has a number.
   The popover depends on the kind, picked from the options (set `kind` to force one; `templates/presets.js` has one of each):
 
   | Kind | When | Popover |
@@ -70,32 +73,32 @@ To see every kind of group on a demo page: `node serve.mjs examples/demo --varia
 - Hover an option to preview it. Click it to keep it. Arrow keys change the pick at once (in the dock row and in the
   popover). Enter closes the popover; Esc closes it and keeps the pick. The popover grows to 70% of the window, then
   scrolls with a thin overlay knob, and the pick scrolls into view when it opens.
-- Comments save on every key. A group whose option names change starts fresh (a new round); its old pick and comment
-  go to "Restore last round" in the "…" menu. Groups that did not change keep theirs.
-- `DevPanel.config({ markers: 'dot' | 'none' | 'dock', arrows: 'groups' | 'options', inline: 3 | 'fit' | 'all',
-  rounds: 'auto' | 'ask' })` changes the markers, what back and next step through, the inline count, and whether a new
-  round asks first. `?dv-set={json}` sets them for one page load with its own store (options mode uses it).
-- Hovering an option or a dot draws thin, faint red guide lines along the section's four edges. They grow out past the
+- Comments and the overall comment save on every key. A group whose option names change starts fresh (a new round),
+  with no notice: its old pick and comment move to **Archived**, where each shows its old text and an Unarchive
+  button that puts it back. A group the variants file dropped goes there too (Unarchive is off for it).
+  Groups that did not change keep theirs.
+- Hovering a group's dock row draws thin, faint red guide lines along the section's four edges. They grow out past the
   section (to the screen edge when it is off screen), glow once and fade, about 1 second. No fill; the page never moves.
-- **Back** and **next** (keys `[` and `]`) and a click on a blue dot scroll smoothly to the group and open its popover.
-  A group on another page takes you to that page first.
+- **Back** and **next** (keys `[` and `]`) only move the focus: the group's row is marked, the page scrolls smoothly to
+  it, and its lines flash. A group on another page takes you to that page first.
 - `-` shrinks the dock to a small capsule (count and chevron). Key `h` hides it fully; a small corner handle brings it
   back. Both are kept after a reload. An empty block the height of the dock is added after the page, so the footer
   always scrolls above it.
-- The dock is the artifact kit's dock: the pager (one dot per group, click to go there), the comment button,
+- The dock is the artifact kit's dock: the pager (one dot per group, click to go there), the overall comment,
   **Open / Archived** (the **Final** switch at the end of each popover moves a group to Archived), **Focus On / Off**
-  (dims the rest of the page, paint only, kept after a reload), the eye button (hide dots, key `.`), **Clear** (two
-  clicks, then Undo for 5 seconds) and **Copy choices** (open groups only). On a phone, Open / Archived, Focus and
-  Clear sit in the `…` menu.
+  (dims the rest of the page, paint only, kept after a reload), the eye button (hide the green dots, key `.`), **Clear**
+  (two clicks, then Undo for 5 seconds) and **Copy choices** (open groups only). On a phone, Open / Archived, Focus,
+  Clear, minimize and the eye sit in the `…` menu, and the overall comment takes its own line.
 - The count covers only groups you can use on this page now. With no groups, only the corner handle shows. Stored
-  picks of a group the variants file no longer has are dropped. `examples/selfcheck.mjs` checks this.
+  picks of a group the variants file no longer has move to Archived. `examples/selfcheck.mjs` checks this.
 - The "2 / 5" count opens the list of every group. Click it to see **every group**, grouped by page, with each one's current pick.
   Click a row to go there. Your picks and comments stay in your browser, for the whole site.
 
-**Copy choices** gives one line per group, from every page. Paste it to the person or coding agent who builds the site.
-When the site has more than one page, each line names its page.
+**Copy choices** gives the overall comment first, then one line per group, from every page. Paste it to the person or
+coding agent who builds the site. When the site has more than one page, each line names its page.
 
 ```text
+- Overall: feels calm, keep it
 - Email field (/): 2 Soft ring - make the ring thinner
   and a bit lighter
 - Main button (/settings): 1 Current
@@ -221,11 +224,11 @@ the real `devpanel.js` with that option's setting. Each group has a comment fiel
 Copy choices and Focus.
 
 ```sh
-node options.mjs examples/dock-options.mjs --out /tmp/dock-options --port 0   # prints the page URL
+node options.mjs examples/accent-options.mjs --out /tmp/accent-options --port 0   # prints the page URL
 ```
 
 The spec names the site, variants, frame size, and groups; each option has `set` (config values), `params`
-(URL params such as `dv-hl`), and `seed` (a starting store, such as the last round). It needs the artifact kit
+(URL params such as `dv-pick` or `dv-hl`), and `seed` (a starting store, such as old picks). It needs the artifact kit
 (`KIT_DIR`, default `~/.agents/artifact-kit`). `serve.mjs` never adds the overlay to a kit page.
 
 ## Why not a separate options page
