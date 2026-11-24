@@ -134,10 +134,9 @@ When `target` matches many elements, such as every card, the dot and outline sit
 Your options still change every card. `sample: 'all'` outlines all of them in one box instead.
 `apply(i)` runs your own code for changes that CSS cannot do, such as new text. More ready examples are in `recipes.md`.
 
-`DevPanel.config({ topic: 'email field' })` sets the browser tab title to `<prefix> > email field` while the overlay
-runs. `serve.mjs` and `quick.mjs` get the prefix from `~/.agents/bin/orca-title` (or `DV_TITLE_CMD`) when it exists,
-else the repo folder name. An old `title: 'a > b'` still works; its last part is the topic. The title is set again if
-the site rewrites its own. Without a topic, the title stays and the console warns once.
+The browser tab title is exactly `<project> > <Orca tab>`, nothing after it. `serve.mjs`, `quick.mjs`, and
+`options.mjs` get it from `~/.agents/bin/orca-title` (or `DV_TITLE_CMD`) when it exists, else the repo folder name.
+The overlay sets it again if the site rewrites its own. An old `topic` or `title` in `DevPanel.config` is ignored.
 
 One server, several separate sites (such as `/memory/` and `/throttlecontrol/`): put this first in `variants.js`, so
 each site gets its own picks, count, back and next, and Copy choices. Groups whose `page` is on another site are skipped.

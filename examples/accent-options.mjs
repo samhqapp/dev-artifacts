@@ -3,7 +3,7 @@
 const accent = (i) => ({ 'dv-pick': `accent:${i}`, 'dv-clean': '' }); // force the pick, hide the overlay in the frame
 
 export default {
-  topic: 'accent color',
+  heading: 'Accent color',
   site: './demo', variants: '../templates/presets.js', css: '../templates/presets.css',
   size: [1240, 720],
   lead: 'Each frame is the demo site with that accent color. Click inside a frame to try it, or open it full size.',

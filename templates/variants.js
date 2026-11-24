@@ -3,9 +3,7 @@
 // Picking option i sets data-dv-<id>="<i>" on <html>; style each option in variants.css with that attribute.
 // Put the recommended option first (option 2). Give every option a one-line note that says what it looks like.
 
-// Always name the page: the tab title becomes '<project> > <Orca tab> > <topic>' (serve.mjs adds the prefix).
-// The topic is 1-3 words. Never a bare "ui", "site", or "options". See templates/presets.js for every kind of group.
-DevPanel.config({ topic: 'email field' });
+// The tab title is set for you: exactly '<project> > <Orca tab>'. See templates/presets.js for every kind of group.
 
 DevPanel.group({
   id: 'input',                // lowercase letters, digits, dashes; used in data-dv-input and in --open input

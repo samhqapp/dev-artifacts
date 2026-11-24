@@ -1,6 +1,6 @@
 // Example page for quick.mjs. Copy it, edit TITLE, LEAD and GROUPS, then:
 //   node quick.mjs page.js out.html && open out.html
-const TITLE = 'project > topic';
+const TITLE = 'Pick a layout'; // the page heading; the tab title comes from orca-title
 const LEAD = 'One plain line on what to pick and why.';
 const GROUPS = [
   // One pick from a few options; `rec` marks the recommended one (picked by default).

@@ -2,14 +2,14 @@
 // Options page: decide how a component or tool should look or work. One kit panel per option, side by side, each
 // with the real page in a frame (dark only, like the page) running the real devpanel.js with that option's setting.
 // Usage: node options.mjs <spec.mjs> --out <dir> [--port 0]
-// spec.mjs exports { topic, site, variants?, css?, path?, size?: [w, h], lead?, groups: [{ name, hint?, options: [
+// spec.mjs exports { heading, site, variants?, css?, path?, size?: [w, h], lead?, groups: [{ name, hint?, options: [
 //   { name, sub, recommended?, set: {DevPanel.config values}, params?: {url params}, seed?: {store, dock} }] }] }
 // It copies <site> into <out>, writes <out>/__options/ (page plus kit files), then runs serve.mjs on <out>.
 import { cpSync, mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
-import { titlePrefix, fullTitle } from './title.mjs';
+import { tabTitle } from './title.mjs';
 
 const args = process.argv.slice(2), flag = (n) => { const i = args.indexOf(n); return i < 0 ? undefined : args[i + 1]; };
 const specPath = args[0], out = flag('--out'), port = flag('--port') ?? '0';
@@ -47,7 +47,7 @@ const frame = (o) => `<div class="p-frame"><iframe loading="lazy" title="${esc(o
   + `<a class="p-open" href="${src(o)}" target="_blank" title="Open this frame full size">Open ↗</a></div>`;
 // a new round number whenever the questions change, so old answers never come back
 const round = [...JSON.stringify(spec.groups.map((g) => [g.name, g.options.map((o) => o.name)]))].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
-const title = fullTitle(titlePrefix(), spec.topic);
+const title = tabTitle();
 writeFileSync(path.join(dir, 'index.html'), `<!doctype html>
 <html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'))}</title>
@@ -62,7 +62,7 @@ writeFileSync(path.join(dir, 'index.html'), `<!doctype html>
 </style></head>
 <body><main class="k-wrap" data-kit data-round="${round}">
 <section class="k-part" data-part="Start">
-  <p class="k-kicker">Options</p><h1 class="k-title">${esc(spec.topic)}</h1>
+  <p class="k-kicker">Options</p><h1 class="k-title">${esc(spec.heading)}</h1>
   ${spec.lead ? `<p class="k-lead">${esc(spec.lead)}</p>` : ''}
 </section>
 ${spec.groups.map((g, i) => `<section class="k-part" data-part="${esc(g.name)}">

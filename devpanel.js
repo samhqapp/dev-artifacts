@@ -11,9 +11,8 @@
      'images' a grid of thumbnails with a big preview (any option with img).
    Every popover ends with the group's comment field. A group without `page` belongs to the page where its target first
    shows up. Picks, comments, and the list of groups are kept for the whole site (one localStorage key per origin).
-   DevPanel.config({ topic: 'buy dialog' }) names the page: the tab title is '<prefix> > <topic>', where serve.mjs puts the
-   prefix ('<project> > <Orca tab>', or the repo folder name) in front of this file. An old `title` is read as the topic
-   (its last ' > ' part). DevPanel.config({ site: '/memory/' | ['/a/', '/b/'] }) splits one server into separate sites,
+   The tab title is exactly '<project> > <Orca tab>' (or the repo folder name), which serve.mjs puts in front of this
+   file; an old `topic` or `title` config is ignored. DevPanel.config({ site: '/memory/' | ['/a/', '/b/'] }) splits one server into separate sites,
    each with its own store; groups whose `page` is on another site are skipped. Call it before DevPanel.group.
    DevPanel.config({ navigate(path) }) lets an app route itself; otherwise an SPA gets pushState + popstate and a
    static site a normal page load. Everything lives in one shadow root, so no style leaks in or out. Never ship this file.
@@ -439,7 +438,7 @@ const KIT_CSS = String.raw`
   const KEY = 'devpanel', GO = 'devpanel:go', DOCK_KEY = 'devpanel:dock' + SET, FOCUS_KEY = 'devpanel:focus' + SET;
   // Loaded from another origin (serve.mjs on 4799 inside a Vite app): the page is an SPA that routes itself.
   const me = document.currentScript, spa = !!me && new URL(me.src, location.href).origin !== location.origin;
-  const PREFIX = String(window.__dvTitlePrefix || ''); // '<project> > <Orca tab>', set by serve.mjs in front of this file
+  const TITLE = String(window.__dvTitle || ''); // '<project> > <Orca tab>', set by serve.mjs in front of this file
   const forced = Object.fromEntries((Q.get('dv-pick') || '').split(',').map((s) => s.split(':')).filter((p) => p[1] > 0).map(([k, v]) => [k, +v]));
   // overall: the dock's comment on the whole page. old: picks and comments of past rounds, shown in Archived.
   const st = { picks: {}, notes: {}, groups: [], fin: {}, old: [], overall: '' };
@@ -1357,19 +1356,12 @@ svg { display: block; flex: none; }
   addEventListener('popstate', () => { sync(); }); // an SPA route change: "this page" moved
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else setTimeout(boot);
 
-  // The tab title '<prefix> > <topic>' lives only in this injected code; an SPA that rewrites <title> gets it set back.
-  let titleMo;
-  function setTitle() {
-    const topic = cfg.topic || (cfg.title && PREFIX ? String(cfg.title).split(' > ').pop() : cfg.title);
-    if (!topic) return;
-    const t = PREFIX ? `${PREFIX} > ${topic}` : topic;
-    const put = () => { if (document.title !== t) document.title = t; };
+  // The tab title '<project> > <Orca tab>' lives only in this injected code; an SPA that rewrites <title> gets it set back.
+  if (TITLE) {
+    const put = () => { if (document.title !== TITLE) document.title = TITLE; };
     put();
-    if (titleMo) titleMo.disconnect();
-    titleMo = new MutationObserver(put);
-    titleMo.observe(document.head, { childList: true, subtree: true, characterData: true });
+    new MutationObserver(put).observe(document.head || document.documentElement, { childList: true, subtree: true, characterData: true });
   }
-  setTimeout(() => cfg.topic || cfg.title || console.warn("DevPanel: no topic. Add DevPanel.config({ topic: 'buy dialog' }) to variants.js"), 1500);
 
   const KINDS = ['flat', 'select', 'many', 'images'];
   window.DevPanel = {
@@ -1396,11 +1388,10 @@ svg { display: block; flex: none; }
       if (od) { addDot(g); sync(); }
       return g;
     },
-    // topic: names the page for the tab title. site: a base path such as '/memory/', or a list of them: each base is its
+    // site: a base path such as '/memory/', or a list of them: each base is its
     // own site with its own store, count, back and next, and Copy choices. A page outside every base uses the whole-origin store.
     config(c) {
       Object.assign(cfg, c);
-      if (c.topic || c.title) setTitle();
       if (!('site' in c)) return;
       if (groups.length) throw new Error('Call DevPanel.config({ site }) before DevPanel.group');
       base = [].concat(c.site || []).map((b) => norm(b).replace(/\/?$/, '/')).filter((b) => (here() + '/').startsWith(b))

@@ -5,10 +5,11 @@ import { mkdtempSync, writeFileSync, rmSync, mkdirSync, copyFileSync } from 'nod
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
+import { tabTitle } from '../title.mjs';
 
 const { chromium } = await import(process.env.PLAYWRIGHT || 'playwright');
 const here = path.dirname(new URL(import.meta.url).pathname), dir = mkdtempSync(path.join(os.tmpdir(), 'dv-check-')), v = path.join(dir, 'v.js');
-const put = (groups) => writeFileSync(v, `DevPanel.config({ topic: 'self check' });\n` + groups.map((id) =>
+const put = (groups) => writeFileSync(v, groups.map((id) =>
   `DevPanel.group({ id: '${id}', label: '${id}', target: '.d-hero h1', options: [{ name: 'A' }, { name: 'B' }] });`).join('\n'));
 put([]);
 // a two-page copy of the demo: / and /b.html
@@ -26,6 +27,7 @@ try {
   await p.goto(`http://127.0.0.1:${port}/`); await p.waitForTimeout(400);
   let s = await state();
   assert.ok(s.empty && !s.dock && s.handle && s.count === null && s.md === '', '0 groups: no dock, no count, only the handle ' + JSON.stringify(s));
+  assert.equal(await p.title(), tabTitle(), 'the tab title is exactly orca-title, nothing after it');
   put(['one']); await p.reload(); await p.waitForTimeout(400); s = await state();
   assert.ok(!s.empty && s.dock && s.count === '1 / 1', '1 group: "1 / 1" ' + JSON.stringify(s));
   put(['one', 'two']); await p.reload(); await p.waitForTimeout(400);
@@ -132,5 +134,5 @@ DevPanel.group({ id: 'big', label: 'big', target: '.d-hero p', kind: 'select', o
   await js('.od-dock .dv-clear', (e) => e.click()); await p.waitForTimeout(100);
   const after = await row1();
   for (const k of ['next', 'eye', 'arch', 'copy']) assert.equal(after[k], first[k], 'Clear all? moved ' + k);
-  console.log('ok: 0 groups, 1 group, removed group, counts agree, two pages, all groups in the dock, arrows pick, instant save, 70% list, overall first, 0 px shift, rounds to Archived, no blue dots, row 1 still');
+  console.log('ok: tab title, 0 groups, 1 group, removed group, counts agree, two pages, all groups in the dock, arrows pick, instant save, 70% list, overall first, 0 px shift, rounds to Archived, no blue dots, row 1 still');
 } finally { await b.close(); srv.kill(); rmSync(dir, { recursive: true, force: true }); }

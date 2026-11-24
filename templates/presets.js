@@ -1,7 +1,6 @@
 // presets.js: one example of every kind of group. Copy the one that fits. The demo runs it:
 //   node serve.mjs examples/demo --variants templates/presets.js --css templates/presets.css
 // The dock picks the kind from the options; set `kind` only to force one.
-DevPanel.config({ topic: 'dev artifacts' });
 
 // 2-3 short options: one segmented row in the dock (kind 'flat'). Hover previews, click picks.
 DevPanel.group({

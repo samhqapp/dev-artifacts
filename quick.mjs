@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Quick one-off pick page: one HTML file, Preact + htm (JSX-like) inlined, no build, no network.
 // Usage: node quick.mjs <page.js> <out.html>
-// page.js sets `const TITLE = '...'` and `const GROUPS = [...]` (see templates/quick-page.js), and may
+// page.js sets `const TITLE = '...'` (the heading; the tab title is always orca-title's) and `const GROUPS = [...]` (see templates/quick-page.js), and may
 // define `function Extra()` to render more below the groups.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { titlePrefix, fullTitle } from './title.mjs';
+import { tabTitle } from './title.mjs';
 
 const [page, out] = process.argv.slice(2);
 if (!page || !out) { console.error('usage: node quick.mjs <page.js> <out.html>'); process.exit(1); }
@@ -14,9 +14,8 @@ const lib = readFileSync(here('templates/preact-htm.js'), 'utf8')
   .replace(/export\{([^}]*)\};?\s*$/, (_, list) => 'window.preact={' + list.split(',').map((p) => { const [a, b] = p.split(' as '); return `${b}:${a}`; }).join(',') + '};');
 const shell = readFileSync(here('templates/quick.html'), 'utf8');
 const pageSrc = readFileSync(page, 'utf8');
-const m = pageSrc.match(/const TITLE\s*=\s*['"`]([^'"`]*)/);
 writeFileSync(out, shell
-  .replace('<!--TITLE-->', () => fullTitle(titlePrefix(), m ? m[1] : 'pick').replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;')))
+  .replace('<!--TITLE-->', () => tabTitle().replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;')))
   .replace('/*LIB*/', () => '(()=>{' + lib + '})();')
   .replace('/*PAGE*/', () => pageSrc));
 console.log(out);
