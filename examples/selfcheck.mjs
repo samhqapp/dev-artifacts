@@ -117,5 +117,20 @@ DevPanel.group({ id: 'big', label: 'big', target: '.d-hero p', kind: 'select', o
   st = await store();
   assert.ok(st.old.length === 1 && st.old[0].id === 'm', 'a removed group goes to Archived ' + JSON.stringify(st));
   assert.equal(await p.locator('.od-dot.od-plain:visible').count(), 0, 'no blue dots on the page');
-  console.log('ok: 0 groups, 1 group, removed group, counts agree, two pages, all groups in the dock, arrows pick, instant save, 70% list, overall first, 0 px shift, rounds to Archived, no blue dots');
+  // row 1 still: 20 fast clicks on next, then Clear, never move the arrows, eye, Clear, Open/Archived, or Copy
+  await p.evaluate(() => { for (let i = 1; i <= 9; i++) DevPanel.group({ id: 'extra-' + i, label: 'Extra group ' + i, target: '.d-hero h1', options: [{ name: 'Tight' }, { name: 'Loose' }] }); });
+  await p.waitForTimeout(300);
+  const row1 = () => p.evaluate(() => { const s = document.querySelector('dev-panel').shadowRoot, q = (x) => { const e = s.querySelector(x); if (!e || !e.offsetParent) return null;
+    const r = e.getBoundingClientRect(); return [r.x, r.y, r.width].map(Math.round).join(','); };
+    return { next: q('.od-step > :last-child'), back: q('.od-step > :first-child'), eye: q('.dv-eye'), clear: q('.dv-clear'), arch: q('.dv-arch'), copy: q('.od-primary') }; });
+  const first = await row1();
+  for (const k of ['next', 'back', 'eye', 'clear', 'arch', 'copy']) assert.ok(first[k], 'row 1 shows ' + k);
+  for (let i = 0; i < 20; i++) {
+    await js('.od-dock .od-step > :last-child', (e) => e.click()); await p.waitForTimeout(30);
+    assert.deepEqual(await row1(), first, 'row 1 moved after next click ' + (i + 1));
+  }
+  await js('.od-dock .dv-clear', (e) => e.click()); await p.waitForTimeout(100);
+  const after = await row1();
+  for (const k of ['next', 'eye', 'arch', 'copy']) assert.equal(after[k], first[k], 'Clear all? moved ' + k);
+  console.log('ok: 0 groups, 1 group, removed group, counts agree, two pages, all groups in the dock, arrows pick, instant save, 70% list, overall first, 0 px shift, rounds to Archived, no blue dots, row 1 still');
 } finally { await b.close(); srv.kill(); rmSync(dir, { recursive: true, force: true }); }
