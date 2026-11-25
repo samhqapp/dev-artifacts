@@ -52,9 +52,10 @@ To see every kind of group on a demo page: `node serve.mjs examples/demo --varia
 - The page gets no markers. Hover a group's row in the dock, or step to it, and thin red guide lines point at its
   section. There are no dots and no comment-only groups: a group with `options: []` is skipped, and comments go in
   the overall comment.
-- The dots and dock are `dots.js`, shared with other tools. Edit it there and run `node dots-sync.mjs devpanel.js`.
+- The dots and dock are `dots.js`, shared with the artifact kit in `kit/` (its recipe: `kit/README.md`). Edit it
+  there and run `node dots-sync.mjs kit/kit.js devpanel.js`.
 - The dock, popovers, comment fields and hints use the artifact kit's own classes and tokens (`k-dock`, `k-seg`,
-  `k-comment`, `k-hint`), copied in by `dots-sync.mjs` from `kit.css` (`$KIT_CSS`, else `~/.agents/artifact-kit/kit.css`).
+  `k-comment`, `k-hint`), copied in by `dots-sync.mjs` from `kit/kit.css`.
 - The **dock** spans the window with 16 px gutters. Row 1 is fixed: back / count / next, an **overall
   comment** on the whole page, Open / Archived, Focus, the eye, Clear, "…" and Copy choices at the right. Nothing in
   row 1 ever moves: every changing text (the count, Open / Archived, Clear, Copy choices) keeps the width of its widest
@@ -230,8 +231,8 @@ node options.mjs examples/accent-options.mjs --out /tmp/accent-options --port 0 
 ```
 
 The spec names the site, variants, frame size, and groups; each option has `set` (config values), `params`
-(URL params such as `dv-pick` or `dv-hl`), and `seed` (a starting store, such as old picks). It needs the artifact kit
-(`KIT_DIR`, default `~/.agents/artifact-kit`). `serve.mjs` never adds the overlay to a kit page.
+(URL params such as `dv-pick` or `dv-hl`), and `seed` (a starting store, such as old picks). It uses the artifact kit
+in `kit/`. `serve.mjs` never adds the overlay to a kit page.
 
 ## Why not a separate options page
 

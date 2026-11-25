@@ -1,0 +1,26 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kit > stacked bar</title>
+<script src="../kit.js"></script>
+
+<main class="k-wrap" data-kit data-views="page">
+<section class="k-part" data-part="Heat">
+  <p class="k-kicker">1. Heat</p>
+  <h2 class="k-h2">How long until the phone gets warm or hot?</h2>
+  <p class="k-hint">Sample data. Each test run plays the same 690 second video. iOS reports the phone heat as Cool, Warm, or Hot. A longer gray bar is better.</p>
+  <div class="k-stackbar" data-max="720" data-mark="690" data-ticks="0,180,360,540,720" data-unit=" s" role="img" aria-label="Heat by build. Build 21 stays cool for the whole run.">
+    <p class="k-sb-key"><span data-c="soft">Cool</span><span data-c="amber">Warm</span><span data-c="red">Hot</span><span>Dashed line: end of the run (690 s)</span></p>
+    <div class="k-sb-row" data-v="142 200 348"><b>Build 16</b><em>Hot at 342 s</em></div>
+    <div class="k-sb-row" data-v="68 380 242"><b>Build 18</b><em>Hot at 448 s</em></div>
+    <div class="k-sb-row" data-v="388 302"><b>Build 19</b><em>Never Hot</em></div>
+    <div class="k-sb-row" data-v="385 100 205"><b>Build 20</b><em>Hot at 485 s</em></div>
+    <div class="k-sb-row" data-v="690"><b>Build 21</b><em>Never Hot</em></div>
+  </div>
+  <div class="k-list">
+    <div class="k-row"><span>Build 21</span><span>Warm only at 694 s, after the run</span></div>
+    <div class="k-row"><span>Second run</span><span>The same code never got Warm</span></div>
+    <div class="k-row"><span>Cause</span><span>Less copying and drawing work</span>
+      <div class="k-detail"><p>Build 21 shows the video without a processor copy of each frame. It also redraws only the parts of the screen that changed.</p></div></div>
+  </div>
+</section>
+</main>

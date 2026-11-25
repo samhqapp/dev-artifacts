@@ -1,0 +1,91 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kit > flow chart</title>
+<script src="../kit.js"></script>
+
+<main class="k-wrap" data-kit data-views="page">
+<section class="k-part" data-part="Pipeline">
+  <h1 class="k-title">One page takes 38 ms. The page finder uses half of it.</h1>
+  <p class="k-lead">Sample data: a document scanner on a phone, 500 frames of a recorded test video. Hover or tap a step to open it.</p>
+  <p class="k-flow-key">
+    <span data-kind="model">Model file in the app</span>
+    <span data-kind="vision">OS framework</span>
+    <span data-kind="server">Our server</span>
+    <span data-kind="code">Plain code, no model</span>
+    <span data-kind="time">Time per frame, a full bar is 25 ms</span>
+  </p>
+
+  <div class="k-flow" data-scale="25">
+    <section class="k-lane"><header><b>Camera</b><span>10 frames a second</span></header>
+      <div class="k-node" data-id="cam" data-icon="camera" data-ms="0.5" data-to="crop">
+        <b>Camera</b><span>1280 x 720 · 30 fps</span><em>RAM, CPU: measuring</em>
+        <div class="k-node-more"><p>The camera hands over a 1280 by 720 picture 30 times a second. The preview draws each frame in about half a millisecond.</p><code>CameraSession</code></div>
+      </div>
+      <div class="k-node" data-id="crop" data-ms="3.1" data-to="shrink">
+        <b>Keep 1 in 3</b><span>10 fps · 3.1 ms</span><em>RAM, CPU: measuring</em>
+        <div class="k-node-more"><p>Only one frame out of every three goes on, so 10 a second. That is enough to follow a page and keeps the phone cool.</p><code>FrameSampler.offer</code></div>
+      </div>
+      <div class="k-node" data-id="shrink" data-ms="4.2" data-to="motion">
+        <b>Shrink</b><span>512 px · 4.2 ms</span><em>RAM, CPU: measuring</em>
+        <div class="k-node-more"><p>The frame is scaled so its long side is 512 pixels. A small picture makes every later step faster.</p><code>resize(longSide: 512)</code></div>
+      </div>
+      <div class="k-node" data-id="motion" data-ms="1.0" data-to="dec">
+        <b>Motion check</b><span>64 x 36 gray · 1.0 ms</span><em>RAM, CPU: measuring</em>
+        <div class="k-node-more"><p>The frame becomes a 64 by 36 gray grid and is compared with the last one. Simple math, no model, 1 ms.</p><code>GrayGrid.compare</code></div>
+      </div>
+      <div class="k-node" data-id="dec" data-dec data-nspan="1">
+        <b>Page moved?</b>
+        <div class="k-node-more"><p>Yes sends the frame to the full step (80% of frames). No sends it to the cheap hold step (20%).</p><code>Scanner.needsFull</code></div>
+      </div>
+      <div class="k-node" data-id="watch" data-ghost data-ms="6.0" data-nspan="1">
+        <b>Hold step</b><span>20% · 6 ms</span><em>RAM, CPU: measuring</em>
+        <div class="k-node-more"><p>When nothing moved, the last page outline stays as it is. The step takes 6 ms instead of 38 ms.</p><code>Scanner.hold</code></div>
+      </div>
+    </section>
+    <section class="k-lane"><header><b>On-device vision</b><span>80% of frames</span></header>
+      <div class="k-node" data-id="find" data-kind="model" data-span="2" data-ms="18.4" data-to="text">
+        <b>Page finder</b><span>page-edges · 6 MB · 18.4 ms</span><em>RAM, CPU: measuring</em>
+        <div class="k-node-more"><p>A 6 MB model finds the four corners of the page. It takes about 18.4 ms, half of the whole step.</p><code>PageFinder.find</code></div>
+      </div>
+      <div class="k-node" data-id="text" data-kind="vision" data-span="2" data-ms="7.5" data-to="sharp">
+        <b>Text reader</b><span>OS text reader · 7.5 ms</span><em>RAM, CPU: measuring</em>
+        <div class="k-node-more"><p>The phone's built-in text reader reads the page, so there is no model file in the app.</p><code>TextReader.read</code></div>
+      </div>
+      <div class="k-node" data-id="sharp" data-kind="vision" data-span="2" data-ms="5.2" data-to="follow">
+        <b>Sharpness</b><span>OS framework · 5.2 ms</span><em>RAM, CPU: measuring</em>
+        <div class="k-node-more"><p>Gives each frame a sharpness score, so the best shot of a page wins.</p><code>Quality.score</code></div>
+      </div>
+    </section>
+    <section class="k-lane"><header><b>Tracking and decisions</b><span>Plain code, 0.4 ms</span></header>
+      <div class="k-node" data-id="follow" data-span="2" data-ms="0.4" data-to="best">
+        <b>Follow the page</b><span>overlap 0.5 · 0.4 ms</span><em>RAM, CPU: measuring</em>
+        <div class="k-node-more"><p>A new outline that overlaps the last one by half or more is the same page.</p><code>PageTracker.update</code></div>
+      </div>
+      <div class="k-node" data-id="best" data-span="2" data-to="decide">
+        <b>Best shot</b><span>keeps the sharpest frame</span><small>Runs inside the 0.4 ms of Follow the page</small>
+        <div class="k-node-more"><p>While the page stays still, the sharpest frame so far is kept.</p><code>PageTracker.best</code></div>
+      </div>
+      <div class="k-node" data-id="decide" data-span="2">
+        <b>Save the page</b><span>12 pages saved</span><small>Runs inside the 0.4 ms of Follow the page</small>
+        <div class="k-node-more"><p>When the page leaves the frame, its best shot is saved. This run saved 12 pages.</p><code>PageTracker.commit</code></div>
+      </div>
+    </section>
+    <section class="k-lane"><header><b>Server and list</b><span>After each page</span></header>
+      <div class="k-node" data-id="name" data-kind="server" data-span="2">
+        <b>Title on server</b><span>1.2 s · the phone does not wait</span><small>Runs in the background</small>
+        <div class="k-node-more"><p>The page text goes to the server, which writes a short title for it.</p><code>server/title.py</code></div>
+      </div>
+      <div class="k-node" data-id="cart" data-icon="list" data-col="6" data-span="2">
+        <b>Page list</b><span>main thread 9% busy</span><small>Undo or rename any page</small>
+        <div class="k-node-more"><p>The page shows in the list at once; its title swaps in when the server answers.</p><code>PageList (main thread)</code></div>
+      </div>
+    </section>
+    <i class="k-edge" data-from="dec" data-to="watch" data-label="No"></i>
+    <i class="k-edge" data-from="dec" data-to="find" data-label="Yes"></i>
+    <i class="k-edge" data-from="watch" data-to="cam" data-label="next frame" data-route="over" data-narrow="rail" data-dash></i>
+    <i class="k-edge" data-from="decide" data-to="name" data-label="each page"></i>
+    <i class="k-edge" data-from="decide" data-to="cart" data-label="at once" data-narrow="rail"></i>
+    <i class="k-edge" data-from="name" data-to="cart" data-label="title later" data-dash></i>
+  </div>
+</section>
+</main>

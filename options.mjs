@@ -5,9 +5,8 @@
 // spec.mjs exports { heading, site, variants?, css?, path?, size?: [w, h], lead?, groups: [{ name, hint?, options: [
 //   { name, sub, recommended?, set: {DevPanel.config values}, params?: {url params}, seed?: {store, dock} }] }] }
 // It copies <site> into <out>, writes <out>/__options/ (page plus kit files), then runs serve.mjs on <out>.
-import { cpSync, mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { cpSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import os from 'node:os';
 import path from 'node:path';
 import { tabTitle } from './title.mjs';
 
@@ -16,8 +15,7 @@ const specPath = args[0], out = flag('--out'), port = flag('--port') ?? '0';
 if (!specPath || !out) { console.error('usage: node options.mjs <spec.mjs> --out <dir> [--port 0]'); process.exit(1); }
 const spec = (await import(path.resolve(specPath))).default, base = path.dirname(path.resolve(specPath));
 const rel = (p) => p && path.resolve(base, p);
-const kit = process.env.KIT_DIR || path.join(os.homedir(), '.agents/artifact-kit');
-if (!existsSync(path.join(kit, 'kit.js'))) { console.error(`no kit.js in ${kit} (set KIT_DIR)`); process.exit(1); }
+const kit = new URL('./kit', import.meta.url).pathname;
 
 // the site, plus a seed script in each page's head: ?dv-seed writes that frame's store before devpanel.js reads it
 mkdirSync(out, { recursive: true });

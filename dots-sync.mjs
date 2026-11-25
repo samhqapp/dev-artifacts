@@ -2,15 +2,13 @@
 // Copies dots.js into each given file, between its option-dots markers, so every copy stays the same as the one source.
 // Usage: node dots-sync.mjs <file>...   A file needs both markers once: "/* option-dots:start" and "/* option-dots:end */".
 // A file with kit-css markers ("/* kit-css:start" and "/* kit-css:end */") also gets the artifact kit's tokens and its
-// dock, segmented control, comment field, and hint rules, cut from kit.css ($KIT_CSS, else
-// ~/.agents/artifact-kit/kit.css) as a String.raw constant KIT_CSS, with :root as :host for a shadow root.
-// Without that file the vendored copy stays as it is.
+// dock, segmented control, comment field, and hint rules, cut from kit/kit.css as a String.raw constant KIT_CSS,
+// with :root as :host for a shadow root.
+// Run after every edit of dots.js or kit/kit.css: node dots-sync.mjs kit/kit.js devpanel.js
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 const src = readFileSync(new URL('./dots.js', import.meta.url), 'utf8').trim();
 const A = '/* option-dots:start', B = '/* option-dots:end */', KA = '/* kit-css:start', KB = '/* kit-css:end */';
-const KIT = process.env.KIT_CSS || join(homedir(), '.agents/artifact-kit/kit.css');
+const KIT = new URL('./kit/kit.css', import.meta.url).pathname;
 const TAKE = /^\.k-(dock|seg|comment|hint|copy|nav|dots|final|clear)\b/;
 
 // Top-level rules of kit.css (comments dropped, @media blocks skipped).

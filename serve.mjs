@@ -29,10 +29,9 @@ const own = path.dirname(fileURLToPath(import.meta.url));
 const TITLE = tabTitle(); // '<project> > <Orca tab>', or the repo folder name
 
 // The artifact kit (kit.js fetches kit.css next to itself). A local options page (`<main data-kit>` markup only) gets it injected.
-const kit = process.env.KIT_DIR || path.join(os.homedir(), '.agents/artifact-kit');
-const hasKit = fs.existsSync(path.join(kit, 'kit.js'));
+const kit = path.join(own, 'kit');
 const DEV = {
-  ...(hasKit && { '/__dev/kit.js': path.join(kit, 'kit.js'), '/__dev/kit.css': path.join(kit, 'kit.css') }),
+  '/__dev/kit.js': path.join(kit, 'kit.js'), '/__dev/kit.css': path.join(kit, 'kit.css'),
   '/__dev/devpanel.js': path.join(own, 'devpanel.js'),
   ...(variants && { '/__dev/variants.js': path.resolve(variants) }),
   ...(css && { '/__dev/variants.css': path.resolve(css) }),
@@ -112,7 +111,7 @@ function handle(req, res) {
   // a kit page has the kit's own dock, so it gets no overlay
   if (type.startsWith('text/html')) {
     const html = body.toString('utf8'), at = html.toLowerCase().lastIndexOf('</body>');
-    if (/<main[^>]*\bdata-kit\b/.test(html)) { if (hasKit) body = kitPage(html); }
+    if (/<main[^>]*\bdata-kit\b/.test(html)) body = kitPage(html);
     else body = at < 0 ? html + INJECT : html.slice(0, at) + INJECT + '\n' + html.slice(at);
   }
   res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' }).end(body);

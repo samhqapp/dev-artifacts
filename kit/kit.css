@@ -1,0 +1,630 @@
+/* Artifact Kit v1. Shared look for every owner page: compact native macOS (Apple) style.
+   Layout: one outer .k-wrap, pages read as .k-part sections, one sharp and the rest dimmed.
+   No badges, chips or pills. Status is named once, in a group header. */
+:root {
+  --page: #f2f2f7; --card: #ffffff; --inset: #f2f2f7;
+  --ink: #1c1c1e; --muted: rgba(60,60,67,.62); --line: rgba(60,60,67,.16);
+  --blue: #007aff; --blue-ink: #0062cc; --blue-bg: rgba(0,122,255,.09);
+  --red: #d70015; --red-bg: rgba(255,59,48,.09);
+  --amb: #b25000; --amb-bg: rgba(255,159,10,.13);
+  --grn: #248a3d; --grn-bg: rgba(52,199,89,.12);
+  --gry: rgba(60,60,67,.62); --gry-bg: rgba(120,120,128,.13);
+  --dock: rgba(255,255,255,.66); --dock-hi: rgba(255,255,255,.7); --seg: rgba(120,120,128,.16); --seg-on: #ffffff;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06);
+  --zebra: rgba(120,120,128,.06); --sep: rgba(60,60,67,.1); --soft: rgba(120,120,128,.09); --sw-off: rgba(120,120,128,.24);
+  --ref-open: #1a7f37; --ref-merged: #8250df; --ref-draft: #6e7781; --ref-closed: #cf222e; --ref-mine: #e8590c;
+  --pop: rgba(255,255,255,.94);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-title: 44px; --fs-h2: 28px; --fs-slide: 34px; --fs-body: 17px; --fs-sm: 15px; --fs-kicker: 13px;
+  /* motion: every open/close in the kit uses these. Open on a gentle spring (no overshoot), close on the faster
+     ease-out quint (--k-ease-close). Words come in over --k-morph-in and leave over --k-morph-out, before a surface shrinks. */
+  --k-ease: linear(0, 0.022, 0.075, 0.147, 0.228, 0.31, 0.391, 0.467, 0.537, 0.601, 0.657, 0.708, 0.751, 0.789, 0.822, 0.85, 0.874, 0.895, 0.912, 0.927, 0.939, 0.949, 0.958, 0.965, 0.971, 0.976, 0.98, 0.984, 0.987, 0.989, 0.991, 0.993, 0.994, 0.995, 0.996, 0.997, 0.997, 0.998, 0.998, 0.998, 1);
+  --k-ease-close: cubic-bezier(.22, 1, .36, 1); --k-open: 380ms; --k-close: 220ms; --k-fade: 100ms;
+  --k-morph-in: 150ms; --k-morph-out: 100ms; --k-words-at: 40ms; --k-stagger: 12ms;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px)); --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+  /* mockup (app screen) tokens, dark by default; [data-mockup="light"] swaps them */
+  --m-canvas: #09090b; --m-text: #f4f4f7; --m-sec: rgba(244,244,247,.66); --m-tile: #18181c; --m-line: rgba(255,255,255,.14);
+  --m-glass: rgba(20,20,25,.78); --m-on: #34c759; --m-red: #f14c35; --m-knob: #ffffff;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page: #000000; --card: #1c1c1e; --inset: #000000;
+  --ink: #f2f2f7; --muted: rgba(235,235,245,.6); --line: rgba(84,84,88,.6);
+  --blue: #0a84ff; --blue-ink: #4da3ff; --blue-bg: rgba(10,132,255,.16);
+  --red: #ff6961; --red-bg: rgba(255,69,58,.16); --amb: #ff9f0a; --amb-bg: rgba(255,159,10,.16);
+  --grn: #30d158; --grn-bg: rgba(48,209,88,.14); --gry: rgba(235,235,245,.6); --gry-bg: rgba(142,142,147,.18);
+  --dock: rgba(40,40,44,.6); --dock-hi: rgba(255,255,255,.14); --seg: rgba(118,118,128,.32); --seg-on: #636366;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  --zebra: rgba(255,255,255,.035); --sep: rgba(84,84,88,.42); --soft: rgba(255,255,255,.06); --sw-off: rgba(120,120,128,.4);
+  --ref-open: #3fb950; --ref-merged: #a371f7; --ref-draft: #8b949e; --ref-closed: #f85149; --ref-mine: #ff922b;
+  --pop: rgba(44,44,48,.94);
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --page: #000000; --card: #1c1c1e; --inset: #000000;
+  --ink: #f2f2f7; --muted: rgba(235,235,245,.6); --line: rgba(84,84,88,.6);
+  --blue: #0a84ff; --blue-ink: #4da3ff; --blue-bg: rgba(10,132,255,.16);
+  --red: #ff6961; --red-bg: rgba(255,69,58,.16); --amb: #ff9f0a; --amb-bg: rgba(255,159,10,.16);
+  --grn: #30d158; --grn-bg: rgba(48,209,88,.14); --gry: rgba(235,235,245,.6); --gry-bg: rgba(142,142,147,.18);
+  --dock: rgba(40,40,44,.6); --dock-hi: rgba(255,255,255,.14); --seg: rgba(118,118,128,.32); --seg-on: #636366;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  --zebra: rgba(255,255,255,.035); --sep: rgba(84,84,88,.42); --soft: rgba(255,255,255,.06); --sw-off: rgba(120,120,128,.4);
+  --ref-open: #3fb950; --ref-merged: #a371f7; --ref-draft: #8b949e; --ref-closed: #f85149; --ref-mine: #ff922b;
+  --pop: rgba(44,44,48,.94);
+  color-scheme: dark }
+:root[data-mockup="light"] {
+  --m-canvas: #f3f2ee; --m-text: #121214; --m-sec: rgba(18,18,20,.62); --m-tile: #e4e2dc; --m-line: rgba(18,18,20,.12);
+  --m-glass: rgba(255,255,255,.82); --m-red: #d93a24;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: auto; }
+body { margin: 0; background: var(--page); color: var(--ink); font: var(--fs-body)/1.45 var(--font); -webkit-font-smoothing: antialiased; }
+img { max-width: 100%; height: auto; } /* keep the aspect when max-width shrinks an img with width and height attributes */
+a { color: var(--blue-ink); text-decoration: none; }
+a:hover { text-decoration: underline; }
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
+
+/* Page frame and type scale: 44 title, 28 section title, 34 slide title, small kicker */
+.k-wrap { max-width: 1600px; margin: 0 auto; padding-left: var(--gutter-l); padding-right: var(--gutter-r); padding-block: 32px 150px; }
+.k-title { font-size: var(--fs-title); line-height: 1.08; font-weight: 700; letter-spacing: -.025em; margin: 0 0 10px; text-wrap: balance; }
+.k-h2 { font-size: var(--fs-h2); line-height: 1.15; font-weight: 600; letter-spacing: -.015em; margin: 0 0 6px; text-wrap: balance; }
+.k-kicker { font-size: var(--fs-kicker); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+.k-lead { font-size: 19px; line-height: 1.45; color: var(--muted); margin: 0 0 20px; max-width: 70ch; text-wrap: pretty; }
+.k-hint { font-size: 16px; color: var(--muted); margin: 0 0 16px; max-width: 80ch; text-wrap: pretty; }
+.k-part { margin-bottom: 56px; scroll-margin-top: 20px; }
+.k-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+/* Card grids: wide columns that fill the row; a lone card spans the row instead of sitting small beside empty space. */
+.k-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px; align-items: start; }
+.k-mono { font-family: var(--mono); font-size: 13.5px; }
+
+/* Grouped inset list: soft zebra rows, faint hairline separators, label left, value right */
+.k-list { background: var(--card); border-radius: 12px; overflow: hidden; min-width: 0; }
+.k-row { display: grid; grid-template-columns: minmax(auto, max-content) minmax(min(8em, 40vw), 1fr); align-items: baseline; column-gap: 12px; padding: 10px 14px; font-size: var(--fs-sm); line-height: 1.4; }
+.k-row + .k-row { border-top: .5px solid var(--sep); }
+.k-list > .k-row:nth-child(even) { background: var(--zebra); }
+/* Tables: same card, zebra and hairlines as a list. Wide tables scroll inside their own box on phones. */
+table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--card); border-radius: 12px; overflow: hidden; font-size: var(--fs-sm); line-height: 1.4; font-variant-numeric: tabular-nums; }
+th, td { padding: 10px 14px; text-align: left; vertical-align: baseline; }
+th { font-size: var(--fs-kicker); font-weight: 600; color: var(--muted); }
+tr + tr > td, thead + tbody > tr:first-child > td { border-top: .5px solid var(--sep); }
+tbody > tr:nth-child(even) > td { background: var(--zebra); }
+.k-table { overflow-x: auto; border-radius: 12px; min-width: 0; }
+/* Matrix: options as rows, features as columns, a colored mark in each cell with an optional short note under it. */
+.k-mx :is(th, td) { padding: 10px 6px; text-align: center; vertical-align: top; }
+.k-mx th { vertical-align: bottom; line-height: 1.25; }
+.k-mx :is(th, td):first-child { padding-left: 14px; text-align: left; min-width: 150px; }
+.k-mx td:first-child { font-weight: 600; }
+.k-mx td:last-child { white-space: nowrap; font-weight: 600; }
+.k-mx td small { display: block; margin-top: 4px; font-size: 12px; line-height: 1.25; color: var(--muted); }
+.k-mx tbody > tr.k-rec > td { background: var(--blue-bg); }
+.k-mk { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-style: normal; font-weight: 700; font-size: 14px; line-height: 1; vertical-align: middle; }
+.k-mk.k-y { color: var(--grn); background: var(--grn-bg); } .k-mk.k-y::before { content: "✓"; }
+.k-mk.k-n { color: var(--red); background: var(--red-bg); } .k-mk.k-n::before { content: "✗"; }
+.k-mk.k-p { color: var(--amb); background: var(--amb-bg); } .k-mk.k-p::before { content: "◐"; }
+.k-mk.k-u { color: var(--gry); background: var(--gry-bg); } .k-mk.k-u::before { content: "?"; }
+.k-legend .k-mk { margin-right: 6px; }
+.k-row > :first-child { color: var(--muted); max-width: 45vw; }
+/* Neither side squeezes the other into one word per line: the label and the value column each keep at least 8 em. */
+.k-row > :first-child:not(:only-child) { min-width: min(8em, 40vw); }
+.k-row > :nth-child(2) { text-align: right; overflow-wrap: anywhere; }
+.k-row > :only-child { grid-column: 1 / -1; color: var(--ink); max-width: none; }
+.k-row.k-strong > :first-child { color: var(--ink); font-weight: 600; }
+/* A row shows about nine words. Longer detail sits in .k-detail and opens only on a click, tap or Enter: hover never changes layout. */
+.k-detail { grid-column: 1 / -1; display: grid; grid-template-rows: 0fr; color: var(--muted); font-size: 14px; text-align: left; transition: grid-template-rows var(--k-close) var(--k-ease-close); }
+/* kit.js wraps the detail's content in .k-detail-in. Only that bare wrapper collapses to 0: a child with its own padding,
+   border or min-height (a .k-text) would keep that height when closed and show a cut slice of itself. */
+.k-detail-in { overflow: hidden; min-height: 0; opacity: 0; transition: opacity var(--k-fade) ease; }
+.k-detail-in > * { margin: 0; }
+/* Open grows on --k-open and the words fade in after it starts; close fades the words over --k-fade while the height shrinks. */
+.k-row.k-open > .k-detail { grid-template-rows: 1fr; transition: grid-template-rows var(--k-open) var(--k-ease); }
+.k-row.k-open > .k-detail > .k-detail-in { opacity: 1; transition: opacity var(--k-morph-in) ease var(--k-words-at); }
+.k-detail-in::before { content: ""; display: block; height: 6px; }
+.k-row[tabindex] { cursor: default; }
+
+/* Option panels: side by side, stack on phones. Selected = system blue border and radio. */
+.k-group { margin-top: 4px; }
+.k-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; align-items: stretch; }
+.k-options.k-keeps { margin-top: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 420px)); }
+.k-option { background: var(--card); border-radius: 18px; box-shadow: var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; border: 2px solid transparent; cursor: pointer; transition: border-color .18s ease; }
+.k-options > .k-option:not(:has(> :not(.k-option-head))) { align-self: start; } /* a text-only choice stays compact beside image cards */
+.k-option:focus-visible { outline: none; border-color: var(--blue); }
+.k-option[aria-checked="true"] { border-color: var(--blue); }
+.k-option .k-list { background: var(--inset); }
+.k-option-head { display: flex; align-items: flex-start; gap: 10px; min-height: 40px; }
+.k-keep .k-option-head { min-height: 0; }
+.k-name { font-size: var(--fs-body); font-weight: 600; line-height: 1.3; min-width: 0; }
+.k-name .k-num { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; margin-right: 6px; }
+.k-name small { display: block; font-size: var(--fs-kicker); font-weight: 500; margin-top: 2px; color: var(--muted); }
+.k-name small.k-rec { color: var(--blue-ink); }
+.k-radio { width: 20px; height: 20px; margin-top: calc((var(--fs-body) * 1.3 - 20px) / 2); border-radius: 50%; border: 1.5px solid var(--line); flex: none; display: grid; place-items: center; }
+.k-option[aria-checked="true"] .k-radio { border-color: var(--blue); background: var(--blue); }
+.k-option[aria-checked="true"] .k-radio::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
+.k-option[role="checkbox"] .k-radio { border-radius: 6px; }
+.k-option[role="checkbox"][aria-checked="true"] .k-radio::after { width: 9px; height: 5px; border-radius: 0; background: none; border: solid #fff; border-width: 0 0 2px 2px; transform: translate(0, -1px) rotate(-45deg); }
+.k-line { margin: 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.4; }
+.k-keep { box-shadow: none; background: transparent; border: 2px dashed var(--line); }
+.k-keep[aria-checked="true"] { border-style: solid; border-color: var(--blue); background: var(--card); }
+.k-comment { display: block; width: 100%; margin-top: 12px; font: inherit; font-size: 16px; line-height: 1.4; color: var(--ink); background: var(--card); border: .5px solid var(--line); border-radius: 12px; padding: 11px 14px; min-height: 46px; resize: none; overflow: hidden; outline: none; box-shadow: var(--shadow); field-sizing: content; }
+.k-comment::placeholder { color: var(--muted); }
+.k-comment:focus { border-color: var(--blue); }
+
+/* Status groups, worst first. One tinted section per status, the state named once in its header. */
+.k-status { border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.k-status > h3 { margin: 0; padding: 0 4px; font-size: var(--fs-sm); font-weight: 600; letter-spacing: .02em; }
+.k-status .k-list { background: var(--card); }
+.k-red { background: var(--red-bg); } .k-red > h3 { color: var(--red); }
+.k-amber { background: var(--amb-bg); } .k-amber > h3 { color: var(--amb); }
+.k-blue { background: var(--blue-bg); } .k-blue > h3 { color: var(--blue-ink); }
+.k-green { background: var(--grn-bg); } .k-green > h3 { color: var(--grn); }
+.k-gray { background: var(--gry-bg); } .k-gray > h3 { color: var(--gry); }
+/* Progress bar: <span class="k-progress" style="--p:30%">30%</span> in a row's value. The bar takes its status group's color. */
+.k-progress { --k-pc: var(--blue); display: inline-flex; align-items: center; gap: 8px; min-width: 0; text-align: left; font-variant-numeric: tabular-nums; color: var(--muted); }
+.k-progress::before { content: ""; width: 72px; height: 6px; border-radius: 3px; flex: none;
+  background: linear-gradient(90deg, var(--k-pc) var(--p, 0%), var(--sw-off) 0); }
+@media (max-width: 860px) { .k-progress::before { width: 40px; } }
+/* The best value in a row or table: <b class="k-best">48.5</b>, accent color. Name it in words nearby too. */
+.k-best { color: var(--blue-ink); font-weight: 600; }
+.k-green .k-progress { --k-pc: var(--grn); } .k-red .k-progress { --k-pc: var(--red); } .k-amber .k-progress { --k-pc: var(--amb); }
+
+/* Screenshot card: image, faint hairline divider, then a roomy caption */
+.k-shots { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%, var(--shot-min, 240px)), 1fr)); gap: 16px; align-items: start; }
+.k-shot { margin: 0; background: var(--card); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; min-width: 0; display: flex; flex-direction: column; }
+/* The image is a bare <img> or a <picture> (Light/Dark sources); both get the same box. */
+.k-shot > picture { display: block; overflow: hidden; }
+/* No fill behind a contained image: the room beside it takes the card color, never a dark bar. */
+.k-shot > img, .k-shot > picture > img, .k-shot > video { display: block; width: 100%; height: auto; aspect-ratio: var(--ratio, 4 / 3); object-fit: contain; }
+.k-shot.k-cover > img, .k-shot.k-cover > picture > img { background: var(--inset); }
+.k-shot.k-cover > img, .k-shot.k-cover > picture > img { object-fit: cover; }
+/* Nothing touches the divider: a contained image or mockup keeps 14 px of room on every side. Cover images stay edge to edge. */
+.k-shot:not(.k-cover) > :is(img, picture, video), .k-shot > .k-media { margin: 14px; width: calc(100% - 28px); border-radius: 10px; }
+.k-shot > figcaption { border-top: .5px solid color-mix(in srgb, var(--line) 30%, transparent); padding: 13px 14px 14px; display: flex; flex-direction: column; gap: 3px; background: var(--card); }
+.k-shot > figcaption > b { font-size: var(--fs-body); font-weight: 600; line-height: 1.3; }
+.k-shot > figcaption > span { font-size: var(--fs-sm); line-height: 1.4; color: var(--muted); }
+.k-shot video { cursor: zoom-in; }
+.k-shot video:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+/* Section header with actions: the heading block left, icon buttons right (k-copydoc last). */
+.k-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.k-head > :first-child { min-width: 0; }
+.k-head > :not(:first-child) { flex: none; }
+.k-copydoc { position: relative; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 9px; background: var(--soft); color: var(--muted); cursor: pointer; transition: color var(--k-morph-in); }
+.k-copydoc:hover, .k-copydoc.k-done { color: var(--blue); }
+.k-copydoc:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.k-copydoc svg { width: 16px; height: 16px; }
+.k-copydoc::after { content: attr(data-msg); position: absolute; right: calc(100% + 8px); top: 50%; transform: translateY(-50%); padding: 4px 9px; border-radius: 7px; background: var(--ink); color: var(--card); font-size: var(--fs-sm); white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity var(--k-morph-out); }
+.k-copydoc.k-done::after { opacity: 1; }
+/* Every shot image (and any img[data-zoom]) opens in the preview panel on a click. */
+/* kit.js marks every image in .k-wrap or .k-shot (not in a link, not data-no-zoom) as .k-zoomable: a click opens the preview panel. */
+.k-zoomable { cursor: zoom-in; }
+/* A very tall image (kit.js adds k-tall) shows its top part in the card's box, with a soft blur fade and a hint at the bottom. */
+.k-shot.k-tall > img, .k-shot.k-tall > picture > img { object-fit: cover; object-position: top; }
+.k-more { position: relative; z-index: 1; height: 88px; margin: -102px 14px 14px; border-radius: 0 0 10px 10px; pointer-events: none;
+  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--card) 70%, transparent) 55%, var(--card));
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 45%); mask-image: linear-gradient(to bottom, transparent, #000 45%);
+  font-size: var(--fs-kicker); font-weight: 600; color: var(--muted); }
+.k-shot:not(.k-tall) > .k-more { display: none; }
+
+/* Preview panel: a modal dialog over a dimmed, blurred page. The image sits at its natural size and is moved by a transform. */
+/* The dim and blur sit on the dialog itself (not ::backdrop), so the whole panel fades in and out with one opacity. */
+.k-lb { position: fixed; inset: 0; width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; overflow: hidden; touch-action: none; overscroll-behavior: contain; color: #fff;
+  background: rgba(0,0,0,.62); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); opacity: 0; transition: opacity var(--k-close) var(--k-ease-close); }
+.k-lb.k-show { opacity: 1; transition: opacity var(--k-open) var(--k-ease); }
+.k-lb:not(.k-show) .k-lb-img { transition-duration: var(--k-close); transition-timing-function: var(--k-ease-close); } /* close shrinks back onto the thumbnail as it fades */
+.k-lb::backdrop { background: transparent; }
+.k-lb-img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; user-select: none; -webkit-user-drag: none; cursor: grab; border-radius: 6px; box-shadow: 0 20px 60px rgba(0,0,0,.45); transition: transform .22s var(--k-ease); }
+.k-lb.k-drag .k-lb-img { transition: none; cursor: grabbing; }
+.k-lb-bar { position: absolute; left: 0; right: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 24px); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: 999px; background: rgba(30,30,34,.66);
+  backdrop-filter: blur(24px) saturate(1.8); -webkit-backdrop-filter: blur(24px) saturate(1.8); border: .5px solid rgba(255,255,255,.14); }
+.k-lb-bar output { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+.k-lb button, .k-lb a { font: inherit; font-size: 14px; font-weight: 600; line-height: 1; color: #fff; background: transparent; border: 0; border-radius: 999px; padding: 9px 13px; cursor: pointer; white-space: nowrap; text-decoration: none; }
+.k-lb button:hover, .k-lb a:hover { background: rgba(255,255,255,.14); text-decoration: none; }
+.k-lb-x { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: 14px; width: 36px; height: 36px; padding: 0 !important; display: grid; place-items: center;
+  background: rgba(30,30,34,.66) !important; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: .5px solid rgba(255,255,255,.14) !important; font-size: 20px !important; }
+
+/* Comment-only group (data-comment-only): one card per reviewed item (a screenshot, a .k-todo text block),
+   then its comment field at full width, then a footer row: "Final" left, the switch right. Use it as a cell of .k-shots or .k-todos. */
+.k-group[data-comment-only] { margin: 0; background: var(--card); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; min-width: 0; display: flex; flex-direction: column; }
+.k-group[data-comment-only] > .k-shot { box-shadow: none; border-radius: 0; }
+.k-note { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; background: var(--card); margin-top: auto; }
+.k-group[data-comment-only] > .k-shot + .k-note { padding-top: 0; } /* the caption above already pads 14 px */
+.k-note > .k-comment { margin: 0; min-width: 0; box-shadow: none; background: var(--inset); }
+.k-note > .k-final-bar { margin: 0; padding-top: 10px; border-top: .5px solid var(--sep); }
+
+/* Spacing of everything stacked straight in a part, one rule for each kind of pair, so no pair is left without a gap:
+   a block (card, list, grid, group, page block) after anything: 16 px; a text block (kicker, title, heading, lead, hint,
+   line, to-do head) after a block: 32 px, as it opens a new section; text after text keeps its own small margins
+   (kicker, then title, then hint). Vertical margins collapse, so the larger one wins. kitcheck.mjs proves every page. */
+.k-part > * + :not(.k-kicker, .k-title, .k-h2, .k-lead, .k-hint, .k-line, .k-todo-head, .k-kind, .k-meta) { margin-top: 16px; }
+.k-part > :not(.k-kicker, .k-title, .k-h2, .k-lead, .k-hint, .k-line, .k-todo-head, .k-kind, .k-meta) + :is(.k-kicker, .k-title, .k-h2, .k-lead, .k-hint, .k-line, .k-todo-head, .k-kind) { margin-top: 32px; }
+
+/* Mockups: draw at 1:1 points, kit.js scales .k-screen to the width of .k-phone */
+.k-phone { position: relative; width: 100%; border-radius: 22px; overflow: hidden; background: #000; box-shadow: 0 0 0 .5px var(--line); }
+.k-screen { position: absolute; top: 0; left: 0; width: 390px; transform-origin: 0 0; background: var(--m-canvas); color: var(--m-text); overflow: hidden; font-family: var(--font); }
+.k-m-list { background: var(--m-tile); border-radius: 14px; overflow: hidden; margin: 0 14px; }
+.k-m-li { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 16px; font-size: 17px; }
+.k-m-li + .k-m-li { border-top: .5px solid var(--m-line); }
+.k-m-li .v { margin-left: auto; color: var(--m-sec); }
+.k-m-li.red { color: var(--m-red); }
+.k-m-sw { margin-left: auto; width: 51px; height: 31px; border-radius: 16px; background: var(--m-line); position: relative; flex: none; }
+.k-m-sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: var(--m-knob); box-shadow: 0 2px 4px rgba(0,0,0,.25); }
+.k-m-sw.on { background: var(--m-on); }
+.k-m-sw.on::after { left: 22px; }
+.k-m-title { font-size: 22px; font-weight: 700; letter-spacing: -.01em; padding: 18px 16px 12px; }
+
+/* No transitions until kit.js marks the page ready, so first paint never animates from browser defaults. */
+html:not(.k-ready) *, html:not(.k-ready) *::before, html:not(.k-ready) *::after { transition: none !important; }
+
+/* Focus reading: one part sharp, the rest dimmed. Only when kit.js runs, so the page reads without it. */
+/* A light dim: unfocused parts stay easy to read. The dock's Focus switch sets data-focus="off" on <html>, which drops it. */
+.k-js .k-part { transition: opacity .12s ease; }
+html.k-js:not([data-view="slides"]):not([data-focus="off"]) .k-part:not(.k-focus) { opacity: .8; }
+.k-part.k-enter > * { animation: k-in .38s cubic-bezier(.2, .7, .2, 1) both; animation-delay: calc(var(--i, 0) * 45ms); }
+@keyframes k-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* Slides: the same parts, one at a time, bigger type */
+html[data-view="slides"] .k-part { display: none; margin-bottom: 0; padding-top: 4vh; min-height: calc(100vh - 220px); }
+html[data-view="slides"] .k-part.k-focus { display: block; }
+html[data-view="slides"] .k-part .k-h2 { font-size: var(--fs-slide); letter-spacing: -.02em; }
+html[data-view="slides"] .k-hint { font-size: 16px; }
+
+/* Final row: the footer of every part, option group and comment card. "Final" left, a macOS switch right
+   (track and knob, system blue when on). The label is a <label>, so a click on it toggles the switch too. */
+.k-gone { display: none !important; }
+.k-final-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 0; padding: 0 2px; font-size: var(--fs-sm); font-weight: 500; }
+.k-part > .k-final-bar, .k-group:not([data-comment-only]) > .k-final-bar { padding: 10px 2px 0; border-top: .5px solid var(--sep); }
+.k-final-bar > label { cursor: pointer; color: var(--ink); user-select: none; }
+.k-final { position: relative; flex: none; width: 42px; height: 26px; padding: 0; border: 0; border-radius: 13px; cursor: pointer; background: var(--sw-off); transition: background-color .2s ease; }
+.k-final::after { content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06); transition: transform .2s cubic-bezier(.3,.7,.3,1); }
+.k-final[aria-checked="true"] { background: var(--blue); }
+.k-final[aria-checked="true"]::after { transform: translateX(16px); }
+.k-final:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 13px; }
+.k-dots button[hidden] { display: none; }
+.k-empty { text-align: center; padding: 48px 0; }
+
+/* To-do cards: a group header (k-todo-head) over a grid of wide cards. Each card is a comment-only group holding a
+   .k-todo text block (title in <b>, one plain sentence or two in <span>); a bare .k-todo in the grid is a card of its own. */
+.k-todo-head { margin: 28px 0 0; font-size: var(--fs-kicker); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.k-part > .k-todo-head + * { margin-top: 10px; }
+.k-todos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px; }
+.k-todo { padding: 16px 16px 0; display: grid; gap: 6px; align-content: start; }
+.k-todo > b, .k-step > b { font-size: var(--fs-body); font-weight: 600; line-height: 1.3; }
+.k-todo > span, .k-step > span { font-size: var(--fs-sm); line-height: 1.45; color: var(--muted); max-width: 80ch; text-wrap: pretty; }
+.k-todos > .k-todo { padding: 16px; background: var(--card); border-radius: 18px; box-shadow: var(--shadow); }
+
+/* Step cards: a numbered flow, side by side, stacked on phones. */
+.k-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+.k-step { padding: 16px; border-radius: 16px; background: var(--card); box-shadow: var(--shadow); display: grid; gap: 6px; align-content: start; min-width: 0; }
+
+/* Pending placeholder: where content arrives later. Long text block: a draft or log that keeps its line breaks and scrolls. */
+.k-pending { display: grid; place-items: center; min-height: 160px; padding: 16px; border-radius: 16px; border: 1.5px dashed var(--line); color: var(--muted); font-size: var(--fs-sm); text-align: center; }
+.k-text { margin: 0; padding: 14px 16px; border-radius: 12px; background: var(--soft); font: 13.5px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; color: var(--ink);
+  min-height: calc(5 * 1.55em + 28px); max-height: calc(18 * 1.55em + 28px); } /* at least 5 lines, up to 18, then it scrolls */
+.k-row .k-text { margin-top: 4px; color: var(--ink); }
+
+/* References (k-ref): a number such as a PR or issue, colored by state (data-state open, merged, draft, closed),
+   with an orange underline for the owner's own (data-mine). A legend row explains them once. */
+.k-ref { font-weight: 600; white-space: nowrap; color: var(--blue-ink); }
+.k-ref[data-state="open"] { color: var(--ref-open); }
+.k-ref[data-state="merged"] { color: var(--ref-merged); }
+.k-ref[data-state="draft"] { color: var(--ref-draft); }
+.k-ref[data-state="closed"] { color: var(--ref-closed); }
+.k-ref[data-mine] { text-decoration: underline 2px var(--ref-mine); text-underline-offset: 3px; }
+/* Thread replies: GitHub octicons as masks (colored by currentColor), an inbox (sticky thread list beside the threads,
+   stacked on phones), the kind line, avatars, a timeline whose line runs through the avatar centers (14 px row padding
+   + 12 px half avatar = 26 px), the open comment you reply to, and a tinted reply block whose options hold prose. */
+.k-oct { display: inline-block; width: 16px; height: 16px; flex: none; vertical-align: -3px; background: currentColor; -webkit-mask: var(--k-oct) center / contain no-repeat; mask: var(--k-oct) center / contain no-repeat; }
+.k-oct[data-icon="issue"] { --k-oct: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z'/%3E%3Cpath d='M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z'/%3E%3C/svg%3E"); }
+.k-oct[data-icon="issue-closed"] { --k-oct: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M11.28 6.78a.75.75 0 0 0-1.06-1.06L7.25 8.69 5.78 7.22a.75.75 0 0 0-1.06 1.06l2 2a.75.75 0 0 0 1.06 0l3.5-3.5Z'/%3E%3Cpath d='M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0Zm-1.5 0a6.5 6.5 0 1 0-13 0 6.5 6.5 0 0 0 13 0Z'/%3E%3C/svg%3E"); }
+.k-oct[data-icon="pr"] { --k-oct: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z'/%3E%3C/svg%3E"); }
+.k-oct[data-icon="pr-draft"] { --k-oct: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.25 1A2.25 2.25 0 0 1 4 5.372v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.251 2.251 0 0 1 3.25 1Zm9.5 14a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5ZM2.5 3.25a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0ZM3.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm9.5 0a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM14 7.5a1.25 1.25 0 1 1-2.5 0 1.25 1.25 0 0 1 2.5 0Zm0-4.25a1.25 1.25 0 1 1-2.5 0 1.25 1.25 0 0 1 2.5 0Z'/%3E%3C/svg%3E"); }
+.k-oct[data-icon="pr-merged"] { --k-oct: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z'/%3E%3C/svg%3E"); }
+.k-oct[data-icon="pr-closed"] { --k-oct: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.25 1A2.25 2.25 0 0 1 4 5.372v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.251 2.251 0 0 1 3.25 1Zm9.5 5.5a.75.75 0 0 1 .75.75v3.378a2.251 2.251 0 1 1-1.5 0V7.25a.75.75 0 0 1 .75-.75Zm-2.03-5.273a.75.75 0 0 1 1.06 0l.97.97.97-.97a.748.748 0 0 1 1.265.332.75.75 0 0 1-.205.729l-.97.97.97.97a.751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018l-.97-.97-.97.97a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734l.97-.97-.97-.97a.75.75 0 0 1 0-1.06ZM2.5 3.25a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0ZM3.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm9.5 0a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z'/%3E%3C/svg%3E"); }
+.k-oct[data-icon="commit"] { --k-oct: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z'/%3E%3C/svg%3E"); }
+/* Inbox. Without JS the sidebar is a 320 px column of rows. kit.js wraps its content in .k-side-in (one surface) and moves
+   each row's icon and number into a .k-th-id column, so a row is: id (48 px, never moves) | words (kind and second line).
+   Desktop: the surface is 340 px wide, clipped to a 72 px rail of ids; a resting mouse (40 ms), focus or a tap unclips it over
+   the threads on the spring (--k-open), and leaving (80 ms) clips it back on the quint (--k-close). Only clip-path, transform
+   and opacity move, so nothing lays out per frame. Transitions, not keyframes, so a return mid-close reverses from where it is.
+   Animation Off and reduced motion make it instant (see the end). */
+.k-inbox { display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); gap: 28px; align-items: start; }
+.k-side { position: sticky; top: 20px; z-index: 15; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.k-side > .k-list + .k-kicker { margin-top: 12px; }
+.k-row.k-th { display: flex; flex-direction: column; gap: 3px; color: var(--ink); text-decoration: none; cursor: pointer; }
+.k-side .k-list > .k-row.k-th > * { max-width: none; min-width: 0; text-align: left; }
+.k-row.k-th[aria-current="true"] { background: var(--blue-bg); }
+.k-side-in { display: flex; flex-direction: column; gap: 6px; padding: 8px; overflow: hidden; border-radius: 16px;
+  background: var(--pop); border: .5px solid var(--line); backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6); }
+.k-side-in > * { flex: none; }
+.k-side-in > .k-kicker { position: relative; margin: 6px 0 0 8px; }
+.k-side-in > .k-kicker:first-child { margin-top: 2px; }
+.k-side-in > .k-list { background: transparent; border-radius: 0; overflow: visible; display: flex; flex-direction: column; gap: 2px; }
+.k-side-in .k-row.k-th { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; column-gap: 8px; padding: 4px 0; border: 0; background: transparent; }
+.k-th-id { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 0; border-radius: 10px; color: var(--k-st, var(--ref-open)); }
+.k-th-id > .k-ref { font-size: 12px; }
+.k-side .k-list > .k-row.k-th > .k-th-id { color: var(--k-st, var(--ref-open)); }
+.k-th[aria-current="true"] > .k-th-id { background: var(--blue-bg); }
+.k-th-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.k-side-in .k-th-body > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-side-in .k-th-body > .k-kind { display: block; }
+@media (min-width: 861px) {
+  html.k-js .k-inbox { grid-template-columns: 72px minmax(0, 1fr); gap: 20px; }
+  html.k-js .k-side-in { position: absolute; top: 0; left: 0; width: 340px; clip-path: inset(0 268px 0 0 round 16px);
+    transition: clip-path var(--k-close) var(--k-ease-close); }
+  html.k-js .k-side-in > * { width: 322px; }
+  html.k-js .k-side.k-open .k-side-in { clip-path: inset(0 0 0 0 round 18px); transition: clip-path var(--k-open) var(--k-ease); }
+  /* clip-path cuts a box-shadow, so the shadow is a layer that scales with the panel (transform only); kit.js sets --k-ph to its height. */
+  html.k-js .k-side::before { content: ""; position: absolute; top: 0; left: 0; width: 340px; height: var(--k-ph, 260px); border-radius: 18px; pointer-events: none;
+    box-shadow: 0 16px 40px rgba(0,0,0,.2); transform-origin: left; transform: scaleX(.2118); opacity: 0;
+    transition: transform var(--k-close) var(--k-ease-close), opacity var(--k-close) var(--k-ease-close); }
+  html.k-js .k-side.k-open::before { transform: none; opacity: 1; transition: transform var(--k-open) var(--k-ease), opacity var(--k-open) var(--k-ease); }
+  /* The clip cuts the panel's right border, so the closed rail draws its own edge, which fades out as the panel opens. */
+  html.k-js .k-side::after { content: ""; position: absolute; top: 0; left: 0; width: 72px; height: var(--k-ph, 260px); border-radius: 16px; pointer-events: none;
+    box-shadow: inset 0 0 0 .5px var(--line), 0 1px 2px rgba(0,0,0,.06); transition: opacity var(--k-fade) ease calc(var(--k-close) - var(--k-fade)); }
+  html.k-js .k-side.k-open::after { opacity: 0; transition: opacity var(--k-fade) ease; }
+}
+/* Word morph (kit.js builds each section label as one moving label). On open the label moves from the rail's center to its left
+   edge while "PRs" slides up and out and "Pull requests" slides up into its place, in --k-morph-in; the row words come in with
+   an 8 px slide, --k-stagger apart. On close every word leaves in --k-morph-out, as the panel starts to shrink, never after it. */
+.k-kk-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.k-side { --k-mx: cubic-bezier(.2, .8, .2, 1); }
+.k-kk { display: inline-flex; white-space: nowrap; font-size: 12px; letter-spacing: .01em; text-transform: none; color: var(--muted); }
+.k-kk-t { position: relative; display: inline-block; }
+.k-kk-s, .k-kk-l { display: inline-block; transform-origin: left center; }
+.k-kk-l { position: absolute; left: 0; top: 0; }
+.k-side :is(.k-kk, .k-kk-s, .k-kk-l, .k-th-body) { transition: opacity var(--k-md) ease var(--k-mw), transform var(--k-md) var(--k-mx) var(--k-mw); }
+/* Closing: the long words leave at once; the short label comes back a beat later, as the label returns to the center. */
+.k-side :is(.k-kk, .k-kk-l, .k-th-body) { --k-md: var(--k-morph-out); --k-mw: 0ms; }
+.k-side .k-kk-s { --k-md: var(--k-morph-out); --k-mw: calc(var(--k-morph-out) * .4); }
+/* Opening: the short label leaves fast, the long one and the row words arrive. */
+.k-side.k-open :is(.k-kk, .k-kk-l) { --k-md: var(--k-morph-in); --k-mw: 0ms; }
+.k-side.k-open .k-kk-s { --k-md: calc(var(--k-morph-in) * .6); --k-mw: 0ms; }
+.k-side.k-open .k-th-body { --k-md: var(--k-morph-in); --k-mw: calc(var(--k-words-at) + var(--i, 0) * var(--k-stagger)); }
+.k-side:not(.k-open) .k-th-body { opacity: 0; transform: translateX(-8px); }
+.k-side.k-open .k-kk-s { opacity: 0; transform: translateY(-70%); }
+.k-side:not(.k-open) .k-kk-l { opacity: 0; transform: translateY(70%); }
+@media (min-width: 861px) { html.k-js .k-side:not(.k-open) .k-kk { transform: translateX(calc(20px - 50%)); } }
+@media (max-width: 860px) { .k-side:not(.k-open) .k-kk, .k-kk-s { display: none; } .k-kk-l { position: static; } }
+.k-kind { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; font-size: var(--fs-sm); font-weight: 600; line-height: 1.35; color: var(--k-st, var(--ref-open)); }
+[data-state="draft"]:is(.k-kind, .k-th-id) { --k-st: var(--ref-draft); } [data-state="merged"]:is(.k-kind, .k-th-id) { --k-st: var(--ref-merged); } [data-state="closed"]:is(.k-kind, .k-th-id) { --k-st: var(--ref-closed); }
+.k-side .k-list > .k-row.k-th .k-kind { color: var(--k-st, var(--ref-open)); }
+.k-side .k-list > .k-row.k-th > .k-meta { color: var(--muted); }
+.k-state { font-size: 13px; font-weight: 400; color: var(--muted); }
+.k-meta { margin: 0; font-size: 13px; line-height: 1.4; color: var(--muted); overflow-wrap: anywhere; }
+.k-part > .k-kind + .k-h2 { margin-top: 6px; }
+a.k-at, .k-meta a { color: var(--blue-ink); font-weight: 600; text-decoration: none; }
+a.k-at:hover, .k-meta a:hover { text-decoration: underline; }
+/* Avatar: opaque, a ring in the color of the surface behind it (--ring; the card by default), the GitHub image over
+   the first letter of the login (kit.js fills both from data-login). With a .k-oct inside it is an event dot (a commit). */
+.k-av { position: relative; z-index: 2; display: inline-grid; place-items: center; width: 24px; height: 24px; flex: none; border-radius: 50%; overflow: hidden;
+  background: var(--inset); color: var(--muted); box-shadow: 0 0 0 3px var(--ring, var(--card)); font-size: 12px; font-weight: 600; text-transform: uppercase; text-decoration: none; }
+.k-av > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.k-tl { position: relative; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.k-tl::before { content: ""; position: absolute; left: 25px; top: 20px; bottom: 20px; width: 2px; background: var(--line); z-index: 1; }
+.k-tl > * { position: relative; }
+.k-tl:has(> :only-child)::before { display: none; }
+.k-row.k-ev { grid-template-columns: 24px minmax(0, 1fr); column-gap: 10px; align-items: center; }
+.k-row.k-ev > :nth-child(2) { color: var(--ink); text-align: left; max-width: none; min-width: 0; }
+.k-row.k-ev > .k-detail { grid-column: 2; }
+.k-row.k-ev > .k-av { min-width: 0; }
+.k-target { background: var(--card); border-radius: 14px; padding: 14px; box-shadow: 0 0 0 2px var(--blue); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.k-target > :not(.k-by) { margin-left: 34px; }
+.k-target > .k-list { background: var(--inset); }
+.k-tag { margin: 0; font-size: 13px; font-weight: 600; color: var(--blue-ink); }
+.k-by { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: var(--fs-sm); }
+/* Prose: Markdown-like text at body size (paragraphs, lists, inline code, small tables), for a comment or a reply draft. */
+.k-prose { font-size: var(--fs-body); line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; min-width: 0; }
+.k-prose > * { margin: 0; } .k-prose > * + * { margin-top: 10px; }
+.k-prose ul, .k-prose ol { padding-left: 22px; } .k-prose li + li { margin-top: 4px; }
+.k-prose code { font: .86em var(--mono); padding: 1px 4px; border-radius: 5px; background: var(--soft); }
+.k-prose table { font-size: var(--fs-sm); background: transparent; }
+.k-prose th, .k-prose td { padding: 6px 10px; white-space: nowrap; } /* a narrow column scrolls the table (wrap it in .k-table), never squeezes its cells */
+.k-reply { margin-left: 34px; padding: 14px; border-radius: 18px; background: var(--blue-bg); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.k-reply > .k-group { margin: 0; }
+/* Text-heavy options (replies, drafts) stack as full-width cards, one under another, so each reads like a comment.
+   On by default in a k-reply; data-stack on any k-options does the same. Visual options stay side by side. */
+.k-reply .k-options, .k-options[data-stack] { grid-template-columns: minmax(0, 1fr); }
+/* A reply draft in an option: prose in an inset box, at least 5 lines and up to 18, then it scrolls. */
+.k-option > .k-prose { padding: 12px 14px; border-radius: 12px; background: var(--soft); font-size: 16px; overflow: auto; min-height: calc(5 * 1.5em + 24px); max-height: calc(18 * 1.5em + 24px); }
+@media (max-width: 860px) {
+  .k-inbox, html.k-js .k-inbox { grid-template-columns: minmax(0, 1fr); }
+  /* Phone: the rail is a sticky bar of 52 px at the top; open, the panel floats over the content below it. */
+  .k-side { position: static; }
+  html.k-js .k-side { position: sticky; top: 8px; height: 52px; }
+  html.k-js .k-inbox .k-part { scroll-margin-top: 72px; }
+  .k-side:not(.k-open) .k-side-in { flex-direction: row; align-items: center; gap: 2px; height: 52px; padding: 0 6px; overflow-x: auto; border-radius: 14px; }
+  .k-side:not(.k-open) .k-side-in > .k-kicker { font-size: 0; margin: 0 4px; width: .5px; height: 28px; background: var(--line); }
+  .k-side:not(.k-open) .k-th-body { display: none; }
+  .k-side:not(.k-open) .k-side-in > .k-list { flex-direction: row; }
+  .k-side:not(.k-open) .k-side-in .k-row.k-th { display: block; padding: 0; }
+  .k-side:not(.k-open) .k-th-id { flex-direction: row; gap: 5px; padding: 6px 8px; }
+  .k-side.k-open .k-side-in { position: absolute; top: 0; left: 0; width: 100%; max-height: 70vh; overflow-y: auto; box-shadow: 0 16px 40px rgba(0,0,0,.2); }
+  .k-reply { margin-left: 0; }
+  /* Phone: no sideways scrolling, so a .k-table stacks: each row is a card, its first cell the title, then label-left,
+     value-right rows (kit.js copies each column's header into data-label). */
+  .k-table { overflow-x: visible; }
+  .k-table thead { display: none; }
+  .k-table :is(table, tbody, tr, td) { display: block; }
+  .k-table table { background: transparent; border-radius: 0; overflow: visible; }
+  .k-table tr { background: var(--card); border-radius: 12px; overflow: hidden; padding: 4px 0; }
+  .k-table tr + tr { margin-top: 12px; }
+  .k-table td, .k-table tr + tr > td, .k-table tbody > tr:nth-child(even) > td { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border-top: 0; background: none; white-space: normal; text-align: right; }
+  .k-table tr > td + td { border-top: .5px solid var(--sep); }
+  .k-table td:nth-child(odd):not(:first-child) { background: var(--zebra); }
+  .k-table td::before { content: attr(data-label); color: var(--muted); text-align: left; }
+  .k-table td:first-child { font-weight: 600; text-align: left; }
+  .k-table td:first-child::before { content: none; }
+  .k-table.k-mx td:not(:first-child) { justify-content: flex-start; align-items: center; gap: 8px; }
+  .k-table.k-mx td:not(:first-child)::before { margin-right: auto; }
+  .k-table.k-mx td small { display: inline; margin: 0; text-align: right; }
+}
+.k-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: var(--fs-sm); color: var(--muted); }
+/* Popover for any [data-pop]: shows on hover or keyboard focus, a tap shows it first and a second tap follows the link. */
+.k-pop { position: fixed; z-index: 30; max-width: min(360px, calc(100vw - 32px)); padding: 14px 16px; border-radius: 14px; display: grid; gap: 8px;
+  background: var(--pop); color: var(--ink); border: .5px solid var(--line); box-shadow: 0 12px 32px rgba(0,0,0,.2);
+  backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6); font-size: 14px; line-height: 1.45; }
+/* Closed it stays laid out but unseen, so it fades and settles both ways; visibility flips at the end of the close. */
+.k-pop { transform-origin: top left; opacity: 0; transform: translateY(-4px) scale(.98); visibility: hidden; pointer-events: none;
+  transition: opacity var(--k-close) var(--k-ease-close), transform var(--k-close) var(--k-ease-close), visibility 0s linear var(--k-close); }
+.k-pop.k-show { opacity: 1; transform: none; visibility: visible; pointer-events: auto;
+  transition: opacity 160ms ease, transform var(--k-open) var(--k-ease), visibility 0s; }
+.k-pop h4 { margin: 0; font-size: 15px; font-weight: 600; }
+.k-pop p { margin: 0; color: var(--muted); }
+.k-pop dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; }
+.k-pop dt { color: var(--muted); }
+.k-pop dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.k-pop a { font-size: 13px; font-weight: 600; }
+/* Option dots (kit.js 2b): a [data-dot] box shows only inside its dot's popover, at a popover's type size. */
+[data-dot] { display: none; }
+.od-body > [data-dot] { display: block; --fs-body: 15px; --fs-sm: 14px; --fs-kicker: 12px; }
+.od-body .k-options { grid-template-columns: 1fr; gap: 10px; }
+.od-body .k-option { padding: 12px; border-radius: 14px; }
+.od-body .k-option-head { min-height: 0; }
+.od-body .k-comment { font-size: 15px; margin-top: 10px; }
+
+/* Floating Liquid Glass dock: a compact capsule */
+.k-dock { position: fixed; left: 0; right: 0; margin-inline: auto; width: max-content; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; padding: 6px; max-width: calc(100vw - 24px); border-radius: 999px;
+  background: var(--dock); backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  border: .5px solid var(--line); box-shadow: var(--shadow), inset 0 1px 0 var(--dock-hi); }
+.k-dock button { font: inherit; font-size: 14px; font-weight: 600; line-height: 1; color: var(--ink); background: transparent; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
+.k-dock .k-nav { width: 32px; height: 32px; padding: 0; font-size: 20px; display: grid; place-items: center; }
+.k-dock .k-nav:disabled { opacity: .3; cursor: default; }
+.k-dock output { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 0 4px; white-space: nowrap; min-width: 40px; text-align: center; }
+.k-dots { display: flex; align-items: center; gap: 2px; }
+.k-dots button { width: 14px; height: 14px; padding: 0; display: grid; place-items: center; }
+.k-dots button::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); opacity: .45; transition: transform .2s ease, opacity .2s ease; }
+.k-dots button[aria-current="true"]::after { opacity: 1; background: var(--blue); transform: scale(1.35); }
+.k-seg { display: flex; align-items: center; background: var(--seg); border-radius: 999px; padding: 2px; }
+.k-seg button { padding: 6px 10px; }
+.k-seg-label { font-size: 14px; font-weight: 600; color: var(--muted); padding: 0 6px 0 10px; white-space: nowrap; }
+.k-seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.k-dock .k-copy { background: var(--blue); color: #fff; }
+.k-fallback { position: fixed; left: 0; right: 0; margin-inline: auto; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); width: min(560px, calc(100vw - 32px)); height: 120px; z-index: 21; font: 13px/1.4 var(--mono); color: var(--ink); background: var(--card); border: .5px solid var(--line); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); }
+.k-fallback[hidden] { display: none; }
+
+@media (max-width: 560px) {
+  :root { --fs-title: 34px; --fs-h2: 24px; --fs-slide: 28px; }
+  .k-dots { display: none; }
+  .k-dock { border-radius: 24px; gap: 6px; }
+  .k-wrap { padding-block: 24px 170px; }
+  .k-row > :first-child:not(:only-child) { max-width: 50%; }
+}
+/* Flow chart (k-flow): tinted lanes, step cards left to right, arrows drawn by kit.js in one SVG layer.
+   The card's color says where the step runs (data-kind: model, vision, server, code). Below 1100 px of flow width
+   each lane has two columns and the cards wrap; kit.js redraws the arrows on every size change. */
+.k-flow { --k-band: color-mix(in srgb, var(--ink) 5%, var(--page)); position: relative; display: grid; row-gap: 28px; margin-top: 4px; container-type: inline-size; }
+/* Arrows touch the cards on purpose; clip-path (inset 0, no visible change) tells kitcheck to skip the line layer. */
+.k-flow > svg.k-flow-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; clip-path: inset(0); z-index: 2; }
+.k-flow-lines path { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.k-flow-lines path.k-dash { stroke-dasharray: 4 5; }
+.k-flow-lines path.k-hot { stroke: var(--blue); stroke-width: 2; }
+.k-flow-lines marker path { fill: var(--muted); stroke: none; }
+.k-flow-lines marker.k-hot path { fill: var(--blue); }
+.k-flow-lines text { font: 600 13px var(--font); fill: var(--muted); }
+.k-flow-lines rect { fill: var(--page); }
+.k-flow-lines rect.k-inband { fill: var(--k-band); }
+.k-edge { display: none; }
+
+.k-lane { display: grid; grid-template-columns: 112px repeat(var(--k-cols, 6), minmax(0, 1fr)); column-gap: 28px; align-items: stretch;
+  padding: 16px 20px; border-radius: 18px; background: var(--k-band); }
+.k-lane.k-top { padding-top: 38px; }
+.k-lane > header { grid-column: 1; align-self: start; display: grid; gap: 2px; padding-top: 4px; }
+.k-lane > header b { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+.k-lane > header span { font-size: 13px; line-height: 1.35; color: var(--muted); }
+
+.k-node { --k-k: var(--muted); --k-kbg: transparent; position: relative; z-index: 1; grid-column: var(--c, auto) / span var(--s, 1);
+  display: grid; align-content: start; gap: 4px; min-width: 0; padding: 14px; text-align: left; color: var(--ink); background: var(--card);
+  border-radius: 14px; box-shadow: var(--shadow), inset 0 0 0 .5px var(--line); cursor: default; transition: background-color .12s ease, box-shadow .12s ease; }
+.k-node:hover, .k-node:focus-visible, .k-node.k-on { background: color-mix(in srgb, var(--blue) 6%, var(--card)); outline: none; }
+.k-node[data-kind="model"]  { --k-k: var(--blue); --k-kbg: var(--blue-bg); }
+.k-node[data-kind="vision"] { --k-k: var(--grn);  --k-kbg: var(--grn-bg); }
+.k-node[data-kind="server"] { --k-k: var(--amb);  --k-kbg: var(--amb-bg); }
+.k-node:is([data-kind="model"], [data-kind="vision"], [data-kind="server"]) { box-shadow: var(--shadow), inset 0 0 0 1px color-mix(in srgb, var(--k-k) 38%, transparent); }
+.k-node-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.k-flow .k-ic { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--k-k, var(--muted)); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.k-node:is([data-kind="model"], [data-kind="vision"], [data-kind="server"]) .k-ic { width: 26px; height: 26px; padding: 5px; border-radius: 7px; background: var(--k-kbg); }
+.k-node-top > b { font-size: 16px; font-weight: 650; line-height: 1.25; letter-spacing: -.01em; }
+.k-node:is([data-kind="model"], [data-kind="vision"], [data-kind="server"]) .k-node-top > b { font-size: 17px; }
+.k-node > span { font-size: 13.5px; line-height: 1.35; font-weight: 500; font-variant-numeric: tabular-nums; opacity: .82; }
+.k-node > small, .k-node > em { font-size: 12.5px; line-height: 1.35; font-variant-numeric: tabular-nums; color: var(--muted); }
+.k-node-more { display: none; }
+.k-time { display: block; height: 4px; margin-top: auto; border-radius: 2px; background: color-mix(in srgb, var(--ink) 8%, transparent); overflow: hidden; }
+.k-time i { display: block; height: 100%; width: var(--w); min-width: 3px; border-radius: 2px; background: var(--k-k); }
+.k-node:not([data-kind]) .k-time i, .k-node[data-kind="code"] .k-time i { background: color-mix(in srgb, var(--ink) 38%, transparent); }
+.k-time.k-none { visibility: hidden; }
+/* Side path: dashed, no fill. */
+.k-node[data-ghost] { background: transparent; box-shadow: none; border: 1.5px dashed color-mix(in srgb, var(--ink) 22%, transparent); }
+/* Decision: a diamond drawn in SVG, the question on top. */
+.k-node[data-dec] { background: none; box-shadow: none; place-items: center; align-content: center; padding: 0; }
+.k-node[data-dec] > svg { position: absolute; left: 0; top: 6px; width: 100%; height: calc(100% - 12px); overflow: visible; }
+.k-node[data-dec] polygon { fill: var(--card); stroke: var(--blue); stroke-width: 1.5; vector-effect: non-scaling-stroke; transition: fill .12s ease; filter: drop-shadow(0 4px 10px rgba(0,0,0,.08)); }
+.k-node[data-dec]:is(:hover, .k-on) polygon { fill: color-mix(in srgb, var(--blue) 8%, var(--card)); }
+.k-node[data-dec] > b { position: relative; font-size: 15px; font-weight: 650; text-align: center; line-height: 1.2; }
+
+.k-flow-key { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; margin: 0 0 14px; font-size: 14px; color: var(--muted); }
+.k-flow-key > span { display: inline-flex; align-items: center; gap: 7px; }
+.k-flow-key .k-ic { width: 22px; height: 22px; padding: 4px; border-radius: 6px; flex: none; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.k-flow-key [data-kind="model"]  .k-ic { stroke: var(--blue); background: var(--blue-bg); }
+.k-flow-key [data-kind="vision"] .k-ic { stroke: var(--grn); background: var(--grn-bg); }
+.k-flow-key [data-kind="server"] .k-ic { stroke: var(--amb); background: var(--amb-bg); }
+.k-flow-key [data-kind="code"]   .k-ic { stroke: var(--muted); }
+.k-flow-key [data-kind="time"]::before { content: ""; flex: none; width: 36px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--blue) 60%, color-mix(in srgb, var(--ink) 8%, transparent) 60%); }
+
+/* The open card: one overlay above the flow that grows from the card's own box, so nothing under it moves. */
+.k-node.k-flow-big { position: absolute; z-index: 5; display: none; overflow: hidden; align-content: start; background: var(--card);
+  box-shadow: 0 18px 44px rgba(0,0,0,.22), 0 2px 6px rgba(0,0,0,.08), inset 0 0 0 .5px var(--line); }
+.k-node.k-flow-big.k-open { display: grid; }
+.k-flow-big.k-anim { transition: left .13s cubic-bezier(.2,.8,.2,1), top .13s cubic-bezier(.2,.8,.2,1), width .13s cubic-bezier(.2,.8,.2,1), height .13s cubic-bezier(.2,.8,.2,1); }
+.k-flow-big.k-anim.k-shut { transition-duration: .1s; }
+.k-flow-big .k-node-more { display: grid; gap: 2px; margin-top: 6px; }
+.k-flow-big .k-node-more p { margin: 0; font-size: 15px; line-height: 1.5; }
+.k-flow-big .k-node-more code { font: 12px/1.35 var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.k-flow-big .k-time { margin-top: 6px; }
+
+@container (max-width: 1099px) {
+  .k-flow > .k-lane { max-width: 560px; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; row-gap: 28px; padding: 16px 34px 18px 14px; }
+  .k-flow > .k-lane + .k-lane { margin-top: 12px; }
+  .k-lane > header { grid-column: 1 / -1; padding-top: 0; max-width: calc(100% - 64px); }
+  .k-lane > .k-node { grid-column: span var(--ns, 2); }
+  .k-node[data-dec] { min-height: 84px; }
+  .k-time { margin-top: 6px; }
+}
+
+/* Stacked bar chart (k-stackbar): one row per option on one shared axis. kit.js builds the segments, the dashed mark
+   and the axis from data-v, data-max, data-mark and data-ticks. On a phone the result text moves under the bar. */
+.k-stackbar { --lw: 76px; display: grid; gap: 10px; background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 16px 18px; min-width: 0; }
+.k-stackbar > h3 { margin: 0; font-size: var(--fs-sm); font-weight: 600; }
+.k-sb-key { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; font-size: 13px; color: var(--muted); }
+.k-sb-key > span { display: inline-flex; align-items: center; gap: 6px; }
+.k-sb-key > span[data-c]::before { content: ""; width: 12px; height: 12px; border-radius: 3px; background: var(--c); }
+.k-stackbar [data-c="soft"] { --c: color-mix(in srgb, var(--gry) 45%, var(--card)); }
+.k-stackbar [data-c="gray"] { --c: var(--gry); }
+.k-stackbar [data-c="blue"] { --c: var(--blue); }
+.k-stackbar [data-c="green"] { --c: var(--grn); }
+.k-stackbar [data-c="amber"] { --c: var(--amb); }
+.k-stackbar [data-c="red"] { --c: var(--red); }
+.k-sb-row { display: grid; grid-template-columns: var(--lw) minmax(0, 1fr) 92px; align-items: center; gap: 10px; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.k-sb-row > b { font-weight: 600; }
+.k-sb-row > em { font-style: normal; color: var(--muted); text-align: right; }
+.k-sb-bar { position: relative; height: 18px; border-radius: 5px; background: var(--soft); display: flex; gap: 2px; }
+.k-sb-bar > i { height: 100%; border-radius: 4px; background: var(--c, var(--blue)); transform-origin: left center; }
+.k-sb-bar > s { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 2px dashed var(--ink); opacity: .55; }
+.k-sb-axis { font-size: 13px; color: var(--muted); }
+.k-sb-ax { position: relative; height: 18px; }
+.k-sb-ax > span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.k-sb-ax > span:first-child { transform: none; }
+.k-sb-ax > span:last-child { transform: translateX(-100%); }
+@media (max-width: 560px) {
+  .k-stackbar { --lw: 62px; padding: 14px; }
+  .k-sb-row { grid-template-columns: var(--lw) minmax(0, 1fr); gap: 8px; }
+  .k-sb-row > em { grid-column: 2; text-align: left; margin-top: -6px; }
+  .k-sb-ax > .k-minor { display: none; }
+}
+
+/* Animation switch: kit.js sets data-anim on <html> before first paint. Pause freezes CSS animations in place.
+   Off removes all motion, so focus dimming changes at once. Reduced motion starts at Off; an explicit Play wins. */
+html[data-anim="pause"] *, html[data-anim="pause"] *::before, html[data-anim="pause"] *::after { animation-play-state: paused !important; }
+html[data-anim="off"] *, html[data-anim="off"] *::before, html[data-anim="off"] *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+@media (prefers-reduced-motion: reduce) { html:not([data-anim="play"]) *, html:not([data-anim="play"]) *::before, html:not([data-anim="play"]) *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
