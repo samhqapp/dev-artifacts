@@ -493,6 +493,7 @@ a.k-at:hover, .k-meta a:hover { text-decoration: underline; }
 .k-dock .k-nav:disabled { opacity: .3; cursor: default; }
 .k-dock output { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 0 4px; white-space: nowrap; min-width: 40px; text-align: center; }
 .k-dots { display: flex; align-items: center; gap: 2px; }
+.k-dots[data-many] { display: none; } /* more than 7 items: "‹ 3 / 158 ›", no dots */
 .k-dots button { width: 14px; height: 14px; padding: 0; display: grid; place-items: center; }
 .k-dots button::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); opacity: .45; transition: transform .2s ease, opacity .2s ease; }
 .k-dots button[aria-current="true"]::after { opacity: 1; background: var(--blue); transform: scale(1.35); }

@@ -125,6 +125,7 @@
 .od-ctl .od-count { all: unset; box-sizing: border-box; height: 28px; padding: 0 4px; border-radius: 999px; display: flex; align-items: center;
   justify-content: center; gap: 5px; font: 600 13px/1 var(--od-font); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .od-ctl .od-count::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--od-blue); flex: none; }
+.od-ctl .od-count[data-many]::before { content: none; } /* more than 7 items: arrows and "3 / 158" only, no dot */
 .od-ctl button:hover, .od-ctl button:focus-visible { background: var(--od-fill); }
 .od-ctl .od-step button:hover, .od-ctl .od-step button:focus-visible { background: var(--od-fill); }
 .od-ctl .od-eye { width: 32px; height: 32px; padding: 0; border-radius: 50%; display: grid; place-items: center; color: var(--od-muted);
@@ -207,6 +208,7 @@
       eye.setAttribute('aria-checked', String(hidden)); eye.innerHTML = hidden ? EYE_OFF : EYE;
       eye.title = (hidden ? 'Show dots' : 'Hide dots') + '  ( . )';
       if (!o.list || o.count) count.textContent = o.count ? o.count() : `${cur && list.includes(cur) ? list.indexOf(cur) + 1 : '–'} / ${list.length}`;
+      count.toggleAttribute('data-many', +count.textContent.split('/').pop() > 7); // more than 7: no dots, only the number
       schedule();
     }
     function setHidden(v) {
@@ -425,6 +427,7 @@ const KIT_CSS = String.raw`
 .k-dock .k-nav:disabled { opacity: .3; cursor: default; }
 .k-dock output { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; padding: 0 4px; white-space: nowrap; min-width: 40px; text-align: center; }
 .k-dots { display: flex; align-items: center; gap: 2px; }
+.k-dots[data-many] { display: none; }
 .k-dots button { width: 14px; height: 14px; padding: 0; display: grid; place-items: center; }
 .k-dots button::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); opacity: .45; transition: transform .2s ease, opacity .2s ease; }
 .k-dots button[aria-current="true"]::after { opacity: 1; background: var(--blue); transform: scale(1.35); }
@@ -1273,7 +1276,7 @@ svg { display: block; flex: none; }
     const k = blue.findIndex((m) => m.id === curId);
     posText = k < 0 ? `${blue.length}` : `${k + 1} / ${blue.length}`;
     od.controls.querySelector('.od-step').hidden = !blue.length; // no pager with nothing to page through
-    pager.hidden = blue.length < 2;
+    pager.hidden = blue.length < 2 || blue.length > 7; // more than 7 groups: "‹ 3 / 158 ›", no dots
     pager.innerHTML = blue.map((g) => `<button type="button" data-id="${esc(g.id)}" title="${esc(g.label)}" aria-label="${esc(g.label)}" aria-current="${g.id === curId}"></button>`).join('');
     for (const g of groups) if (g.rec) g.rec.n = blue.findIndex((m) => m.id === g.id) + 1;
     od.sync(); updX();

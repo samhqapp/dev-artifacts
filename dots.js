@@ -97,6 +97,7 @@
 .od-ctl .od-count { all: unset; box-sizing: border-box; height: 28px; padding: 0 4px; border-radius: 999px; display: flex; align-items: center;
   justify-content: center; gap: 5px; font: 600 13px/1 var(--od-font); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .od-ctl .od-count::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--od-blue); flex: none; }
+.od-ctl .od-count[data-many]::before { content: none; } /* more than 7 items: arrows and "3 / 158" only, no dot */
 .od-ctl button:hover, .od-ctl button:focus-visible { background: var(--od-fill); }
 .od-ctl .od-step button:hover, .od-ctl .od-step button:focus-visible { background: var(--od-fill); }
 .od-ctl .od-eye { width: 32px; height: 32px; padding: 0; border-radius: 50%; display: grid; place-items: center; color: var(--od-muted);
@@ -179,6 +180,7 @@
       eye.setAttribute('aria-checked', String(hidden)); eye.innerHTML = hidden ? EYE_OFF : EYE;
       eye.title = (hidden ? 'Show dots' : 'Hide dots') + '  ( . )';
       if (!o.list || o.count) count.textContent = o.count ? o.count() : `${cur && list.includes(cur) ? list.indexOf(cur) + 1 : '–'} / ${list.length}`;
+      count.toggleAttribute('data-many', +count.textContent.split('/').pop() > 7); // more than 7: no dots, only the number
       schedule();
     }
     function setHidden(v) {

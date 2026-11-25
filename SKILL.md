@@ -92,6 +92,8 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 - Dots and dock come from `<repo>/dots.js`, the one shared overlay (the artifact kit uses it too). Edit only
   that file, then run `node <repo>/dots-sync.mjs <file>` for each copy (devpanel.js and any other file with its markers).
 - It is built from the artifact kit's classes and hints (`dots-sync.mjs` copies the kit.css rules in). Do not restyle it per site.
+- More than 7 items (owner, 2026-11-25): a dock, pager, or option stepper with more than 7 groups, parts, or options
+  shows only the arrows with the number in the middle, "‹ 3 / 158 ›", and no dots. Built into dots.js, kit.js and kit.css.
 - The dock spans the window (16 px gutters). Row 1 is fixed: back / count / next, the overall comment,
   Open/Archived, Focus, the eye, Clear, "…", Copy choices. Nothing in row 1 ever moves (each changing text keeps its
   widest width). The current group's name is bolder and white, and the other groups dim to 60%. Below it every group of the
