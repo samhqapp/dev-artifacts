@@ -138,7 +138,7 @@ Every part, every group outside a part, and every comment card ends with a foote
 
 ## Image lightbox (preview panel)
 
-Every image in `.k-wrap` or `.k-shot` (and any `img[data-zoom]`) opens on a click, Enter or Space (cursor `zoom-in`). No markup needed. Add `data-no-zoom` to an image to opt out; an image inside a link stays a link. Images added later work too.
+Every image in `.k-wrap` or `.k-shot` (and any `img[data-zoom]`) opens on a click, Enter or Space (cursor `zoom-in`). No markup needed. Add `data-no-zoom` to an image to opt out; an image inside a link stays a link. Images added later work too. An HTML mockup with `data-zoom="Title"` (any element, not only `img`) opens in the same panel as a live copy of the node at its own layout size, so CSS motion keeps running; it zooms, pans and steps like an image, with no Download.
 
 - It opens in a modal panel over a dimmed, blurred page, fit to the screen, grown from the thumbnail (about 220 ms; a fade or a cut when Animation is Off or the system asks for reduced motion), and shrinks back onto it on close.
 - Wheel or trackpad pinch zooms at the pointer, drag pans, two-finger pinch and drag work on phones, double-click or Z switches fit and 100%. Keys: `+` `-` zoom, `0` fit, `1` 100%, arrows pan when zoomed; Left and Right step through the page's visible images when not.

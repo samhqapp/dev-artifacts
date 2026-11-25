@@ -509,7 +509,7 @@
         head.append(el('span', 'k-radio'), nm);
         head.firstChild.setAttribute('aria-hidden', 'true');
         o.prepend(head); o.tabIndex = 0; o.setAttribute('role', multi ? 'checkbox' : 'radio'); o.setAttribute('aria-checked', 'false');
-        o.addEventListener('click', e => { if (!e.target.closest('a,button,textarea,input,select,img.k-zoomable')) choose(i); }); // an image opens the preview, not a pick
+        o.addEventListener('click', e => { if (!e.target.closest('a,button,textarea,input,select,.k-zoomable')) choose(i); }); // an image opens the preview, not a pick
         o.addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && e.target === o) { e.preventDefault(); choose(i); } });
       });
       ta.addEventListener('input', () => { grow(); saved.notes[name] = ta.value; saveState(); emit(st); });
@@ -650,12 +650,20 @@
     };
     /* Every image in .k-wrap or .k-shot (and any img[data-zoom]) becomes .k-zoomable and opens the preview panel on a click,
        Enter or Space. data-no-zoom, or a link around the image, opts out. Images added later are marked too. */
-    const mark = () => $$('.k-shot img, .k-wrap img, img[data-zoom]').forEach(img => {
-      if (img.classList.contains('k-zoomable') || img.closest('a, [data-no-zoom], .k-lb')) return;
-      img.classList.add('k-zoomable'); img.tabIndex = 0; img.setAttribute('role', 'button');
-      img.setAttribute('aria-label', 'Open preview' + (img.alt ? ': ' + img.alt : ''));
-      img.addEventListener('load', () => tall(img)); if (img.complete) tall(img);
-    });
+    const mark = () => {
+      $$('.k-shot img, .k-wrap img, img[data-zoom]').forEach(img => {
+        if (img.classList.contains('k-zoomable') || img.closest('a, [data-no-zoom], .k-lb')) return;
+        img.classList.add('k-zoomable'); img.tabIndex = 0; img.setAttribute('role', 'button');
+        img.setAttribute('aria-label', 'Open preview' + (img.alt ? ': ' + img.alt : ''));
+        img.addEventListener('load', () => tall(img)); if (img.complete) tall(img);
+      });
+      // An HTML mockup with data-zoom="Title" opens in the same panel: a live copy of the node, scaled like an image.
+      $$('[data-zoom]:not(img)').forEach(n => {
+        if (n.classList.contains('k-zoomable') || n.closest('.k-lb')) return;
+        n.classList.add('k-zoomable'); n.tabIndex = 0; n.setAttribute('role', 'button');
+        n.setAttribute('aria-label', 'Open preview' + (n.dataset.zoom ? ': ' + n.dataset.zoom : ''));
+      });
+    };
     mark(); new MutationObserver(mark).observe(d.body, { childList: true, subtree: true });
     cssIn.then(() => $$('img.k-zoomable').forEach(tall));
     /* A video in a .k-shot plays full screen with controls on a click, Enter or Space (the preview panel is for images). */
@@ -682,10 +690,10 @@
         try { navigator.clipboard.writeText(text).then(() => done('Copied'), manual); } catch { manual(); }
       });
     });
-    const vis = () => $$('img.k-zoomable').filter(n => n.getClientRects().length);
-    d.addEventListener('click', e => { const t = e.target.closest && e.target.closest('img.k-zoomable'); if (t) preview(t); });
+    const vis = () => $$('.k-zoomable').filter(n => n.getClientRects().length);
+    d.addEventListener('click', e => { const t = e.target.closest && e.target.closest('.k-zoomable'); if (t) preview(t); });
     d.addEventListener('keydown', e => {
-      if ((e.key === 'Enter' || e.key === ' ') && !e.metaKey && !e.ctrlKey && !e.altKey && e.target.matches && e.target.matches('img.k-zoomable')) { e.preventDefault(); preview(e.target); }
+      if ((e.key === 'Enter' || e.key === ' ') && !e.metaKey && !e.ctrlKey && !e.altKey && e.target.matches && e.target.matches('.k-zoomable')) { e.preventDefault(); preview(e.target); }
     });
 
     /* 3b. Preview panel: a modal <dialog> over a dimmed, blurred page. The image grows from its thumbnail (about 220 ms; a fade
@@ -709,7 +717,7 @@
       return { left: r.left + (r.width - nw * s) / 2, top: r.top + (r.height - nh * s) / 2, width: nw * s, height: nh * s, bottom: r.bottom, right: r.right };
     };
     function mkPreview() {
-      const dlg = el('dialog', 'k-lb'), im = el('img', 'k-lb-img'), x = el('button', 'k-lb-x', '×'), bar = el('div', 'k-lb-bar'), cap = el('output');
+      const dlg = el('dialog', 'k-lb'), im = el('img', 'k-lb-img'), box = el('div', 'k-lb-img k-lb-dom'), x = el('button', 'k-lb-x', '×'), bar = el('div', 'k-lb-bar'), cap = el('output');
       const btn = (t, label, fn) => { const b = el('button', '', t); b.type = 'button'; b.setAttribute('aria-label', label); b.onclick = fn; return b; };
       const prevB = btn('‹', 'Previous image', () => show(i - 1)), nextB = btn('›', 'Next image', () => show(i + 1));
       const zoomB = btn('100%', 'Switch between fit and 100%', () => zoomTo(near(fit) ? 1 : fit));
@@ -718,20 +726,20 @@
       dlg.setAttribute('aria-label', 'Image preview'); x.type = 'button'; x.setAttribute('aria-label', 'Close'); x.onclick = () => close();
       im.alt = ''; im.draggable = false;
       bar.append(prevB, cap, nextB, zoomB, dl); if (share) bar.append(share);
-      dlg.append(im, bar, x); d.body.append(dlg);
-      let list = [], i = 0, s = 1, fit = 1, tx = 0, ty = 0, moved = 0, wt = 0, pinch = null, grow = false, closing = false;
+      dlg.append(im, box, bar, x); d.body.append(dlg);
+      let list = [], cur = im, dw = 1, dh = 1, i = 0, s = 1, fit = 1, tx = 0, ty = 0, moved = 0, wt = 0, pinch = null, grow = false, closing = false;
       const motion = () => anim === 'play' && !reduce.matches;
       const onScreen = r => r.width && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
       // Jump the image (no transition) onto the thumbnail's visible rect.
-      const toThumb = () => { const r = shown(list[i]); if (!onScreen(r)) return false; s = r.width / nw(); tx = r.left; ty = r.top; im.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`; return true; };
-      const pts = new Map(), W = () => dlg.clientWidth, H = () => dlg.clientHeight, nw = () => im.naturalWidth || 1, nh = () => im.naturalHeight || 1;
+      const toThumb = () => { const r = shown(list[i]); if (!onScreen(r)) return false; s = r.width / nw(); tx = r.left; ty = r.top; cur.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`; return true; };
+      const pts = new Map(), W = () => dlg.clientWidth, H = () => dlg.clientHeight, nw = () => cur === im ? im.naturalWidth || 1 : dw, nh = () => cur === im ? im.naturalHeight || 1 : dh;
       const near = v => Math.abs(s - v) < .005, zoomed = () => nw() * s > W() + 1 || nh() * s > H() + 1;
       const quick = () => { dlg.classList.add('k-drag'); clearTimeout(wt); wt = setTimeout(() => !pts.size && dlg.classList.remove('k-drag'), 160); };
       const apply = () => {
         const w = nw() * s, h = nh() * s;
         tx = w <= W() ? (W() - w) / 2 : Math.min(0, Math.max(W() - w, tx));
         ty = h <= H() ? (H() - h) / 2 : Math.min(0, Math.max(H() - h, ty));
-        im.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
+        cur.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
         zoomB.textContent = Math.round(s * 100) + '%';
       };
       const zoomTo = (v, px = W() / 2, py = H() / 2) => {
@@ -743,7 +751,7 @@
         fit = Math.min(2, (W() - 2 * pad) / nw(), (H() - 150) / nh());
         if (grow) { // grow from the thumbnail: jump onto it with no transition, then animate to the fit
           grow = false; clearTimeout(wt); dlg.classList.add('k-drag');
-          const ok = toThumb(); void im.offsetWidth; dlg.classList.remove('k-drag');
+          const ok = toThumb(); void cur.offsetWidth; dlg.classList.remove('k-drag');
           if (ok) { s = fit; apply(); return; }
         }
         s = fit; quick(); apply();
@@ -752,12 +760,19 @@
       function show(k) {
         if (list[i]) list[i].style.visibility = '';
         i = (k + list.length) % list.length;
-        const n = list[i], url = n.currentSrc || n.src, fig = n.closest('figure'), t = fig && fig.querySelector('figcaption b');
+        const n = list[i], dom = n.tagName !== 'IMG', url = dom ? '' : n.currentSrc || n.src, fig = n.closest('figure'), t = fig && fig.querySelector('figcaption b');
+        const name = (t && t.textContent) || (dom ? n.dataset.zoom : n.alt);
+        if (dom) { // a live copy of the mockup at its own layout size (no page zoom), scaled like an image
+          const z = parseFloat(getComputedStyle(n).zoom) || 1, c = n.cloneNode(true);
+          c.classList.remove('k-zoomable'); c.removeAttribute('tabindex'); c.removeAttribute('role');
+          c.style.cssText += `;zoom:1;margin:0;width:${n.getBoundingClientRect().width / z}px`;
+          box.replaceChildren(c); box.hidden = false; im.hidden = true; cur = box; dw = c.offsetWidth || 1; dh = c.offsetHeight || 1;
+        } else { box.hidden = true; box.replaceChildren(); im.hidden = false; cur = im; }
         n.style.visibility = 'hidden'; // the thumbnail lifts out of the page into the panel
-        cap.textContent = `${i + 1} / ${list.length}` + ((t && t.textContent) || n.alt ? ' · ' + ((t && t.textContent) || n.alt) : '');
+        cap.textContent = `${i + 1} / ${list.length}` + (name ? ' · ' + name : '');
         prevB.hidden = nextB.hidden = list.length < 2;
-        dl.href = url; dl.setAttribute('download', url.split('/').pop().split('?')[0] || 'image');
-        if (im.src === url && im.complete) reset(); else im.src = url;
+        dl.hidden = dom; if (!dom) { dl.href = url; dl.setAttribute('download', url.split('/').pop().split('?')[0] || 'image'); }
+        if (dom) reset(); else if (im.src === url && im.complete) reset(); else im.src = url;
       }
       const step = k => { show(k); list[i].scrollIntoView({ block: 'nearest' }); }; // keep the thumbnail in view, so close shrinks back onto it
       prevB.onclick = () => step(i - 1); nextB.onclick = () => step(i + 1);
@@ -794,7 +809,7 @@
       const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) dlg.classList.remove('k-drag'); };
       dlg.addEventListener('pointerup', up); dlg.addEventListener('pointercancel', up);
       dlg.addEventListener('click', e => { if (e.target === dlg && moved < 6) close(); });
-      dlg.addEventListener('dblclick', e => { if (e.target === im) zoomTo(near(fit) ? (fit < 1 ? 1 : fit * 2) : fit, e.clientX, e.clientY); });
+      dlg.addEventListener('dblclick', e => { if (cur.contains(e.target)) zoomTo(near(fit) ? (fit < 1 ? 1 : fit * 2) : fit, e.clientX, e.clientY); });
       dlg.addEventListener('keydown', e => {
         e.stopPropagation(); // the page's arrow keys must not move parts behind the panel
         if (e.metaKey || e.ctrlKey || e.altKey) return;
