@@ -701,7 +701,9 @@
     });
 
     /* 3b. Preview panel: a modal <dialog> over a dimmed, blurred page. The image grows from its thumbnail (about 220 ms; a fade
-       or a cut when Animation is Off or the system asks for reduced motion) and shrinks back on close. Wheel or pinch zooms at
+       or a cut when Animation is Off or the system asks for reduced motion) and shrinks back on close. It opens at Fit (the
+       whole frame, never above real size; data-dpr="2" or an @2x name marks a 2x render), and one zoom holds for every image
+       of the page and is kept after a reload. Wheel or pinch zooms at
        the pointer, drag pans, double-click (or Z) toggles fit and 100%, keys + - 0 1, arrows pan when zoomed and go to the
        previous or next visible image of the same group when not. Esc, the close button or a click on the backdrop closes it, and focus
        returns to the thumbnail. While it is open, the kit's arrow keys and hover focus pause. */
@@ -732,14 +734,19 @@
       const dlg = el('dialog', 'k-lb'), im = el('img', 'k-lb-img'), box = el('div', 'k-lb-img k-lb-dom'), x = el('button', 'k-lb-x', '×'), bar = el('div', 'k-lb-bar'), cap = el('output');
       const btn = (t, label, fn) => { const b = el('button', '', t); b.type = 'button'; b.setAttribute('aria-label', label); b.onclick = fn; return b; };
       const prevB = btn('‹', 'Previous image', () => show(i - 1)), nextB = btn('›', 'Next image', () => show(i + 1));
-      const zoomB = btn('100%', 'Switch between fit and 100%', () => zoomTo(near(fit) ? 1 : fit));
+      const zoomB = btn('100%', 'Switch between fit and 100%', () => zoomTo(near(fit) ? real() : fit));
       const dl = el('a', '', 'Download'); dl.setAttribute('download', '');
       const share = navigator.share ? btn('Share', 'Share image', () => navigator.share({ title: cap.textContent, url: im.src }).catch(() => {})) : null;
       dlg.setAttribute('aria-label', 'Image preview'); x.type = 'button'; x.setAttribute('aria-label', 'Close'); x.onclick = () => close();
       im.alt = ''; im.draggable = false;
       bar.append(prevB, cap, nextB, zoomB, dl); if (share) bar.append(share);
       dlg.append(im, box, bar, x); d.body.append(dlg);
-      let list = [], cur = im, dw = 1, dh = 1, i = 0, s = 1, fit = 1, tx = 0, ty = 0, moved = 0, wt = 0, pinch = null, grow = false, closing = false;
+      let list = [], cur = im, dw = 1, dh = 1, i = 0, s = 1, fit = 1, tx = 0, ty = 0, moved = 0, wt = 0, pinch = null, grow = false, closing = false, dpr = 1;
+      // One zoom for the whole page, kept after a reload: 'fit', or a size where 1 = real size (1 image pt per CSS px).
+      const zoomKey = 'kit-zoom:' + location.pathname;
+      let zoom = 'fit'; try { const z = localStorage.getItem(zoomKey); if (z && z !== 'fit' && +z > 0) zoom = +z; } catch {}
+      // A 2x render (data-dpr="2" or an "@2x" file name) is at real size when 2 image pixels fill 1 CSS px.
+      const density = n => +n.dataset.dpr || (/@2x\./.test(n.currentSrc || n.src || '') ? 2 : 1), real = () => 1 / dpr;
       const motion = () => anim === 'play' && !reduce.matches;
       const onScreen = r => r.width && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
       // Jump the image (no transition) onto the thumbnail's visible rect.
@@ -752,21 +759,24 @@
         tx = w <= W() ? (W() - w) / 2 : Math.min(0, Math.max(W() - w, tx));
         ty = h <= H() ? (H() - h) / 2 : Math.min(0, Math.max(H() - h, ty));
         cur.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
-        zoomB.textContent = Math.round(s * 100) + '%';
+        zoomB.textContent = near(fit) ? 'Fit' : Math.round(s * dpr * 100) + '%';
       };
       const zoomTo = (v, px = W() / 2, py = H() / 2) => {
-        v = Math.min(Math.max(v, Math.min(fit, 1)), Math.max(fit, 1) * 6);
-        tx = px - (px - tx) * v / s; ty = py - (py - ty) * v / s; s = v; apply();
+        v = Math.min(Math.max(v, Math.min(fit, real())), Math.max(fit, real()) * 6);
+        tx = px - (px - tx) * v / s; ty = py - (py - ty) * v / s; s = v;
+        zoom = Math.abs(v - fit) < .005 ? 'fit' : v * dpr; try { localStorage.setItem(zoomKey, String(zoom)); } catch {}
+        apply();
       };
       const reset = () => {
         const pad = W() < 600 ? 12 : 40;
-        fit = Math.min(2, (W() - 2 * pad) / nw(), (H() - 150) / nh());
-        if (grow) { // grow from the thumbnail: jump onto it with no transition, then animate to the fit
+        fit = Math.min(real(), (W() - 2 * pad) / nw(), (H() - 150) / nh()); // the whole frame, never above real size
+        const want = zoom === 'fit' ? fit : zoom / dpr;
+        if (grow) { // grow from the thumbnail: jump onto it with no transition, then animate to the page zoom
           grow = false; clearTimeout(wt); dlg.classList.add('k-drag');
           const ok = toThumb(); void cur.offsetWidth; dlg.classList.remove('k-drag');
-          if (ok) { s = fit; apply(); return; }
+          if (ok) { s = want; tx = (W() - nw() * s) / 2; ty = (H() - nh() * s) / 2; apply(); return; }
         }
-        s = fit; quick(); apply();
+        s = want; tx = (W() - nw() * s) / 2; ty = (H() - nh() * s) / 2; quick(); apply();
       };
       im.onload = reset;
       function show(k) {
@@ -774,6 +784,7 @@
         i = (k + list.length) % list.length;
         const n = list[i], dom = n.tagName !== 'IMG', url = dom ? '' : n.currentSrc || n.src, fig = n.closest('figure'), t = fig && fig.querySelector('figcaption b');
         const name = (t && t.textContent) || (dom ? n.dataset.zoom : n.alt);
+        dpr = dom ? 1 : density(n);
         if (dom) { // a live copy of the mockup at its own layout size (no page zoom), scaled like an image
           const z = parseFloat(getComputedStyle(n).zoom) || 1, c = n.cloneNode(true);
           c.classList.remove('k-zoomable'); c.removeAttribute('tabindex'); c.removeAttribute('role');
@@ -821,7 +832,7 @@
       const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) dlg.classList.remove('k-drag'); };
       dlg.addEventListener('pointerup', up); dlg.addEventListener('pointercancel', up);
       dlg.addEventListener('click', e => { if (e.target === dlg && moved < 6) close(); });
-      dlg.addEventListener('dblclick', e => { if (cur.contains(e.target)) zoomTo(near(fit) ? (fit < 1 ? 1 : fit * 2) : fit, e.clientX, e.clientY); });
+      dlg.addEventListener('dblclick', e => { if (cur.contains(e.target)) zoomTo(near(fit) ? (fit < real() ? real() : fit * 2) : fit, e.clientX, e.clientY); });
       dlg.addEventListener('keydown', e => {
         e.stopPropagation(); // the page's arrow keys must not move parts behind the panel
         if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -829,8 +840,8 @@
         if (k === '+' || k === '=') zoomTo(s * 1.25);
         else if (k === '-' || k === '_') zoomTo(s / 1.25);
         else if (k === '0') zoomTo(fit);
-        else if (k === '1') zoomTo(1);
-        else if (k === 'z' || k === 'Z') zoomTo(near(fit) ? 1 : fit);
+        else if (k === '1') zoomTo(real());
+        else if (k === 'z' || k === 'Z') zoomTo(near(fit) ? real() : fit);
         else if (pan && zoomed()) { tx += pan[0]; ty += pan[1]; apply(); }
         else if (k === 'ArrowLeft' || k === 'ArrowRight') step(i + (k === 'ArrowLeft' ? -1 : 1));
         else return;

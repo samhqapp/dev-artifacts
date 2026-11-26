@@ -84,6 +84,8 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
   always dark. Take shots and run checks in Dark only (`--scheme dark`).
 - No browser focus rings. A custom focus look uses a fill or ring, never the default outline.
 - Borders show on all four sides, at an even width, in every state.
+- Image preview (kit): it opens at Fit and never above real size; mark 2x renders `data-dpr="2"` (or an `@2x` name).
+  One zoom holds for the whole page and stays after a reload. Arrows stay inside the image's own group.
 - Use the site's own colors, fonts, and tokens, so the option looks like it belongs.
 - Never ship the overlay, the variants files, or a look the user has not picked.
 

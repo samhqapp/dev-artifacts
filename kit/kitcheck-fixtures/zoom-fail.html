@@ -1,0 +1,19 @@
+<!doctype html><meta charset="utf-8"><title>Kit > fixture zoom fail</title>
+<!-- Fails check 12: a page-made preview blows a small 2x render up to 200% and resets the zoom on Next. -->
+<link rel="stylesheet" href="kit.css">
+<body style="padding:24px;font:17px system-ui">
+<section class="k-part"><p>Renders</p>
+<img class="k-zoomable" alt="Small A" data-dpr="2" width="160" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect width='400' height='200' fill='%23888'/%3E%3C/svg%3E">
+<img class="k-zoomable" alt="Small B" data-dpr="2" width="160" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect width='400' height='200' fill='%23666'/%3E%3C/svg%3E">
+</section>
+<dialog style="padding:0;border:0"><img alt="" style="display:block"><button type="button" aria-label="Switch between fit and 100%">200%</button><button type="button" aria-label="Next image">Next</button></dialog>
+<script>
+const all = [...document.querySelectorAll('.k-zoomable')], dlg = document.querySelector('dialog'), im = dlg.querySelector('img'), zb = dlg.querySelector('button');
+let at = 0, z = 2;
+const show = i => { all[at].style.visibility = ''; at = (i + all.length) % all.length; all[at].style.visibility = 'hidden'; z = 2; im.src = all[at].src; im.style.width = 400 * z / 2 * 2 + 'px'; zb.textContent = z * 100 + '%'; };
+all.forEach((n, i) => n.addEventListener('click', () => { dlg.showModal(); show(i); }));
+dlg.querySelector('[aria-label="Next image"]').onclick = () => show(at + 1);
+dlg.addEventListener('keydown', e => { if (e.key === '+') { z *= 1.25; zb.textContent = Math.round(z * 100) + '%'; } });
+dlg.addEventListener('close', () => { all[at].style.visibility = ''; });
+</script>
+</body>

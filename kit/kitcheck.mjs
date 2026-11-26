@@ -4,7 +4,8 @@
 // sideways overflow, and clipped text. Saves one full-page screenshot per mode. Also fails on:
 // 7 a focus ring (outline) on keyboard focus, 8 an image cut by object-fit cover/none or a clipping parent,
 // 9 a border on only 2 or 3 sides or with uneven widths, 10 the last content ending less than 12 px above the dock,
-// 11 the image preview's Right arrow jumping from the last image of a group into the next group.
+// 11 the image preview's Right arrow jumping from the last image of a group into the next group,
+// 12 the preview opening above Fit or real size, or losing its zoom on the next image.
 // Fixtures: kitcheck-fixtures/<check>-fail.html exits 1, <check>-pass.html exits 0.
 // Usage: node kitcheck.mjs <page.html> [--out <dir>]   Exit: 0 clean, 1 offenders, 2 could not run.
 // No npm packages: it drives Playwright's headless shell (or Chrome) over the DevTools protocol with Node's own WebSocket.
@@ -246,6 +247,30 @@ try {
         const left = await run(lbWhere);
         if (left) found.set(`lightbox: Right arrow on the last image of a group jumped to "${left}" in the next group`, ['1440 light']);
         for (const type of ['keyDown', 'keyUp']) await cmd('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+        await sleep(300);
+      }
+      // 12. The preview opens at Fit, never above real size (a data-dpr="2" or @2x image is real size at half its pixels),
+      // and one zoom holds for the next image: open a group's first image, zoom in twice, press Next, the zoom is the same.
+      const zOpen = () => { const s = [...document.querySelectorAll('.k-group, .k-shots, .k-part')].find(g => [...g.querySelectorAll('.k-zoomable')].filter(n => n.getClientRects().length).length > 1);
+        if (!s) return false; s.querySelector('.k-zoomable').click(); return true; };
+      const zRead = () => { const d = document.querySelector('dialog[open]'), b = d && d.querySelector('button[aria-label^="Switch between fit"]'), im = d && [...d.querySelectorAll('img')].find(n => !n.hidden);
+        if (!b || !im) return null; const src = [...document.querySelectorAll('.k-zoomable')].find(n => n.style.visibility === 'hidden') || im;
+        const dpr = +src.dataset.dpr || (/@2x\./.test(src.currentSrc || src.src || '') ? 2 : 1);
+        return { label: b.textContent.trim(), over: Math.round(im.getBoundingClientRect().width - im.naturalWidth / dpr) }; };
+      if (await run(zOpen)) {
+        await sleep(400);
+        const a = await run(zRead);
+        if (!a) found.set('preview zoom: no open preview with a zoom button after a click on an image', ['1440 light']);
+        else {
+          if (a.label !== 'Fit' || a.over > 1) found.set(`preview zoom: opens at ${a.label}, ${a.over > 1 ? a.over + ' px above real size' : 'not Fit'}; it must open at Fit, never above real size`, ['1440 light']);
+          for (const k of ['+', '+']) { for (const type of ['keyDown', 'keyUp']) await cmd('Input.dispatchKeyEvent', { type, key: k, text: type === 'keyDown' ? k : undefined }); await sleep(150); }
+          const b = await run(zRead);
+          await run(() => document.querySelector('dialog[open] button[aria-label="Next image"]').click()); await sleep(400);
+          const c = await run(zRead);
+          if (b && c && b.label !== c.label) found.set(`preview zoom: ${b.label} became ${c.label} on the next image; one zoom must hold for the whole page`, ['1440 light']);
+        }
+        for (const type of ['keyDown', 'keyUp']) await cmd('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+        await run(() => { Object.keys(localStorage).filter(k => k.startsWith('kit-zoom:')).forEach(k => localStorage.removeItem(k)); });
         await sleep(300);
       }
     }
