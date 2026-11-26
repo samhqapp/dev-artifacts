@@ -2,7 +2,7 @@
 //   node serve.mjs examples/demo --variants templates/presets.js --css templates/presets.css
 // The dock picks the kind from the options; set `kind` only to force one.
 
-// 2-3 short options: one segmented row in the dock (kind 'flat'). Hover previews, click picks.
+// 2-3 short options: one segmented row in the dock (kind 'flat'). A click picks; hover never previews.
 DevPanel.group({
   id: 'title', label: 'Title weight', target: '.d-hero h1',
   options: [{ name: 'Light', note: 'Thin 300 weight, bigger' }, { name: 'Heavy', note: '800 weight, tighter' }],

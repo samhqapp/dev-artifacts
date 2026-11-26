@@ -306,7 +306,7 @@
           const max = Math.max(room[side], 160);
           if (h > max) { pop.style.maxHeight = max + 'px'; h = max; }
           top = Math.min(Math.max(side === 'below' ? b.bottom + G : b.top - G - h, M), vh - h - M);
-          left = Math.min(Math.max(b.left, M), vw - w - M);
+          left = Math.min(Math.max(shown.pos === 'tl' ? b.left : b.right - w, M), vw - w - M); // under or over its dot's corner
         }
       }
       Object.assign(pop.style, { left: Math.max(left, M) + 'px', top: Math.max(top, M) + 'px' });

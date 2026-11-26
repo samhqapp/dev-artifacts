@@ -97,14 +97,16 @@ For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` cov
 - More than 7 items (owner, 2026-11-25): a dock, pager, or option stepper with more than 7 groups, parts, or options
   shows only the arrows with the number in the middle, "‹ 3 / 158 ›", and no dots. Built into dots.js, kit.js and kit.css.
 - The dock spans the window (16 px gutters). Row 1 is fixed: back / count / next, the overall comment,
-  Open/Archived, Focus, the eye, Clear, "…", Copy choices. Nothing in row 1 ever moves (each changing text keeps its
+  Open/Archived, Badges, Focus (two small switches), the eye, Clear, "…", Copy choices. Nothing in row 1 ever moves (each changing text keeps its
   widest width). The current group's name is bolder and white, and the other groups dim to 60%. Below it every group of the
   page sits at once, "Name  opt opt opt …", wrapping; past 40% of the window the rows scroll. On a phone row 1 keeps
   back, next, "…" and Copy choices; the rest is in "…". "…" in a row, or the group's name, opens the popover with
   the full list (a list, a list with a filter at 8+, or a picture grid when options have `img`). Options never
-  show twice, and nothing carries a number.
-- No markers or dots on the page: the red guide lines point at a group when you hover its dock row or step to it.
-  There are no comment-only groups; a group with `options: []` is skipped. Comments go in the overall comment.
+  show twice.
+- A blue numbered dot sits on each group's section corner (an overlay, no layout change). A click opens a small dropdown
+  with that group's options beside the section, not over it. The dock's Badges switch hides the dots. The red guide
+  lines point at a group when you hover its dock row or step to it. A group with `options: []` is skipped.
+- Options apply on a click or an arrow key only, never on hover (hover previews lag heavy pages).
 - Back and next (`[` `]`) only move the focus: they mark the group's row, scroll the page to it and flash its lines.
   Arrow keys change the pick at once, in a dock row and in the popover; Enter closes the popover, Escape keeps the pick.
 - The popover grows to 70% of the window, then scrolls with a thin overlay knob; the pick scrolls into view.

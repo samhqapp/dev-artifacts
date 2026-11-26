@@ -10,7 +10,7 @@ Show design options live on your local site. Click a dot, try each look, copy yo
   |  +----------------------------+                             |
   |                                                             |
   |                                                             |
-  | ( - < 1/3 ●●● > [(1) Email  Current|Soft|Pill] [c] [Open 3|Archived 0] [Focus On|Off] [eye] Clear [Copy choices] )
+  | ( - < 1/3 ●●● > [(1) Email  Current|Soft|Pill] [c] [Open 3|Archived 0] [Badges ◯] [Focus ◯] [eye] Clear [Copy choices] )
   +-------------------------------------------------------------+
                                dock
 ```
@@ -49,15 +49,18 @@ To see every kind of group on a demo page: `node serve.mjs examples/demo --varia
 
 ## How it works
 
-- The page gets no markers. Hover a group's row in the dock, or step to it, and thin red guide lines point at its
-  section. There are no dots and no comment-only groups: a group with `options: []` is skipped, and comments go in
-  the overall comment.
+- Each group gets a blue numbered dot on its section's corner, drawn on an overlay layer, so the page layout never
+  changes. A click on the dot opens a small dropdown with that group's options beside the section (right, left, below
+  or above, never over it when there is room). The **Badges** switch in the dock shows or hides the dots. Hover a
+  group's row in the dock, or step to it, and thin red guide lines point at its section. There are no comment-only
+  groups: a group with `options: []` is skipped, and comments go in the overall comment.
+- Options apply on a click or an arrow key only, never on hover (hover previews made heavy pages lag).
 - The dots and dock are `dots.js`, shared with the artifact kit in `kit/` (its recipe: `kit/README.md`). Edit it
   there and run `node dots-sync.mjs kit/kit.js devpanel.js`.
 - The dock, popovers, comment fields and hints use the artifact kit's own classes and tokens (`k-dock`, `k-seg`,
   `k-comment`, `k-hint`), copied in by `dots-sync.mjs` from `kit/kit.css`.
 - The **dock** spans the window with 16 px gutters. Row 1 is fixed: back / count / next, an **overall
-  comment** on the whole page, Open / Archived, Focus, the eye, Clear, "…" and Copy choices at the right. Nothing in
+  comment** on the whole page, Open / Archived, Badges, Focus, the eye, Clear, "…" and Copy choices at the right. Nothing in
   row 1 ever moves: every changing text (the count, Open / Archived, Clear, Copy choices) keeps the width of its widest
   value, so you can click › again and again in one place. The current group's name is bolder and white; the other
   groups dim to 60%. dev-artifacts is dark only: the dock, the demo and the options pages are always dark, whatever
@@ -65,7 +68,7 @@ To see every kind of group on a demo page: `node serve.mjs examples/demo --varia
   sits every group of the page at once: its name and its first 3 options as a segmented control (hover one for its
   note). With more options, a 4th item "…" (it shows the pick when the pick is further down) opens the popover with
   the full list; a click on the group's name opens it too. The groups wrap onto more rows; past 40% of the window
-  they scroll. Options never show twice, and nothing has a number.
+  they scroll. Options never show twice.
   The popover depends on the kind, picked from the options (set `kind` to force one; `templates/presets.js` has one of each):
 
   | Kind | When | Popover |
@@ -89,9 +92,9 @@ To see every kind of group on a demo page: `node serve.mjs examples/demo --varia
   (260 ms, a plain fade with reduced motion). A click on it morphs it back. The state is kept after a reload. An empty block the height of the dock is added after the page, so the footer
   always scrolls above it.
 - The dock is the artifact kit's dock: the pager (one dot per group, click to go there), the overall comment,
-  **Open / Archived** (the **Final** switch at the end of each popover moves a group to Archived), **Focus On / Off**
-  (dims the rest of the page, paint only, kept after a reload), **Clear**
-  (two clicks, then Undo for 5 seconds) and **Copy choices** (open groups only). On a phone, Open / Archived, Focus,
+  **Open / Archived** (the **Final** switch at the end of each popover moves a group to Archived), the **Badges** and
+  **Focus** switches (Badges shows the numbered dots; Focus dims the rest of the page, paint only; both kept after a reload), **Clear**
+  (two clicks, then Undo for 5 seconds) and **Copy choices** (open groups only). On a phone, Open / Archived, Badges, Focus,
   Clear sit in the `…` menu, and the overall comment takes its own line.
 - The count covers only groups you can use on this page now. With no groups, only the eye button shows. Stored
   picks of a group the variants file no longer has move to Archived. `examples/selfcheck.mjs` checks this.
