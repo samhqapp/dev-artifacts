@@ -626,10 +626,16 @@ svg { display: block; flex: none; }
 .od-step .k-dots[hidden] { display: none; }
 /* ".od-ctl button { all: unset }" would undo the kit's dot buttons */
 .od-step .k-dots button { width: 14px; height: 14px; padding: 0; display: grid; place-items: center; cursor: pointer; border-radius: 50%; }
-/* no hover pills: hover changes only the text color, like the kit's dock */
+/* hover: the text stays white and a soft light fill sits behind it (blue text on the dark glass was unreadable) */
 .od-dock .od-ctl button:hover, .od-dock .od-ctl .od-step button:hover, .od-dock .od-ctl .od-eye[aria-checked="true"] { background: none; }
-.od-dock .k-seg button:not([aria-pressed="true"]):not(.dv-sel):not(.dv-lab):hover, .od-dock .dv-ib:hover, .od-dock .od-nav:hover:not(:disabled),
-  .od-dock .dv-clear:hover, .od-dock .od-count:hover { color: var(--od-blue); }
+.od-dock .k-seg button:not([aria-pressed="true"]):not(.dv-sel):not(.dv-lab):hover, .od-dock .dv-ib:hover, .od-dock .od-ctl .od-nav:hover:not(:disabled),
+  .od-dock .dv-clear:hover, .od-dock .od-ctl .od-count:hover { color: var(--od-ink); background: rgba(255,255,255,.1); }
+/* the dock: near-solid dark glass, so it reads the same over a light page as over a dark one, with a whole hairline */
+.od-dock.k-dock { background: var(--od-dock); border: .5px solid rgba(255,255,255,.14); }
+/* options in a group row: room around each, and a faint hairline between neighbors (a shadow, so overflow never clips it) */
+.od-dock .dv-g > .dv-o { padding-inline: 12px; }
+.od-dock .dv-g > .dv-o + .dv-o { margin-left: 7px; }
+.od-dock .dv-g > .dv-o + .dv-o:not([aria-pressed="true"]) { background: linear-gradient(rgba(255,255,255,.2), rgba(255,255,255,.2)) left center / 1px 14px no-repeat; }
 .od-dock .k-dots button:hover::after { opacity: .8; }
 .dv-xs { display: grid; gap: 10px; justify-items: start; }
 .dv-xs .k-seg button, .dv-xs .k-clear { font: 600 14px/1 var(--od-font); color: var(--ink); border-radius: 999px; padding: 8px 14px; }
@@ -665,7 +671,7 @@ svg { display: block; flex: none; }
   background: var(--od-dock); color: var(--od-ink); border: .5px solid var(--od-line); box-shadow: var(--od-shadow), inset 0 1px 0 var(--od-hi);
   backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8); }
 .dv-handle svg { width: 20px; height: 20px; }
-.dv-handle:hover { color: var(--od-blue); }
+.dv-handle:hover { background: rgba(48,48,52,.96); }
 .dv-eye svg { width: 18px; height: 18px; }
 
 /* popover content: plain rows like a macOS menu, a filter for long lists, a thumbnail grid for images */
@@ -675,6 +681,9 @@ svg { display: block; flex: none; }
   padding: 8px 12px 8px 10px; border-radius: 10px; position: relative; overflow: hidden; transition: background-color 120ms ease; }
 .dv-row:hover, .dv-row.on { background: var(--dv-hov); }
 .dv-row[aria-selected="true"] { background: var(--dv-sel); }
+/* a hairline between dropdown items; it hides next to a filled row */
+.dv-row + .dv-row::before { content: ""; position: absolute; left: 36px; right: 10px; top: 0; height: .5px; background: var(--sep); }
+.dv-row:is(:hover, .on, [aria-selected="true"])::before, .dv-row:is(:hover, .on, [aria-selected="true"]) + .dv-row::before { opacity: 0; }
 .dv-row .ck { height: 20px; display: grid; place-items: center; color: var(--od-ink); visibility: hidden; }
 .dv-row .ck svg { width: 12px; height: 12px; }
 .dv-row[aria-selected="true"] .ck { visibility: visible; }
@@ -706,7 +715,7 @@ svg { display: block; flex: none; }
 
 /* The popover: a deep, dark glass like a macOS Control Center menu. It grows out of its group in 220 ms (scale .96 and a
    fade) and shrinks back in 150 ms. A hairline highlight on the top edge, a layered soft shadow. */
-:host([data-od-dark]) { --od-pop: rgba(24,24,27,.82); --dv-ease: cubic-bezier(.2,.8,.2,1); --dv-sel: rgba(255,255,255,.1); --dv-hov: rgba(255,255,255,.055); }
+:host([data-od-dark]) { --od-pop: rgba(28,28,30,.95); --od-dock: rgba(28,28,30,.92); --dv-ease: cubic-bezier(.2,.8,.2,1); --dv-sel: rgba(255,255,255,.1); --dv-hov: rgba(255,255,255,.055); }
 .od-pop { border-radius: 18px; border: .5px solid rgba(255,255,255,.1);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 .5px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.2), 0 14px 32px rgba(0,0,0,.32), 0 32px 80px rgba(0,0,0,.4);
   backdrop-filter: blur(44px) saturate(1.9); -webkit-backdrop-filter: blur(44px) saturate(1.9);
