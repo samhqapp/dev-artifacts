@@ -35,6 +35,7 @@ Before every publish, run `node <dev-artifacts>/kit/kitcheck.mjs <page.html>` an
 - Image cut: an image cut by `object-fit: cover`/`none` or by a clipping parent (`.k-cover`, `.k-av` and `.k-tall` crop on purpose).
 - Half border: a border on only 2 or 3 sides, or with uneven widths (a one-side divider is fine).
 - Dock covers: at the page bottom, the last content ends less than 12 px above the dock (`.k-dock`, `.od-dock`, `.dock`).
+- Missing file: any file the page asks for answers 404, or a `data-kit` page has no dock (kit.js never ran). A local options page is markup only: kitcheck injects the kit, dark theme and title as `serve.mjs` does, so never add `<script src="kit.js">` or `<title>` to it. A published page whose kit comes from the files map runs with `--cloud`.
 
 Each new check has a failing and a passing page in `kitcheck-fixtures/`. It serves the page's own folder; kit files missing there come from this folder. Fix an offender in the kit, not with page CSS, unless the page's own markup causes it. Screenshots: on a first publish or a layout change, look at the desktop Light and phone Dark shots; on a text-only update with exit 0, skip them; on a failure, look at each failing shot.
 

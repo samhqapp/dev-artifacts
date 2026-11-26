@@ -7,7 +7,8 @@
 // 11 the image preview's Right arrow jumping from the last image of a group into the next group,
 // 12 the preview opening above Fit or real size, or losing its zoom on the next image.
 // Fixtures: kitcheck-fixtures/<check>-fail.html exits 1, <check>-pass.html exits 0.
-// Usage: node kitcheck.mjs <page.html> [--out <dir>]   Exit: 0 clean, 1 offenders, 2 could not run.
+// 13 a file that answers 404, or a data-kit page with no dock (kit.js never ran).
+// Usage: node kitcheck.mjs <page.html> [--out <dir>] [--cloud]   Exit: 0 clean, 1 offenders, 2 could not run.
 // No npm packages: it drives Playwright's headless shell (or Chrome) over the DevTools protocol with Node's own WebSocket.
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path'; import os from 'node:os'; import { spawn } from 'node:child_process';
 
@@ -15,10 +16,16 @@ const KIT = path.dirname(new URL(import.meta.url).pathname);
 const argv = process.argv.slice(2), outAt = argv.indexOf('--out');
 const pagePath = path.resolve(argv.find((a, i) => !a.startsWith('--') && (outAt < 0 || i !== outAt + 1)) || '');
 if (!pagePath.endsWith('.html') || !fs.existsSync(pagePath)) { console.error('usage: node kitcheck.mjs <page.html> [--out <dir>]'); process.exit(2); }
+// A local options page is kit markup only (`<main data-kit>`, no kit.js script): serve.mjs injects the kit, dark theme and
+// title, so kitcheck serves it the same way. --cloud: a published page whose kit.js comes from the Artifact files map.
+const cloud = argv.includes('--cloud');
+const pageHtml = fs.readFileSync(pagePath, 'utf8');
+const markupOnly = /<main[^>]*\bdata-kit\b/.test(pageHtml) && !/<script[^>]*\bkit\.js\b/.test(pageHtml);
+const want = (await import('../title.mjs')).tabTitle();
+const pageTitle = (pageHtml.match(/<title>([^<]*)<\/title>/i) || [])[1]?.trim() || '';
 // Title rule: exactly the tab title from ../title.mjs, so the reader knows which chat to paste choices into. Kit pages are "Kit > ...".
-{
-  const title = (fs.readFileSync(pagePath, 'utf8').match(/<title>([^<]*)<\/title>/i) || [])[1]?.trim() || '';
-  const want = (await import('../title.mjs')).tabTitle();
+if (!markupOnly) {
+  const title = pageTitle;
   if (!title.startsWith('Kit > ') && title !== want) {
     console.error(`kitcheck: <title> is "${title}"; it must be exactly "${want}"`); process.exit(1);
   }
@@ -28,13 +35,22 @@ fs.mkdirSync(out, { recursive: true });
 
 // Serve the page folder. kit.css and kit.js come from beside the page, or from this kit when the page folder has none.
 const root = path.dirname(pagePath);
+// Kit files come from this folder only where the real host supplies them: serve.mjs for markup-only pages, the files map
+// for --cloud pages, the kit folder for "Kit > " pages. Anywhere else a missing kit.js is a 404, as serve.mjs answers it.
+const kitFallback = markupOnly || cloud || pageTitle.startsWith('Kit > ');
+const missing = new Set();
+const injected = () => {
+  const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${want.replace(/[<&]/g, c => c === '<' ? '&lt;' : '&amp;')}</title>\n<script src="kit.js"></script>`;
+  return `<!doctype html>\n<html lang="en" data-theme="dark">\n<head>${head}</head>\n<body>\n` + pageHtml.replace(/<title>[\s\S]*?<\/title>/i, '') + '\n</body></html>';
+};
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml' };
 const srv = http.createServer((q, s) => {
   const rel = decodeURIComponent(new URL(q.url, 'http://x').pathname).slice(1);
   let f = path.join(root, rel);
   if (!f.startsWith(root + path.sep)) { s.writeHead(403); return s.end(); }
-  if (!fs.existsSync(f) && /^kit\.(css|js)$/.test(rel)) f = path.join(KIT, rel);
-  fs.readFile(f, (e, b) => { if (e) { s.writeHead(404); return s.end(); } s.writeHead(200, { 'content-type': types[path.extname(f)] || 'application/octet-stream' }); s.end(b); });
+  if (markupOnly && f === pagePath) { s.writeHead(200, { 'content-type': types['.html'] }); return s.end(injected()); }
+  if (kitFallback && !fs.existsSync(f) && /^kit\.(css|js)$/.test(rel)) f = path.join(KIT, rel);
+  fs.readFile(f, (e, b) => { if (e) { if (rel !== 'favicon.ico') missing.add('/' + rel); s.writeHead(404); return s.end(); } s.writeHead(200, { 'content-type': types[path.extname(f)] || 'application/octet-stream' }); s.end(b); });
 });
 await new Promise(r => srv.listen(0, '127.0.0.1', r));
 const url = `http://127.0.0.1:${srv.address().port}/${encodeURIComponent(path.basename(pagePath))}`;
@@ -278,7 +294,13 @@ try {
     for (const type of ['keyDown', 'keyUp']) await cmd('Input.dispatchKeyEvent', { type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
     for (const b of await run(focusCheck)) found.set(b, [...(found.get(b) || []), mode]);
   }
+  // 13. Every file loads, and a kit page gets its dock (no dock means kit.js never ran: the page shows unstyled).
+  if (/<main[^>]*\bdata-kit\b/.test(pageHtml) && !(await run(() => !!document.querySelector('.k-dock'))))
+    found.set('kit: no dock on the page, so kit.js did not run and the page shows unstyled', ['all']);
 } catch (e) { console.error('kitcheck: ' + e.message); done(2); }
+for (const f of missing) found.set(/(^|\/)kit\.(js|css)$/.test(f)
+  ? `missing file: ${f} answers 404. On a local options page delete the <script src="kit.js"> and <title> lines (serve.mjs injects the kit and title); on a published page run kitcheck with --cloud`
+  : `missing file: ${f} answers 404. Put the file beside the page or fix its path`, ['all']);
 for (const [b, modes] of found) console.log(`FAIL ${b}  [${[...new Set(modes)].join(', ')}]`);
 console.log(`screenshots: ${out}`);
 console.log(found.size ? `kitcheck: ${found.size} offenders in ${path.basename(pagePath)}` : `kitcheck: clean (${path.basename(pagePath)}, 1440 and 390, light and dark)`);
