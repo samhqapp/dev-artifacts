@@ -658,6 +658,8 @@
         img.classList.add('k-zoomable'); img.tabIndex = 0; img.setAttribute('role', 'button');
         img.setAttribute('aria-label', 'Open preview' + (img.alt ? ': ' + img.alt : ''));
         img.addEventListener('load', () => tall(img)); if (img.complete) tall(img);
+        // No jumps: the box is already reserved by CSS; the image fades in once it has loaded.
+        if (!img.complete) { img.classList.add('k-wait'); const done = () => img.classList.remove('k-wait'); img.addEventListener('load', done, { once: true }); img.addEventListener('error', done, { once: true }); }
       });
       // An HTML mockup with data-zoom="Title" opens in the same panel: a live copy of the node, scaled like an image.
       $$('[data-zoom]:not(img)').forEach(n => {
@@ -707,7 +709,13 @@
     function preview(img) {
       if (!lb) lb = mkPreview();
       if (root.classList.contains('k-lb-open')) return;
-      const list = vis(), k = list.indexOf(img);
+      // Next and previous stay in the same slot: the same data-variant, or the same position inside each option (Dark stays Dark).
+      const slot = n => {
+        if (n.dataset.variant) return 'v:' + n.dataset.variant;
+        const o = n.closest('.k-option'); if (!o) return '';
+        const l = [...o.querySelectorAll('.k-zoomable')]; return l.length > 1 ? 'i:' + l.indexOf(n) : '';
+      };
+      const s = slot(img), list = s ? vis().filter(n => slot(n) === s) : vis(), k = list.indexOf(img);
       lb.open(k < 0 ? [img] : list, Math.max(0, k));
     }
     api.lightbox = i => { const l = vis(); if (l[i || 0]) preview(l[i || 0]); };

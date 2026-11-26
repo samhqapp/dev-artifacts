@@ -60,6 +60,11 @@
 html { -webkit-text-size-adjust: 100%; scroll-behavior: auto; }
 body { margin: 0; background: var(--page); color: var(--ink); font: var(--fs-body)/1.45 var(--font); -webkit-font-smoothing: antialiased; }
 img { max-width: 100%; height: auto; } /* keep the aspect when max-width shrinks an img with width and height attributes */
+/* No jumps on load: an option image holds its box before it loads (from width and height, else --ratio), then fades in. */
+.k-option > img { display: block; width: 100%; object-fit: contain; }
+.k-option > img:not([width]) { aspect-ratio: var(--ratio, 16 / 10); }
+img.k-wait { opacity: 0; }
+img.k-zoomable { transition: opacity .18s ease-out; }
 a { color: var(--blue-ink); text-decoration: none; }
 a:hover { text-decoration: underline; }
 a:focus-visible, button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
