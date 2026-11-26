@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8"><title>Kit > fixture lightbox fail</title>
+<!-- Fails check 11: a page-made preview walks every image on the page, so Right on "First B" jumps to "Second A". -->
+<link rel="stylesheet" href="kit.css">
+<body style="padding:24px;font:17px system-ui">
+<section class="k-part"><p>First</p>
+<img class="k-zoomable" alt="First A" width="160" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect width='400' height='200' fill='%23888'/%3E%3C/svg%3E">
+<img class="k-zoomable" alt="First B" width="160" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect width='400' height='200' fill='%23666'/%3E%3C/svg%3E">
+</section>
+<section class="k-part"><p>Second</p>
+<img class="k-zoomable" alt="Second A" width="160" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect width='400' height='200' fill='%23444'/%3E%3C/svg%3E">
+</section>
+<script>
+const all = [...document.querySelectorAll('.k-zoomable')]; let at = -1;
+const show = i => { if (at >= 0) all[at].style.visibility = ''; at = (i + all.length) % all.length; all[at].style.visibility = 'hidden'; };
+all.forEach((n, i) => n.addEventListener('click', () => show(i)));
+addEventListener('keydown', e => { if (at < 0) return; if (e.key === 'ArrowRight') show(at + 1); if (e.key === 'Escape') { all[at].style.visibility = ''; at = -1; } });
+</script>
+</body>

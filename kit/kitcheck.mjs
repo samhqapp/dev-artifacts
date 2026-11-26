@@ -3,7 +3,8 @@
 // a card closer than 12 px to content above or below it, card content closer than 14 px to the card edge,
 // sideways overflow, and clipped text. Saves one full-page screenshot per mode. Also fails on:
 // 7 a focus ring (outline) on keyboard focus, 8 an image cut by object-fit cover/none or a clipping parent,
-// 9 a border on only 2 or 3 sides or with uneven widths, 10 the last content ending less than 12 px above the dock.
+// 9 a border on only 2 or 3 sides or with uneven widths, 10 the last content ending less than 12 px above the dock,
+// 11 the image preview's Right arrow jumping from the last image of a group into the next group.
 // Fixtures: kitcheck-fixtures/<check>-fail.html exits 1, <check>-pass.html exits 0.
 // Usage: node kitcheck.mjs <page.html> [--out <dir>]   Exit: 0 clean, 1 offenders, 2 could not run.
 // No npm packages: it drives Playwright's headless shell (or Chrome) over the DevTools protocol with Node's own WebSocket.
@@ -228,6 +229,24 @@ try {
         if (!b.open) found.set('hover: the inbox rail did not open on a resting mouse', ['1440 light']);
         if (a.p.join() !== b.p.join()) found.set(`hover: the first thread moved from ${a.p.join(',')} to ${b.p.join(',')}`, ['1440 light']);
         await cmd('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1430, y: 5, pointerType: 'mouse' });
+      }
+      // 11. The preview's Right arrow stays in the image's own group: open the last image of the first group that has one,
+      // press Right, and the thumbnail now in the preview (the hidden one) must sit in that same group.
+      const lbOpen = () => { const scopes = [...document.querySelectorAll('.k-group, .k-shots, .k-part')].filter(s => !s.parentElement.closest('.k-group, .k-shots, .k-part'));
+        const imgs = s => [...s.querySelectorAll('.k-zoomable')].filter(n => n.getClientRects().length);
+        const at = scopes.findIndex(s => imgs(s).length); if (at < 0 || !scopes.slice(at + 1).some(s => imgs(s).length)) return false;
+        document.querySelectorAll('[data-lb-scope]').forEach(n => n.removeAttribute('data-lb-scope')); scopes[at].setAttribute('data-lb-scope', '');
+        imgs(scopes[at]).pop().click(); return true; };
+      if (await run(lbOpen)) {
+        await sleep(300);
+        for (const type of ['keyDown', 'keyUp']) await cmd('Input.dispatchKeyEvent', { type, key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
+        await sleep(300);
+        const lbWhere = () => { const cur = [...document.querySelectorAll('.k-zoomable')].find(n => n.style.visibility === 'hidden'), s = document.querySelector('[data-lb-scope]');
+          s.removeAttribute('data-lb-scope'); return cur && !s.contains(cur) ? (cur.alt || cur.getAttribute('src') || 'an image').slice(0, 40) : ''; };
+        const left = await run(lbWhere);
+        if (left) found.set(`lightbox: Right arrow on the last image of a group jumped to "${left}" in the next group`, ['1440 light']);
+        for (const type of ['keyDown', 'keyUp']) await cmd('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+        await sleep(300);
       }
     }
     // A real Tab press first, so the focus calls after it count as keyboard focus (:focus-visible).

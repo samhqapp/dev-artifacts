@@ -703,7 +703,7 @@
     /* 3b. Preview panel: a modal <dialog> over a dimmed, blurred page. The image grows from its thumbnail (about 220 ms; a fade
        or a cut when Animation is Off or the system asks for reduced motion) and shrinks back on close. Wheel or pinch zooms at
        the pointer, drag pans, double-click (or Z) toggles fit and 100%, keys + - 0 1, arrows pan when zoomed and go to the
-       previous or next visible image of the page when not. Esc, the close button or a click on the backdrop closes it, and focus
+       previous or next visible image of the same group when not. Esc, the close button or a click on the backdrop closes it, and focus
        returns to the thumbnail. While it is open, the kit's arrow keys and hover focus pause. */
     let lb;
     function preview(img) {
@@ -715,7 +715,9 @@
         const o = n.closest('.k-option'); if (!o) return '';
         const l = [...o.querySelectorAll('.k-zoomable')]; return l.length > 1 ? 'i:' + l.indexOf(n) : '';
       };
-      const s = slot(img), list = s ? vis().filter(n => slot(n) === s) : vis(), k = list.indexOf(img);
+      // ...and inside the image's own group (option group, screenshot grid, or part): arrows never jump to the next group.
+      const scope = img.closest('.k-group, .k-shots, .k-part'), here = vis().filter(n => !scope || scope.contains(n));
+      const s = slot(img), list = s ? here.filter(n => slot(n) === s) : here, k = list.indexOf(img);
       lb.open(k < 0 ? [img] : list, Math.max(0, k));
     }
     api.lightbox = i => { const l = vis(); if (l[i || 0]) preview(l[i || 0]); };
