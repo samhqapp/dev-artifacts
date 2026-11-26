@@ -533,7 +533,7 @@ a.k-at:hover, .k-meta a:hover { text-decoration: underline; }
 .k-flow-lines rect.k-inband { fill: var(--k-band); }
 .k-edge { display: none; }
 
-.k-lane { display: grid; grid-template-columns: 112px repeat(var(--k-cols, 6), minmax(0, 1fr)); column-gap: 28px; align-items: stretch;
+.k-lane { display: grid; grid-template-columns: 112px repeat(var(--k-cols, 6), minmax(0, 1fr)); column-gap: 28px; row-gap: 14px; align-items: stretch;
   padding: 16px 20px; border-radius: 18px; background: var(--k-band); }
 .k-lane.k-top { padding-top: 38px; }
 .k-lane > header { grid-column: 1; align-self: start; display: grid; gap: 2px; padding-top: 4px; }

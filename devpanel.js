@@ -419,7 +419,7 @@ const KIT_CSS = String.raw`
 .k-final::after { content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06); transition: transform .2s cubic-bezier(.3,.7,.3,1); }
 .k-final[aria-checked="true"] { background: var(--blue); }
 .k-final[aria-checked="true"]::after { transform: translateX(16px); }
-.k-final:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 13px; }
+.k-final:focus-visible { border-radius: 13px; }
 .k-dots button[hidden] { display: none; }
 .k-dock { position: fixed; left: 0; right: 0; margin-inline: auto; width: max-content; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; padding: 6px; max-width: calc(100vw - 24px); border-radius: 999px; background: var(--dock); backdrop-filter: blur(28px) saturate(1.8); -webkit-backdrop-filter: blur(28px) saturate(1.8); border: .5px solid var(--line); box-shadow: var(--shadow), inset 0 1px 0 var(--dock-hi); }
 .k-dock button { font: inherit; font-size: 14px; font-weight: 600; line-height: 1; color: var(--ink); background: transparent; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; white-space: nowrap; }
