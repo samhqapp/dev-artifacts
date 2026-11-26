@@ -30,6 +30,16 @@ try {
   assert.equal(await p.title(), tabTitle(), 'the tab title is exactly orca-title, nothing after it');
   put(['one']); await p.reload(); await p.waitForTimeout(400); s = await state();
   assert.ok(!s.empty && s.dock && s.count === '1 / 1', '1 group: "1 / 1" ' + JSON.stringify(s));
+  // a page modal that inerts every other body child (as samhq's Buy dialog does) and closes on a backdrop or outside click
+  await p.evaluate(() => { const m = Object.assign(document.createElement('div'), { id: 'modal' });
+    m.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.4)'; document.body.append(m);
+    [...document.body.children].forEach((n) => { if (n !== m) n.inert = true; });
+    m.onclick = () => m.remove(); document.addEventListener('mousedown', (e) => { if (!m.contains(e.target)) m.remove(); }); });
+  await p.waitForTimeout(100);
+  const dk = await p.locator('.od-dock .od-count').first().boundingBox();
+  await p.mouse.click(dk.x + dk.width / 2, dk.y + dk.height / 2);
+  assert.ok(await p.evaluate(() => !!document.getElementById('modal')), 'a dock click never reaches the page: an inert, outside-click modal stays open; fix it in devpanel.js mount(), not in the page');
+  await p.keyboard.press('Escape'); await p.reload(); await p.waitForTimeout(400);
   put(['one', 'two']); await p.reload(); await p.waitForTimeout(400);
   await p.evaluate(() => { localStorage.setItem('devpanel', JSON.stringify({ ...JSON.parse(localStorage.getItem('devpanel')), picks: { two: 3 } })); });
   put(['one']); await p.reload(); await p.waitForTimeout(400); s = await state();

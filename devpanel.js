@@ -765,6 +765,11 @@ svg { display: block; flex: none; }
     const clean = Q.has('dv-clean');
     if (clean) host.style.display = 'none';
     document.body.appendChild(host);
+    // A page modal (such as samhq's Buy dialog) sets inert on every other body child, the dock too: dock clicks then
+    // fall through to the modal's backdrop and close it. Keep the dock live, and keep its clicks and focus away from
+    // the page's own outside-click and focus handlers (devpanel's own window listeners run in the capture phase).
+    new MutationObserver(() => { if (host.inert) host.inert = false; }).observe(host, { attributes: true, attributeFilter: ['inert'] });
+    for (const t of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'touchstart', 'focusin', 'focusout']) host.addEventListener(t, (e) => e.stopPropagation());
     // The end spacer: as tall as the dock and its margin, so the page's last line can scroll above the dock.
     spacer = document.createElement('div'); spacer.setAttribute('aria-hidden', 'true'); spacer.dataset.devPanel = 'spacer';
     spacer.style.cssText = 'display:block;height:0;margin:0;padding:0;border:0;flex:none;pointer-events:none';
