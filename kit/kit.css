@@ -67,7 +67,9 @@ img.k-wait { opacity: 0; }
 img.k-zoomable { transition: opacity .18s ease-out; }
 a { color: var(--blue-ink); text-decoration: none; }
 a:hover { text-decoration: underline; }
-a:focus-visible, button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
+/* No focus rings (owner rule): keyboard focus shows a blue fill, drawn as an inset shadow so it tints any background. */
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible { outline: none; box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--blue) 16%, transparent); border-radius: 6px; }
+img:focus-visible, video:focus-visible { outline: none; filter: brightness(.88); }
 
 /* Page frame and type scale: 44 title, 28 section title, 34 slide title, small kicker */
 .k-wrap { max-width: 1600px; margin: 0 auto; padding-left: var(--gutter-l); padding-right: var(--gutter-r); padding-block: 32px 150px; }
@@ -186,14 +188,12 @@ tbody > tr:nth-child(even) > td { background: var(--zebra); }
 .k-shot > figcaption > b { font-size: var(--fs-body); font-weight: 600; line-height: 1.3; }
 .k-shot > figcaption > span { font-size: var(--fs-sm); line-height: 1.4; color: var(--muted); }
 .k-shot video { cursor: zoom-in; }
-.k-shot video:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 /* Section header with actions: the heading block left, icon buttons right (k-copydoc last). */
 .k-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .k-head > :first-child { min-width: 0; }
 .k-head > :not(:first-child) { flex: none; }
 .k-copydoc { position: relative; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 9px; background: var(--soft); color: var(--muted); cursor: pointer; transition: color var(--k-morph-in); }
 .k-copydoc:hover, .k-copydoc.k-done { color: var(--blue); }
-.k-copydoc:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .k-copydoc svg { width: 16px; height: 16px; }
 .k-copydoc::after { content: attr(data-msg); position: absolute; right: calc(100% + 8px); top: 50%; transform: translateY(-50%); padding: 4px 9px; border-radius: 7px; background: var(--ink); color: var(--card); font-size: var(--fs-sm); white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity var(--k-morph-out); }
 .k-copydoc.k-done::after { opacity: 1; }
@@ -284,7 +284,7 @@ html[data-view="slides"] .k-hint { font-size: 16px; }
 .k-final::after { content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06); transition: transform .2s cubic-bezier(.3,.7,.3,1); }
 .k-final[aria-checked="true"] { background: var(--blue); }
 .k-final[aria-checked="true"]::after { transform: translateX(16px); }
-.k-final:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 13px; }
+.k-final:focus-visible { border-radius: 13px; }
 .k-dots button[hidden] { display: none; }
 .k-empty { text-align: center; padding: 48px 0; }
 

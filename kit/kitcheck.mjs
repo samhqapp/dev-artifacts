@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // kitcheck: render a kit page at 1440 and 390 wide, Light and Dark, with every detail row open, and fail on layout defects:
 // a card closer than 12 px to content above or below it, card content closer than 14 px to the card edge,
-// sideways overflow, and clipped text. Saves one full-page screenshot per mode.
+// sideways overflow, and clipped text. Saves one full-page screenshot per mode. Also fails on:
+// 7 a focus ring (outline) on keyboard focus, 8 an image cut by object-fit cover/none or a clipping parent,
+// 9 a border on only 2 or 3 sides or with uneven widths, 10 the last content ending less than 12 px above the dock.
+// Fixtures: kitcheck-fixtures/<check>-fail.html exits 1, <check>-pass.html exits 0.
 // Usage: node kitcheck.mjs <page.html> [--out <dir>]   Exit: 0 clean, 1 offenders, 2 could not run.
 // No npm packages: it drives Playwright's headless shell (or Chrome) over the DevTools protocol with Node's own WebSocket.
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path'; import os from 'node:os'; import { spawn } from 'node:child_process';
@@ -148,7 +151,50 @@ function check() {
   for (const e of all) { const s = cs(e);
     if (!/hidden|clip/.test(s.overflowX + s.overflowY) || !e.textContent.trim() || e.closest('[aria-expanded="false"]')) continue; // a collapsed disclosure clips on purpose
     if (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1) bad.push(`clipped ${e.scrollWidth}x${e.scrollHeight} in ${e.clientWidth}x${e.clientHeight}: ${name(e)}`); }
+  // 8. Image cut off: an image the owner must judge shows its full frame. Cover thumbnails (.k-cover, .k-av avatars) and a
+  // very tall image with its fade (.k-tall) crop on purpose; icons under 40 px are not judged.
+  for (const e of all) { if (!e.matches('img, video') || e.closest('.k-cover, .k-tall, .k-av')) continue;
+    const r = e.getBoundingClientRect(), s = cs(e), nw = e.naturalWidth || e.videoWidth, nh = e.naturalHeight || e.videoHeight;
+    if (r.width < 40 || r.height < 40 || !nw || !nh) continue;
+    const w = r.width - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight) - parseFloat(s.borderLeftWidth) - parseFloat(s.borderRightWidth),
+      h = r.height - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom) - parseFloat(s.borderTopWidth) - parseFloat(s.borderBottomWidth);
+    const off = Math.abs(w / h / (nw / nh) - 1);
+    if (/cover|none/.test(s.objectFit) && off > .02) { bad.push(`image cut: object-fit ${s.objectFit} shows ${Math.round(w)}x${Math.round(h)} of a ${nw}x${nh} image: ${name(e)}`); continue; }
+    for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) { if (cs(a).overflowX === 'visible') continue;
+      const b = a.getBoundingClientRect(), hid = Math.max(0, b.left - r.left) + Math.max(0, r.right - b.right);
+      if (hid > 1) { bad.push(`image cut: ${Math.round(hid)}px of its width hidden by ${name(a)}: ${name(e)}`); break; } }
+  }
+  // 9. Whole hairlines: a border shows on all four sides at one width. One side alone is a divider (row, caption, Final bar).
+  for (const e of [...document.body.querySelectorAll('*')]) { if (e.matches('hr') || !e.getClientRects().length) continue;
+    const s = cs(e), sides = ['Top', 'Right', 'Bottom', 'Left'].filter(k => parseFloat(s[`border${k}Width`]) > 0 && !/none|hidden/.test(s[`border${k}Style`]) && alpha(s[`border${k}Color`]) > 0);
+    const ws = new Set(sides.map(k => s[`border${k}Width`]));
+    if (sides.length === 2 || sides.length === 3) bad.push(`border on ${sides.join(', ').toLowerCase()} only: ${name(e)}`);
+    else if (sides.length === 4 && ws.size > 1) bad.push(`border widths differ (${['Top', 'Right', 'Bottom', 'Left'].map(k => s[`border${k}Width`]).join(' ')}): ${name(e)}`);
+  }
+  // 10. Dock covers content: scrolled to the very bottom, the last content ends 12 px above the floating dock.
+  // This also covers text under the dock on a page that cannot scroll it out (no scroll room means the bottom is the top).
+  const roots = [document, ...[...document.querySelectorAll('*')].filter(e => e.shadowRoot).map(e => e.shadowRoot)];
+  const dock = roots.map(d => d.querySelector('.k-dock, .od-dock, .dock')).find(d => d && d.getClientRects().length && cs(d).visibility !== 'hidden');
+  if (dock && items.length) { const top = dock.getBoundingClientRect().top, maxY = document.documentElement.scrollHeight - innerHeight;
+    const last = items.filter(i => !dock.contains(i.el)).reduce((m, i) => i.r.bottom + scrollY > m.b ? { b: i.r.bottom + scrollY, el: i.el } : m, { b: -1 });
+    const room = top - (last.b - maxY);
+    if (room < GAP - .5) bad.push(`dock ${room < 0 ? 'covers' : Math.round(room) + 'px above'}: ${name(last.el)} at the page bottom, under ${name(dock)}`); }
   cards.forEach(e => e.removeAttribute('data-card'));
+  return bad;
+}
+// 7. No focus rings: focus each control as a keyboard user would, then fail on an outline (the browser ring or a drawn one).
+// A fill or a box-shadow the kit draws on purpose is fine. Runs after the screenshot, since focus can open a rail or a row.
+function focusCheck() {
+  const bad = [], name = e => { const t = (e.textContent || e.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 30);
+    return `${e.tagName.toLowerCase()}${[...e.classList].map(c => '.' + c).join('')}${t ? ` "${t}"` : ''}`; };
+  for (const e of document.body.querySelectorAll('button, a[href], input, textarea, select, summary, video[controls], [tabindex]:not([tabindex="-1"])')) {
+    if (e.disabled || !e.getClientRects().length) continue;
+    e.focus({ preventScroll: true, focusVisible: true });
+    if (document.activeElement !== e) continue;
+    const s = getComputedStyle(e);
+    if (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) bad.push(`focus ring: ${s.outlineStyle} ${s.outlineWidth} outline on ${name(e)}`);
+    e.blur();
+  }
   return bad;
 }
 
@@ -184,9 +230,12 @@ try {
         await cmd('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1430, y: 5, pointerType: 'mouse' });
       }
     }
+    // A real Tab press first, so the focus calls after it count as keyboard focus (:focus-visible).
+    for (const type of ['keyDown', 'keyUp']) await cmd('Input.dispatchKeyEvent', { type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+    for (const b of await run(focusCheck)) found.set(b, [...(found.get(b) || []), mode]);
   }
 } catch (e) { console.error('kitcheck: ' + e.message); done(2); }
-for (const [b, modes] of found) console.log(`FAIL ${b}  [${modes.join(', ')}]`);
+for (const [b, modes] of found) console.log(`FAIL ${b}  [${[...new Set(modes)].join(', ')}]`);
 console.log(`screenshots: ${out}`);
 console.log(found.size ? `kitcheck: ${found.size} offenders in ${path.basename(pagePath)}` : `kitcheck: clean (${path.basename(pagePath)}, 1440 and 390, light and dark)`);
 done(found.size ? 1 : 0);

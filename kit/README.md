@@ -29,7 +29,14 @@ How loading works: `kit.js` fetches `kit.css` from the same folder and injects i
 
 If a host also blocks scripts from the artifact's own files, inline both at build time: paste `kit.css` into a `<style>` and `kit.js` into a `<script>` in your page. The page then works the same.
 
-Before every publish, run `node <dev-artifacts>/kit/kitcheck.mjs <page.html>` and publish only on exit 0. It renders the page at 1440 and 390 px wide, Light and Dark, with every detail row open, saves the four screenshots, and lists each offender with its element and px: a card closer than 12 px to content above or below it, card content closer than 14 px to the card edge (inset lists and tables use their row padding; cover images are exempt), sideways overflow, clipped text, and crushed text (a squeezed column that wraps after every few characters). It serves the page's own folder; kit files missing there come from this folder. Fix an offender in the kit, not with page CSS, unless the page's own markup causes it. Screenshots: on a first publish or a layout change, look at the desktop Light and phone Dark shots; on a text-only update with exit 0, skip them; on a failure, look at each failing shot.
+Before every publish, run `node <dev-artifacts>/kit/kitcheck.mjs <page.html>` and publish only on exit 0. It renders the page at 1440 and 390 px wide, Light and Dark, with every detail row open, saves the four screenshots, and lists each offender with its element and px: a card closer than 12 px to content above or below it, card content closer than 14 px to the card edge (inset lists and tables use their row padding; cover images are exempt), sideways overflow, clipped text, and crushed text (a squeezed column that wraps after every few characters). It also fails on:
+
+- Focus ring: a control that shows an outline on keyboard focus (the kit draws a fill instead).
+- Image cut: an image cut by `object-fit: cover`/`none` or by a clipping parent (`.k-cover`, `.k-av` and `.k-tall` crop on purpose).
+- Half border: a border on only 2 or 3 sides, or with uneven widths (a one-side divider is fine).
+- Dock covers: at the page bottom, the last content ends less than 12 px above the dock (`.k-dock`, `.od-dock`, `.dock`).
+
+Each new check has a failing and a passing page in `kitcheck-fixtures/`. It serves the page's own folder; kit files missing there come from this folder. Fix an offender in the kit, not with page CSS, unless the page's own markup causes it. Screenshots: on a first publish or a layout change, look at the desktop Light and phone Dark shots; on a text-only update with exit 0, skip them; on a failure, look at each failing shot.
 
 Name your own classes with a page prefix (for example `p-`), never short names like `.c` or `.rec`, and never the kit's `k-` prefix. Short names clash with page code.
 
