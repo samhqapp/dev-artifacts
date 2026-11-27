@@ -49,6 +49,8 @@ Transitions stay off until `kit.js` adds `html.k-ready`, one frame after the sty
 |---|---|
 | `k-wrap` | Page frame (gutter, max width). Add `data-kit` to it. |
 | `k-part` | One reading part. Also one slide. Add `data-part="Name"` (dot tooltip). |
+| `data-bands` on `k-wrap` | Each direct `k-part` becomes a full-width band with no border. Shades take turns (page, a little lighter, page), and the scroll snaps to the band tops. |
+| `button.k-q` with `data-pop="#id"` | A small round "?" beside a heading or value. It shows extra facts in a popover, so the page stays short. |
 | `k-kicker`, `k-title` (44 px), `k-h2` (28 px, 34 px in slides), `k-lead`, `k-hint` | Text scale |
 | `k-list` > `k-row` > `<span>label</span><span>value</span>` | Grouped inset list, label left, value right, soft zebra rows |
 | `<table>` (wrap in `div.k-table` when it may be wide) | Card table with zebra rows and faint hairlines; on phones a `k-table` stacks each row into a card (first cell as title, then label-value rows from the headers), so nothing scrolls sideways |

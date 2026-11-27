@@ -79,6 +79,18 @@ img:focus-visible, video:focus-visible { outline: none; filter: brightness(.88);
 .k-lead { font-size: 19px; line-height: 1.45; color: var(--muted); margin: 0 0 20px; max-width: 70ch; text-wrap: pretty; }
 .k-hint { font-size: 16px; color: var(--muted); margin: 0 0 16px; max-width: 80ch; text-wrap: pretty; }
 .k-part { margin-bottom: 56px; scroll-margin-top: 20px; }
+/* Bands: <main class="k-wrap" data-bands> makes each .k-part a full-width band with no border; shades alternate page, lighter, page.
+   Scroll snaps to the band tops. */
+html:has(.k-wrap[data-bands]) { scroll-snap-type: y proximity; }
+.k-wrap[data-bands] { padding-top: 0; }
+.k-wrap[data-bands] > .k-part { --band: var(--page); margin: 0; padding-block: 28px 32px; scroll-snap-align: start; scroll-margin-top: 0;
+  background: var(--band); box-shadow: 0 0 0 100vmax var(--band); clip-path: inset(0 -100vmax); }
+.k-wrap[data-bands] > .k-part:nth-of-type(even) { --band: color-mix(in srgb, var(--ink) 5%, var(--page)); }
+/* A small "?" that shows extra facts in a popover: <button class="k-q" data-pop="#id">?</button> */
+.k-q { display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0; margin-left: 6px; vertical-align: 2px; border: 0; border-radius: 50%;
+  font: 600 12px/1 var(--font); color: var(--muted); background: var(--soft); cursor: help; }
+.k-q:hover { color: var(--ink); }
+.k-q:focus-visible { border-radius: 50%; }
 .k-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 /* Card grids: wide columns that fill the row; a lone card spans the row instead of sitting small beside empty space. */
 .k-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px; align-items: start; }
