@@ -1766,6 +1766,9 @@ svg { display: block; flex: none; }
       if (c.kind && !KINDS.includes(c.kind)) throw new Error(`DevPanel kind must be one of ${KINDS.join(', ')}: ${c.kind}`);
       if (c.kind === 'grid' && !(c.cols * c.rows === c.options.length)) throw new Error(`DevPanel grid needs options = cols x rows: ${c.id}`);
       if (base && c.page && ![].concat(c.page).some(inBase)) return null; // a group of another site on this server
+      // A listed "Current" next to the automatic one shifts every dock name one option off what apply(i) shows
+      if (c.current !== false && c.options.some((o) => /^current$/i.test(String(o.name).trim())))
+        throw new Error(`DevPanel adds "Current" itself; remove it from the options of ${c.id} (or pass current: false)`);
       if (!c.options.length) return null; // comment-only groups are gone (the overall comment covers it): skip quietly
       const g = { ...c, label: c.label || c.id, pos: c.dot || 'tr',
         opts: c.current === false ? c.options : [{ name: 'Current' }, ...c.options] };
