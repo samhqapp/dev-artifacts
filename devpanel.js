@@ -507,7 +507,7 @@ const KIT_CSS = String.raw`
   // Its typed pick and comment become an old-round item in Archived; Unarchive puts them back while the group exists.
   function retire(id, m) {
     const p = st.picks[id], n = st.notes[id];
-    if (p || n) st.old.push({ id, label: m.label || id, pick: p ? (typeof p === 'object' ? p.label : (m.opts || [])[p - 1]) || null : null, note: n || '' });
+    if (p || n) st.old.push({ id, label: m.label || id, pick: p ? (typeof p === 'object' ? p.label || m.text : (m.opts || [])[p - 1]) || null : null, note: n || '' });
     delete st.picks[id]; delete st.notes[id]; delete st.fin[id];
   }
   function unarchive(k) {
@@ -1817,7 +1817,8 @@ svg { display: block; flex: none; }
       groups.push(g);
       let m = meta(g.id); if (!m) st.groups.push(m = { id: g.id, page: null });
       // a new round for this group when its options changed since the last load (no sig yet: an old store, keep it)
-      const sig = g.opts.map((o) => o.name).join('\n');
+      // a slider is a new round when its range or baked value changes (an old value means something else now)
+      const sig = g.opts.map((o) => o.name).join('\n') + (g.kind === 'range' ? `\n${g.min}..${g.max}=${g.value}` : '');
       if (m.sig && m.sig !== sig) retire(g.id, m);
       Object.assign(m, { label: g.label, opts: g.opts.map((o) => o.name), sig });
       if (g.kind === 'wallpaper') { m.wall = true; if (!wpick(g)) delete st.picks[g.id]; }
