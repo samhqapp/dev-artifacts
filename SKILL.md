@@ -165,6 +165,18 @@ DevPanel.group({ id: 'shield-size', label: 'Shield size', target: '#safety', kin
 - The dock row shows the slider, the value, and a reset button. Every move saves and calls `apply(v)` at once; Reset calls it with `value`.
 - Copy choices writes `format(v)` (or `v` plus `unit`), such as `- Shield size: size 118%`.
 
+Placement tuning (owner, 2026-11-28): once the owner picks an option for an element's place or size (a mark, an
+image, a badge, a screenshot), or asks to move or resize it, give that element a slider set instead of another round
+of fixed options:
+
+- Size, up / down, and left / right when it can move sideways. Add depth (shadow or emboss strength) and strength
+  (opacity) when the element has them. Start every slider at "as baked" (0 or 100%).
+- Wide ranges with room to overshoot: size about 20% to 200%, offsets of at least 600 px each way. When the owner
+  hits a limit, bake that value as the new base and reset the sliders around it.
+- Nothing cuts the element: before you offer the set, check that no `overflow: hidden`, mask, or animation layer
+  clips it at the extreme values, and screenshot the extremes.
+- When the owner pastes final values, bake them into the custom properties and remove the sliders.
+
 ## One site with routes, or several sites
 
 - One site with several pages or routes (a web app): back and next cross pages. This is the default.
