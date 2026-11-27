@@ -59,7 +59,7 @@
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; scroll-behavior: auto; }
 body { margin: 0; background: var(--page); color: var(--ink); font: var(--fs-body)/1.45 var(--font); -webkit-font-smoothing: antialiased; }
-img { max-width: 100%; height: auto; } /* keep the aspect when max-width shrinks an img with width and height attributes */
+img, video { max-width: 100%; height: auto; } /* keep the aspect when max-width shrinks an img with width and height attributes */
 /* No jumps on load: an option image holds its box before it loads (from width and height, else --ratio), then fades in. */
 .k-option > img { display: block; width: 100%; object-fit: contain; }
 .k-option > img:not([width]) { aspect-ratio: var(--ratio, 16 / 10); }
@@ -131,6 +131,8 @@ tbody > tr:nth-child(even) > td { background: var(--zebra); }
 /* Option panels: side by side, stack on phones. Selected = system blue border and radio. */
 .k-group { margin-top: 4px; }
 .k-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; align-items: stretch; }
+.k-options + .k-list { margin-top: 16px; }
+.k-detail .k-shot { margin-top: 6px; }
 .k-options.k-keeps { margin-top: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 420px)); }
 .k-option { background: var(--card); border-radius: 18px; box-shadow: var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; border: 2px solid transparent; cursor: pointer; transition: border-color .18s ease; }
 .k-options > .k-option:not(:has(> :not(.k-option-head))) { align-self: start; } /* a text-only choice stays compact beside image cards */
