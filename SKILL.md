@@ -150,6 +150,21 @@ DevPanel.group({ id: 'hero-bg', label: 'Hero wallpaper', target: '.hero', kind: 
   at once (`url` is null for Current). Arrow keys move the pick; Esc, Enter, or Done close it.
 - Copy choices writes `- Hero wallpaper: Frozen lake at dawn (unsplash/mountains-frozen-lake.jpg) - comment`.
 
+## Live tuning (sliders)
+
+When the owner wants to tune a number by eye (a size, an offset, a gap), use the `range` kind instead of a list of values:
+
+```js
+DevPanel.group({ id: 'shield-size', label: 'Shield size', target: '#safety', kind: 'range',
+  min: 60, max: 160, step: 2, value: 100, unit: '%', format: (v) => `size ${v}%`,
+  apply(v) { shield.style.setProperty('--shield-scale', v / 100); } });
+```
+
+- It takes no `options`. `value` is the baked value; the page keeps it in CSS, so bake the number into a custom property and
+  let `apply(v)` set only that property (no motion replay, no layout change).
+- The dock row shows the slider, the value, and a reset button. Every move saves and calls `apply(v)` at once; Reset calls it with `value`.
+- Copy choices writes `format(v)` (or `v` plus `unit`), such as `- Shield size: size 118%`.
+
 ## One site with routes, or several sites
 
 - One site with several pages or routes (a web app): back and next cross pages. This is the default.

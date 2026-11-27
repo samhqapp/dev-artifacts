@@ -17,6 +17,9 @@
      'wallpaper' no options: every picture in ~/Pictures (local_wallpapers, local_wallpapers_gradients, depth, unsplash)
               from serve.mjs. The dock row shows the pick as a thumbnail and Browse, which opens a big gallery with search
               and groups. apply(url, { f, label }) gets the picture's URL (null for Current). Copy choices: "label (folder/file)".
+     'range'  no options: a slider for live tuning. Give min, max, step, value (the baked value), unit?, format?(v).
+              The dock row shows the slider, the value, and a reset button; every move calls apply(v) at once (Reset and
+              Current call it with value). Copy choices: format(v), or "<v><unit>".
    Every popover ends with the group's comment field. A group without `page` belongs to the page where its target first
    shows up. Picks, comments, and the list of groups are kept for the whole site (one localStorage key per origin).
    The tab title is exactly '<project> > <Orca tab>' (or the repo folder name), which serve.mjs puts in front of this
@@ -783,6 +786,17 @@ svg { display: block; flex: none; }
   .dv-row { padding: 9px 12px 9px 10px; }
   .od-pop, .od-pop.od-up:not(.od-show) { border-radius: 20px; transform: translateY(12px); }
 }
+/* kind 'range': a thin dark-dock slider (white knob on a faint track, blue fill), the value in tabular numbers, reset */
+.od-dock .dv-rg { -webkit-appearance: none; appearance: none; width: 160px; min-width: 64px; height: 32px; margin: 0 4px 0 8px; background: none; cursor: pointer; outline: none; flex: 0 1 160px; }
+.od-dock .dv-g:has(> .dv-rg) > .dv-lab { flex: none; } /* on a phone the slider gives way, so the name stays whole */
+.dv-rg::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: rgba(255,255,255,.18); }
+.dv-rg::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(255,255,255,.18); }
+.dv-rg::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--od-blue, #0a84ff); }
+.dv-rg::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.dv-rg::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.dv-rg:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(10,132,255,.45); }
+.od-dock .dv-rv { min-width: 84px; font: 500 13px/32px var(--od-font); font-variant-numeric: tabular-nums; color: var(--od-ink); white-space: nowrap; }
+.od-dock .dv-rr:disabled { opacity: .3; cursor: default; }
 /* kind 'wallpaper': the dock row shows the pick as a small thumbnail, then Browse */
 .od-dock .dv-g > .dv-wp { display: inline-flex; align-items: center; gap: 8px; max-width: 220px; padding-left: 5px; }
 .od-dock .dv-g > .dv-browse { flex: none; }
@@ -1081,7 +1095,7 @@ svg { display: block; flex: none; }
       const want = Math.min(innerHeight * 0.5, 480);
       if (Math.abs(r.top - want) > 8) scrollBy({ top: r.top - want, behavior: 'instant' });
     }
-    glow(g); popFor(g, kind(g) === 'note', true); // the group's options open beside or above its section, out of the dot
+    glow(g); popFor(g, kind(g) === 'note' || kind(g) === 'range', true); // the group's options open beside or above its section, out of the dot
   }
 
   // The guide lines run once, about 1 s: they shoot out from the target's edges (180 ms), glow up and settle (300 ms),
@@ -1117,13 +1131,16 @@ svg { display: block; flex: none; }
 
   const pick = (g) => st.picks[g.id] || 1;
   const wpick = (g) => { const p = st.picks[g.id]; return p && typeof p === 'object' && p.f ? p : null; };
+  // kind 'range': the pick is { v }; no pick is the baked value
+  const rval = (g) => { const p = st.picks[g.id]; return p && Number.isFinite(p.v) ? p.v : g.value; };
+  const rtext = (g, v) => g.format ? String(g.format(v)) : `${v}${g.unit ? (g.unit === '%' ? '' : ' ') + g.unit : ''}`;
   function setVar(g, i, force) {
     if (g.cur === i && !force) return; // never apply the same value twice
     const changed = g.cur !== i, attr = 'data-dv-' + g.id, root = document.documentElement;
     g.cur = i;
     const w = g.kind === 'wallpaper' && typeof i === 'object' ? i : null; // a wallpaper pick is { f, label }
-    if (i === 1 && g.current !== false) root.removeAttribute(attr); else root.setAttribute(attr, w ? w.f : String(i));
-    try { g.apply && (g.kind === 'wallpaper' ? g.apply(w && wurl(w.f), w) : g.apply(i)); } catch (e) { console.error('[dev artifacts]', g.id, e); }
+    if (i === 1 && g.current !== false) root.removeAttribute(attr); else root.setAttribute(attr, w ? w.f : i && typeof i === 'object' ? String(i.v) : String(i));
+    try { g.apply && (g.kind === 'wallpaper' ? g.apply(w && wurl(w.f), w) : g.kind === 'range' ? g.apply(rval(g)) : g.apply(i)); } catch (e) { console.error('[dev artifacts]', g.id, e); }
     if (changed) { if (od) od.freeze = performance.now() + 500; settle(g, i); }
     schedule();
   }
@@ -1183,6 +1200,13 @@ svg { display: block; flex: none; }
       return `<button type="button" class="dv-lab k-seg-label" aria-haspopup="dialog"${st.notes[g.id] ? ' data-note' : ''} title="Open the gallery"><span>${esc(g.label)}</span></button>`
         + `<button type="button" class="dv-o dv-wp" aria-haspopup="dialog" aria-pressed="true" title="${esc(w ? w.label : 'Current')}">${w ? `<img src="${esc(wurl(w.f, 480))}" alt="">` : ''}<span>${esc(w ? w.label : 'Current')}</span></button>`
         + '<button type="button" class="dv-o dv-browse" aria-haspopup="dialog">Browse</button>';
+    }
+    if (k === 'range') { // the slider, its value, reset; a drag never redraws the row (see oninput)
+      const v = rval(g);
+      return `<button type="button" class="dv-lab k-seg-label" aria-haspopup="dialog"${st.notes[g.id] ? ' data-note' : ''} title="Click to comment"><span>${esc(g.label)}</span></button>`
+        + `<input type="range" class="dv-rg" min="${g.min}" max="${g.max}" step="${g.step}" value="${v}" aria-label="${esc(g.label)}">`
+        + `<span class="dv-rv">${esc(rtext(g, v))}</span>`
+        + `<button type="button" class="dv-ib dv-rr" aria-label="Reset ${esc(g.label)}" title="Reset"${v === g.value ? ' disabled' : ''}>↺</button>`;
     }
     const o = (j) => `<button type="button" class="dv-o" data-i="${j}" aria-pressed="${p === j}">${swatch(g, j)}${esc(g.opts[j - 1].name)}</button>`;
     return `<button type="button" class="dv-lab k-seg-label" aria-haspopup="dialog"${st.notes[g.id] ? ' data-note' : ''} title="${k === 'note' ? 'Click to comment' : 'Click for the comment' + (hasMore(g) ? ', every option' : '') + ' and Final'}"><span>${esc(g.label)}</span></button>`
@@ -1253,8 +1277,24 @@ svg { display: block; flex: none; }
       tipFor(null);
       if (b.dataset.i) { curId = g.id; return choose(g, +b.dataset.i); }
       if (b.classList.contains('dv-rp')) { curId = g.id; return play(g); }
-      if (popG === g) od.close(); else popFor(g, kind(g) === 'note');
+      if (b.classList.contains('dv-rr')) { delete st.picks[g.id]; return rangeSet(g); }
+      if (popG === g) od.close(); else popFor(g, kind(g) === 'note' || kind(g) === 'range');
     };
+    // kind 'range': each move saves and applies at once; the row's text and reset update in place, so the drag goes on
+    rows.oninput = (e) => {
+      const g = e.target.classList.contains('dv-rg') && gOf(e.target); if (!g) return;
+      curId = g.id; st.picks[g.id] = { v: +e.target.value }; rangeSet(g);
+    };
+    function rangeSet(g) {
+      const el = rowEls.get(g.id), v = rval(g), m = meta(g.id);
+      if (m) m.text = rtext(g, v);
+      save(); setVar(g, { v }, true);
+      if (!el) return;
+      const inp = el.querySelector('.dv-rg'); if (inp && +inp.value !== v) inp.value = v;
+      el.querySelector('.dv-rv').textContent = rtext(g, v);
+      el.querySelector('.dv-rr').disabled = v === g.value;
+      el._h = rowHTML(g); // the row now matches what a redraw would write, so sync() leaves it alone
+    }
     // the overlay knob: no track, shows while scrolling or with the pointer on the rows, fades 2 s after
     let kt = 0;
     const showKnob = () => {
@@ -1324,7 +1364,7 @@ svg { display: block; flex: none; }
       || 'Click or an arrow key picks an option, Enter closes.';
     body.innerHTML = `<p class="k-hint">${hint}</p>` + (k === 'many' ? `<div class="dv-filter"><input type="search" placeholder="Filter ${g.opts.length} options" aria-label="Filter options"></div>` : '')
       + (k === 'images' ? `<div class="dv-imgs"><div class="dv-grid" role="listbox" aria-label="${esc(g.label)}">${g.opts.map((o, j) => tile(o, j + 1)).join('')}</div><figure class="dv-pv"><div class="th" title="Open full size"></div><figcaption><b></b><small></small></figcaption></figure></div>`
-        : k === 'note' ? ''
+        : k === 'note' || k === 'range' ? ''
         : k === 'grid' ? `<div class="dv-cells" role="listbox" aria-label="${esc(g.label)}" style="--cols:${g.cols}">${g.opts.map((o, j) => j === 0 && g.opts.length > g.cols * g.rows
           ? `<button type="button" class="dv-cur" role="option" data-i="1" aria-selected="${p === 1}">${esc(o.name)}</button>`
           : `<button type="button" class="dv-cell" role="option" data-i="${j + 1}" aria-selected="${p === j + 1}" aria-label="${esc(o.name)}"></button>`).join('')}</div><p class="dv-cellt"></p>`
@@ -1525,7 +1565,7 @@ svg { display: block; flex: none; }
     if (!popG) {
       // focus on a dock row: every arrow steps through that group's options
       const r = arrow && t && rows.contains(t) && t.closest('[data-id]'), g = r && groups.find((x) => x.id === r.dataset.id);
-      if (!g || !g.opts.length || g.kind === 'wallpaper') return;
+      if (!g || !g.opts.length || g.kind === 'wallpaper' || g.kind === 'range') return; // a slider takes its own arrow keys
       e.preventDefault(); curId = g.id; stepPick(g, /Right|Down/.test(e.key) ? 1 : -1);
       return (r.querySelector(`.dv-o[data-i="${pick(g)}"]`) || r.querySelector('.dv-moreo') || r.querySelector('.dv-lab')).focus({ preventScroll: true });
     }
@@ -1689,7 +1729,7 @@ svg { display: block; flex: none; }
     const ov = (st.overall || '').trim();
     return (ov ? ['- Overall: ' + ov.split('\n').join('\n  ')] : []).concat(all.map((m) => {
       const i = st.picks[m.id] || 1, note = (st.notes[m.id] || '').trim(), co = !(m.opts && m.opts.length);
-      const val = m.wall ? (typeof i === 'object' ? `${i.label} (${i.f})` : 'Current') : `${i} ${m.opts[i - 1] || '?'}`;
+      const val = m.range ? m.text : m.wall ? (typeof i === 'object' ? `${i.label} (${i.f})` : 'Current') : `${i} ${m.opts[i - 1] || '?'}`;
       let s = `- ${m.label}${many && m.page ? ` (${home(m)})` : ''}${co ? (note ? ':' : '') : `: ${val}`}`;
       if (note) { const [first, ...rest] = note.split('\n'); s += (co ? ' ' : ' - ') + first + rest.map((l) => '\n  ' + l).join(''); }
       return s;
@@ -1757,10 +1797,11 @@ svg { display: block; flex: none; }
     new MutationObserver(put).observe(document.head || document.documentElement, { childList: true, subtree: true, characterData: true });
   }
 
-  const KINDS = ['flat', 'select', 'many', 'images', 'grid', 'wallpaper'];
+  const KINDS = ['flat', 'select', 'many', 'images', 'grid', 'wallpaper', 'range'];
   window.DevPanel = {
     group(c) {
-      if (c && c.kind === 'wallpaper') c = { ...c, options: [{ name: '' }], current: true }; // a placeholder, so the group is not skipped
+      if (c && (c.kind === 'wallpaper' || c.kind === 'range')) c = { ...c, options: [{ name: '' }], current: true }; // a placeholder, so the group is not skipped
+      if (c.kind === 'range' && ![c.min, c.max, c.step, c.value].every(Number.isFinite)) throw new Error(`DevPanel range needs min, max, step, value: ${c.id}`);
       if (!c || !c.id || !c.target || !Array.isArray(c.options)) throw new Error('DevPanel.group needs id, target, options');
       if (!/^[a-z0-9-]+$/.test(c.id)) throw new Error('DevPanel id must be lowercase letters, digits, or dashes: ' + c.id);
       if (c.kind && !KINDS.includes(c.kind)) throw new Error(`DevPanel kind must be one of ${KINDS.join(', ')}: ${c.kind}`);
@@ -1780,6 +1821,7 @@ svg { display: block; flex: none; }
       if (m.sig && m.sig !== sig) retire(g.id, m);
       Object.assign(m, { label: g.label, opts: g.opts.map((o) => o.name), sig });
       if (g.kind === 'wallpaper') { m.wall = true; if (!wpick(g)) delete st.picks[g.id]; }
+      if (g.kind === 'range') { const p = st.picks[g.id]; if (!(p && Number.isFinite(p.v))) delete st.picks[g.id]; m.range = true; m.text = rtext(g, rval(g)); }
       if (forced[g.id]) st.picks[g.id] = forced[g.id];
       if (pick(g) > g.opts.length) delete st.picks[g.id];
       if (c.page) m.page = [].concat(c.page);
