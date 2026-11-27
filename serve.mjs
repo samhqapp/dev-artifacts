@@ -64,7 +64,10 @@ function kitPage(html) {
 }
 
 let version = Date.now();
-const reload = () => { version = Date.now(); };
+// Reload only for web files. A browser profile, cache or tmp folder inside the site writes nonstop and
+// would reload the page every 800 ms (2026-11-27: a headless Chrome profile under site-v3/tmp did).
+const WEB = /\.(html?|css|m?js|json|svg|png|jpe?g|webp|gif|avif|woff2?|mp4|webm)$/i, SKIP = /(^|[\\/])(\.|tmp[\\/]|node_modules[\\/]|prof-)/;
+const reload = (_, f) => { if (f && (!WEB.test(f) || SKIP.test(f))) return; version = Date.now(); };
 if (!shotDir) { // shot mode never reloads, so writing shots inside the site can't restart a page mid-shot
   fs.watch(root, { recursive: true }, reload);
   for (const f of Object.values(DEV)) fs.watch(f, reload);
