@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Dev-only static server: serves <site dir>, injects the DevPanel overlay and your variants into every HTML page,
 // and reloads the page when a file changes. Binds 127.0.0.1 only. No npm dependencies.
-// Usage: node serve.mjs <site dir> [--variants file.js] [--css file.css] [--port 0] [--page /path] [--proxy /api=http://127.0.0.1:8080]
+// Usage: node serve.mjs <site dir> [--variants file.js] [--css file.css] [--assets dir] [--port 0] [--page /path] [--proxy /api=http://127.0.0.1:8080]
 //        add --shot <out dir> [--sizes 1440x900,390x844] [--open <group>] [--each] [--scheme dark] [--run '<js>'] to take screenshots and exit.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -15,6 +15,8 @@ const args = process.argv.slice(2);
 const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
 const bool = (name) => { const i = args.indexOf(name); return i >= 0 && !!args.splice(i, 1); };
 const variants = flag('--variants'), css = flag('--css'), port = Number(flag('--port') ?? 0);
+// --assets <dir> serves option images (wallpapers, thumbnails, crops) at /__dev/assets/..., kept outside the site's repo.
+const assetsArg = flag('--assets'), assets = assetsArg && path.resolve(assetsArg);
 const shotDir = flag('--shot'), sizes = flag('--sizes') || '1440x900,390x844', openId = flag('--open'), page = flag('--page') || '/';
 const each = bool('--each');
 // --scheme dark|light shoots in that appearance; --run '<js>' sets up a page state (open a menu, pick an item) before a page shot.
@@ -100,8 +102,9 @@ function handle(req, res) {
     return;
   }
   if (url === '/__dev/version') { res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' }).end(String(version)); return; }
-  const abs = DEV[url] || path.join(root, url);
-  if (!DEV[url] && abs !== root && !abs.startsWith(root + path.sep)) { res.writeHead(403).end(); return; } // no ../ escapes
+  const inAssets = assets && url.startsWith('/__dev/assets/'), base = inAssets ? assets : root;
+  const abs = DEV[url] || (inAssets ? path.join(assets, url.slice('/__dev/assets'.length)) : path.join(root, url));
+  if (!DEV[url] && abs !== base && !abs.startsWith(base + path.sep)) { res.writeHead(403).end(); return; } // no ../ escapes
   // a folder without its trailing slash: redirect, so the page's relative images and CSS resolve
   if (!DEV[url] && !url.endsWith('/') && fs.statSync(abs, { throwIfNoEntry: false })?.isDirectory()) {
     const u = new URL(req.url, 'http://x'); res.writeHead(301, { Location: u.pathname + '/' + u.search }).end(); return;

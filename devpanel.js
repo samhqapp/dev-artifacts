@@ -8,7 +8,9 @@
      'flat'   2-3 short options, no popover list,
      'select' its popover lists the options,
      'many'   the same with a filter field (8 or more options),
-     'images' a grid of thumbnails with a big preview (any option with img).
+     'images' a grid of thumbnails with a big preview (any option with img),
+     'grid'   a Word-style size grid: give cols and rows, and options = cols x rows cells, row by row
+              (hover fills the cells up to the pointer and names that cell, a click picks it).
    Every popover ends with the group's comment field. A group without `page` belongs to the page where its target first
    shows up. Picks, comments, and the list of groups are kept for the whole site (one localStorage key per origin).
    The tab title is exactly '<project> > <Orca tab>' (or the repo folder name), which serve.mjs puts in front of this
@@ -526,7 +528,7 @@ const KIT_CSS = String.raw`
     : g.opts.length <= 3 && g.opts.reduce((n, o) => n + o.name.length, 0) <= 36 ? 'flat' : 'select');
   // The first 3 options sit inline in the dock; the rest are behind "…".
   // (fewer when the row is too narrow, see renderRows)
-  const inlineN = (g) => Math.min(g.opts.length, g.fitN || 3);
+  const inlineN = (g) => g.kind === 'grid' ? 1 : Math.min(g.opts.length, g.fitN || 3);
   const hasMore = (g) => g.opts.length > inlineN(g);
 
   const svg = (d, w = 1.6) => `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -707,6 +709,14 @@ svg { display: block; flex: none; }
 .dv-pv { margin: 0; position: sticky; top: 0; display: grid; gap: 6px; }
 .dv-pv .th { aspect-ratio: 4 / 3; border-radius: 10px; background: var(--od-fill) center / contain no-repeat; box-shadow: inset 0 0 0 .5px var(--od-line);
   cursor: zoom-in; display: grid; place-items: center; color: var(--od-muted); font-weight: 600; }
+/* kind 'grid': a Word-style table grid; hover fills the cells up to the pointer, a click picks that size */
+.dv-cells { display: grid; grid-template-columns: repeat(var(--cols), 24px); gap: 3px; justify-content: start; }
+.dv-cells .dv-cur { grid-column: 1 / -1; justify-self: start; margin-bottom: 4px; padding: 4px 10px; border-radius: 7px; font: 500 12.5px var(--od-font); background: var(--od-fill); }
+.dv-cells .dv-cur[aria-selected="true"] { background: var(--dv-sel); }
+.dv-cell { width: 24px; height: 24px; padding: 0; border-radius: 5px; background: var(--od-fill); box-shadow: inset 0 0 0 1px var(--od-line); transition: background-color 90ms ease; }
+.dv-cell.in { background: color-mix(in srgb, var(--od-blue) 30%, transparent); }
+.dv-cell[aria-selected="true"] { background: var(--od-blue); }
+.dv-cellt { margin: 8px 0 0; font: 500 13px/1.3 var(--od-font); font-variant-numeric: tabular-nums; }
 .dv-pv b { font: 600 14px/1.3 var(--od-font); }
 .dv-pv small { display: block; font: 12.5px/1.35 var(--od-font); color: var(--od-muted); }
 .od-body .k-comment { font-size: 15px; margin-top: 10px; min-height: 40px; padding: 9px 12px; box-shadow: none; border-radius: 12px;
@@ -1206,11 +1216,16 @@ svg { display: block; flex: none; }
     // the kit's visible hint: one line on how this popover works
     const hint = { many: 'Type to filter. Click or an arrow key picks an option, Enter closes.',
       images: 'Click a picture or use an arrow key to pick it. Click the big picture to see it full size.',
-      note: 'Write what should change here. Copy choices puts it under this group.' }[k]
+      note: 'Write what should change here. Copy choices puts it under this group.',
+      grid: 'Move over the grid to size it, click to pick. Copy choices names the size.' }[k]
       || 'Click or an arrow key picks an option, Enter closes.';
     body.innerHTML = `<p class="k-hint">${hint}</p>` + (k === 'many' ? `<div class="dv-filter"><input type="search" placeholder="Filter ${g.opts.length} options" aria-label="Filter options"></div>` : '')
       + (k === 'images' ? `<div class="dv-imgs"><div class="dv-grid" role="listbox" aria-label="${esc(g.label)}">${g.opts.map((o, j) => tile(o, j + 1)).join('')}</div><figure class="dv-pv"><div class="th" title="Open full size"></div><figcaption><b></b><small></small></figcaption></figure></div>`
-        : k === 'note' ? '' : `<div class="dv-list" role="listbox" aria-label="${esc(g.label)}">${g.opts.map((o, j) => row(o, j + 1)).join('')}</div><div class="dv-none" hidden>No option matches.</div>`)
+        : k === 'note' ? ''
+        : k === 'grid' ? `<div class="dv-cells" role="listbox" aria-label="${esc(g.label)}" style="--cols:${g.cols}">${g.opts.map((o, j) => j === 0 && g.opts.length > g.cols * g.rows
+          ? `<button type="button" class="dv-cur" role="option" data-i="1" aria-selected="${p === 1}">${esc(o.name)}</button>`
+          : `<button type="button" class="dv-cell" role="option" data-i="${j + 1}" aria-selected="${p === j + 1}" aria-label="${esc(o.name)}"></button>`).join('')}</div><p class="dv-cellt"></p>`
+        : `<div class="dv-list" role="listbox" aria-label="${esc(g.label)}">${g.opts.map((o, j) => row(o, j + 1)).join('')}</div><div class="dv-none" hidden>No option matches.</div>`)
       + `<textarea class="k-comment" rows="1" placeholder="Comment on ${esc(g.label)}"></textarea>`
       + `<div class="k-final-bar"><label for="dv-fin">Final</label><button type="button" id="dv-fin" class="k-final" role="switch" aria-checked="${fin(g.id)}" title="${fin(g.id) ? 'Final. Turn off to move back to Open' : 'Turn on to move to Archived'}"></button></div>`;
     // the kit's Final switch: the group leaves this view (Open or Archived) and the dock moves to the next one
@@ -1219,11 +1234,20 @@ svg { display: block; flex: none; }
       if (on) st.fin[g.id] = true; else delete st.fin[g.id];
       save(); setTimeout(() => { od.close(); sync(); od.sync(); }, 220); // let the knob slide first
     };
-    const list = body.querySelector('.dv-list, .dv-grid'), ta = body.querySelector('textarea');
+    const list = body.querySelector('.dv-list, .dv-grid, .dv-cells'), ta = body.querySelector('textarea');
+    // grid: fill every cell up to (and left of) cell i, and name it under the grid
+    const off = g.opts.length - g.cols * g.rows, paint = (i) => {
+      list.querySelectorAll('.dv-cell').forEach((c) => {
+        const a = +c.dataset.i - 1 - off, b = i - 1 - off;
+        c.classList.toggle('in', b >= 0 && a % g.cols <= b % g.cols && Math.floor(a / g.cols) <= Math.floor(b / g.cols));
+      });
+      body.querySelector('.dv-cellt').textContent = (g.opts[i - 1] || {}).name || '';
+    };
     if (list) {
-      list.onpointerover = (e) => { const b = e.target.closest('[data-i]'); if (!b || b.contains(e.relatedTarget)) return; activate(g, b, false); if (e.pointerType !== 'touch') glow(g); };
-      list.onpointerleave = () => { unpreview(g); pvShow(g, pick(g)); };
-      list.onclick = (e) => { const b = e.target.closest('[data-i]'); if (b) choose(g, +b.dataset.i); };
+      list.onpointerover = (e) => { const b = e.target.closest('[data-i]'); if (!b || b.contains(e.relatedTarget)) return; activate(g, b, false); if (k === 'grid') paint(+b.dataset.i); if (e.pointerType !== 'touch') glow(g); };
+      list.onpointerleave = () => { unpreview(g); pvShow(g, pick(g)); if (k === 'grid') paint(pick(g)); };
+      list.onclick = (e) => { const b = e.target.closest('[data-i]'); if (b) { choose(g, +b.dataset.i); if (k === 'grid') paint(+b.dataset.i); } };
+      if (k === 'grid') paint(p);
     }
     const pv = body.querySelector('.dv-pv .th');
     if (pv) { pv.onclick = () => { const o = g.opts[(+pv.dataset.i || pick(g)) - 1]; if (o && o.img) lightbox(o); }; pvShow(g, p); }
@@ -1500,12 +1524,13 @@ svg { display: block; flex: none; }
     new MutationObserver(put).observe(document.head || document.documentElement, { childList: true, subtree: true, characterData: true });
   }
 
-  const KINDS = ['flat', 'select', 'many', 'images'];
+  const KINDS = ['flat', 'select', 'many', 'images', 'grid'];
   window.DevPanel = {
     group(c) {
       if (!c || !c.id || !c.target || !Array.isArray(c.options)) throw new Error('DevPanel.group needs id, target, options');
       if (!/^[a-z0-9-]+$/.test(c.id)) throw new Error('DevPanel id must be lowercase letters, digits, or dashes: ' + c.id);
       if (c.kind && !KINDS.includes(c.kind)) throw new Error(`DevPanel kind must be one of ${KINDS.join(', ')}: ${c.kind}`);
+      if (c.kind === 'grid' && !(c.cols * c.rows === c.options.length)) throw new Error(`DevPanel grid needs options = cols x rows: ${c.id}`);
       if (base && c.page && ![].concat(c.page).some(inBase)) return null; // a group of another site on this server
       if (!c.options.length) return null; // comment-only groups are gone (the overall comment covers it): skip quietly
       const g = { ...c, label: c.label || c.id, pos: c.dot || 'tr',
