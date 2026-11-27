@@ -1,6 +1,9 @@
 /* Dev artifacts (DevPanel): a dev-only overlay that shows design options live on a real site.
    DevPanel.group({ id, label, target, options: [{ name, note?, img? }], kind?, page?: '/about' | ['/a', '/b'], dot?: 'tr'|'tl',
-     current?: false, sample?: 'first'|'all', apply?(i) })
+     current?: false, sample?: 'first'|'all', apply?(i), replay?: true | (i) => void })
+   replay: a motion group. Every pick scrolls its target into view and replays it, and its dock row gets a replay
+   button (key r replays the current group). true sends a 'dv-replay' event (detail: { id, i }) for the page to reset
+   and play its animation; a function is called with the pick instead.
    Option 1 is "Current" (no attribute) unless current: false. Picking option i > 1 sets data-dv-<id>="<i>" on <html>.
    No markers on the page. A group with `options: []` is skipped (comments go in the dock's overall comment).
    Every group sits in the dock at once: its name, the first 3 options, "…" for the rest. kind picks the popover
@@ -26,7 +29,7 @@
    A group whose options changed, or that is gone, moves its old pick and comment to Archived.
    URL params: ?dv-open=<id> opens a group, ?dv-hl=<id> holds the guide lines (for screenshots),
    ?dv-pick=<id>:<i>[,<id>:<i>] forces options (nothing is saved), ?dv-clean hides the whole overlay.
-   Keys: h hides the dock, ] and [ go to the next and previous group on any page, arrows and Enter
+   Keys: r replays a motion group, h hides the dock, ] and [ go to the next and previous group on any page, arrows and Enter
    move and pick inside a popover, Escape closes it. */
 /* option-dots:start: a copy of dev-artifacts/dots.js. Edit that file, then run dots-sync.mjs. */
 /* Option dots: one shared overlay of option dots, with the artifact kit's look and motion.
@@ -1071,6 +1074,14 @@ svg { display: block; flex: none; }
       sync(); // the row first, so the loading state lands on its new buttons
     });
     setVar(g, i, true);
+    if (g.replay) play(g);
+  }
+  // A motion group: bring its target into view, then let the page reset and play the picked animation.
+  function play(g) {
+    const t = document.querySelector(g.target); if (!t) return;
+    const r = t.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > innerHeight * .6) t.scrollIntoView({ block: r.height > innerHeight ? 'start' : 'center', behavior: 'instant' });
+    requestAnimationFrame(() => { const i = pick(g); if (typeof g.replay === 'function') g.replay(i); else dispatchEvent(new CustomEvent('dv-replay', { detail: { id: g.id, i } })); });
   }
   // One step through a group's options: picks it at once (saved, applied, guide lines), the same as a click.
   function stepPick(g, d) {
@@ -1088,7 +1099,8 @@ svg { display: block; flex: none; }
     return `<button type="button" class="dv-lab k-seg-label" aria-haspopup="dialog"${st.notes[g.id] ? ' data-note' : ''} title="${k === 'note' ? 'Click to comment' : 'Click for the comment' + (hasMore(g) ? ', every option' : '') + ' and Final'}"><span>${esc(g.label)}</span></button>`
       + (k === 'note' ? `<button type="button" class="dv-sel" aria-haspopup="dialog" aria-expanded="${popG === g}"><span>${esc((st.notes[g.id] || '').trim().split('\n')[0] || 'Add a comment')}</span>${CHEV}</button>`
         : g.opts.slice(0, n).map((_, j) => o(j + 1)).join('')
-          + (hasMore(g) ? `<button type="button" class="dv-o dv-moreo" aria-haspopup="dialog" aria-label="All ${g.opts.length} options" aria-pressed="${p > n}" data-tip="All ${g.opts.length} options">${p > n ? swatch(g, p) + esc(g.opts[p - 1].name) : ''}${DOTS}</button>` : ''));
+          + (hasMore(g) ? `<button type="button" class="dv-o dv-moreo" aria-haspopup="dialog" aria-label="All ${g.opts.length} options" aria-pressed="${p > n}" data-tip="All ${g.opts.length} options">${p > n ? swatch(g, p) + esc(g.opts[p - 1].name) : ''}${DOTS}</button>` : '')
+          + (g.replay ? '<button type="button" class="dv-ib dv-rp" aria-label="Replay the animation" title="Replay (r)">↻</button>' : ''));
   }
   // An old-round item in Archived: its old pick and comment, and Unarchive (off when its group is gone).
   function oldEl(o, k) {
@@ -1151,6 +1163,7 @@ svg { display: block; flex: none; }
       const b = e.target.closest('button'), g = gOf(e.target); if (!b || !g) return;
       tipFor(null);
       if (b.dataset.i) { curId = g.id; return choose(g, +b.dataset.i); }
+      if (b.classList.contains('dv-rp')) { curId = g.id; return play(g); }
       if (popG === g) od.close(); else popFor(g, kind(g) === 'note');
     };
     // the overlay knob: no track, shows while scrolling or with the pointer on the rows, fades 2 s after
@@ -1290,6 +1303,11 @@ svg { display: block; flex: none; }
     if (e.metaKey || e.ctrlKey || e.altKey || !sh) return;
     const t = e.composedPath()[0], arrow = /^Arrow/.test(e.key);
     if (t && t.tagName === 'TEXTAREA') return;
+    if (e.key === 'r' && !(t && (t.isContentEditable || /^(INPUT|SELECT)$/.test(t.tagName)))) {
+      const g = groups.find((x) => x.id === curId && x.replay) || groups.find((x) => x.replay && usable().includes(x));
+      if (g) { e.preventDefault(); play(g); }
+      return;
+    }
     if (!popG) {
       // focus on a dock row: every arrow steps through that group's options
       const r = arrow && t && rows.contains(t) && t.closest('[data-id]'), g = r && groups.find((x) => x.id === r.dataset.id);
