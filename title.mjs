@@ -1,5 +1,5 @@
 // The tab title: exactly '<project> > <Orca tab>' from the owner's orca-title helper when it exists, else the repo
-// folder name. Nothing is ever added after it. DV_TITLE_CMD names another helper. Runs once, in the folder the command was started from.
+// folder name. Only an optional ' · <short name>' may follow it (titleOk). DV_TITLE_CMD names another helper. Runs once, in the folder the command was started from.
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import os from 'node:os';
@@ -17,3 +17,10 @@ export function tabTitle() {
   return path.basename(top || process.cwd());
 }
 
+
+// Several pages from one chat may add ' · <short name>' after the tab title, such as 'proj > tab · A1'.
+// Any other change is wrong: a short name has no '·', '<' or '>', no outer spaces, and at most 40 characters.
+export const titleOk = (t, want) => t === want || (t.startsWith(want + ' · ') && /^[^\s·<>](?:[^·<>]{0,38}[^\s·<>])?$/.test(t.slice(want.length + 3)));
+// The text of a page's own <title>, with &gt; &lt; &amp; decoded.
+export const pageTitle = (html) => ((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || '').trim()
+  .replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');

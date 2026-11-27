@@ -14,7 +14,7 @@ One source: the option dots and their dock part in `kit.js` are a copy of `../do
 <script src="kit.js"></script>
 ```
 
-   The `<title>` is exactly the tab title from `../title.mjs` (`DV_TITLE_CMD`'s output, such as `project > tab`, else the repo folder name). Kit pages are `Kit > <topic>`. kitcheck fails on any other title.
+   The `<title>` is exactly the tab title from `../title.mjs` (`DV_TITLE_CMD`'s output, such as `project > tab`, else the repo folder name), optionally followed by ` · <short name>` (such as `project > tab · A1`) when one chat has several pages. Kit pages are `Kit > <topic>`. kitcheck fails on any other title.
 
 2. Copy the kit files into your artifact on the server. Pass this `files` map to the Artifact tool, with `<kit url>` set to the published kit artifact (this folder, published with `example.html` as its page):
 

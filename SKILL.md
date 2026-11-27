@@ -63,7 +63,8 @@ the overlay. Generic improvements go into this repo; user-specific notes stay in
 1. Copy `<repo>/templates/variants.js` and `variants.css` into a scratch folder outside the site repo.
 2. Write the options. One group per section; option 1 is "Current". Copy the fitting kind from
    `<repo>/templates/presets.js` (flat, select, many, images, comment only, footer); more patterns in `<repo>/recipes.md`.
-   The server sets the tab title to exactly `<project> > <Orca tab>`; never add a topic.
+   The server sets the tab title to exactly `<project> > <Orca tab>`; never add a topic. Several pages from one chat:
+   give each kit page its own `<title><project> > <Orca tab> · A1</title>` (a short name only); the server keeps it.
 3. Check every option in one call, then look at every shot:
    `node <repo>/serve.mjs <site dir> --variants v.js --css v.css --shot <scratch>/shots --each --sizes 1440x900,390x844`
    Add `--open <group>` to check one group in the dock. Fix what looks wrong and shoot again only after a change.

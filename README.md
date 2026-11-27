@@ -43,7 +43,9 @@ It needs Node 22 or newer. It has no npm packages and no build step. It adds not
 
    It prints a link like `http://127.0.0.1:PORT/`. Open it in your browser.
 
-The server only listens on your own computer. When you edit a file, the page reloads by itself.
+The server only listens on your own computer. When you edit a file, the page reloads by itself, once, about 1.5 s
+after the files stop changing. It waits while you type in a field or have a picture preview open, and keeps your
+scroll position. `node examples/servecheck.mjs` checks this and the title rule below.
 
 To see every kind of group on a demo page: `node serve.mjs examples/demo --variants templates/presets.js --css templates/presets.css`.
 
@@ -138,7 +140,9 @@ When `target` matches many elements, such as every card, the dot and outline sit
 Your options still change every card. `sample: 'all'` outlines all of them in one box instead.
 `apply(i)` runs your own code for changes that CSS cannot do, such as new text. More ready examples are in `recipes.md`.
 
-The browser tab title is exactly `<project> > <Orca tab>`, nothing after it. `serve.mjs`, `quick.mjs`, and
+The browser tab title is exactly `<project> > <Orca tab>`. When one chat has several pages, a kit page may name
+itself `<project> > <Orca tab> · <short name>` (such as `site > tab · A1`) in its own `<title>`; `serve.mjs` keeps
+that and replaces any other title. `serve.mjs`, `quick.mjs`, and
 `options.mjs` get it from `~/.agents/bin/orca-title` (or `DV_TITLE_CMD`) when it exists, else the repo folder name.
 The overlay sets it again if the site rewrites its own. An old `topic` or `title` in `DevPanel.config` is ignored.
 

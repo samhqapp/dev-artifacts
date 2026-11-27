@@ -10,7 +10,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { tabTitle } from './title.mjs';
+import { tabTitle, titleOk, pageTitle } from './title.mjs';
 
 const args = process.argv.slice(2);
 const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
@@ -44,8 +44,27 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
   '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.avif': 'image/avif', '.gif': 'image/gif', '.ico': 'image/x-icon',
   '.woff2': 'font/woff2', '.woff': 'font/woff', '.mp4': 'video/mp4', '.webm': 'video/webm', '.txt': 'text/plain; charset=utf-8' };
 
-// polling, not SSE: an open stream never lets headless screenshots finish loading
-const RELOAD = '<script>(v=>setInterval(()=>fetch("/__dev/version").then(r=>r.text()).then(n=>{if(v===undefined)v=n;else if(n!==v)location.reload()}).catch(()=>{}),800))()</script>';
+// Live reload by polling, not SSE: an open stream never lets headless screenshots finish loading.
+// The server moves the version once per burst of edits (see QUIET). The page never reloads under the reader: it waits
+// while a text field has focus or a preview or dialog is open, and keeps the scroll position. Comments save on every key.
+function liveReload() {
+  const key = 'dv-scroll ' + location.pathname;
+  try { const y = +sessionStorage.getItem(key); sessionStorage.removeItem(key);
+    if (y) addEventListener('load', () => requestAnimationFrame(() => scrollTo(0, y))); } catch {}
+  const open = (r) => [...r.querySelectorAll('dialog[open],[role=dialog]')].some((d) => d.checkVisibility());
+  const busy = () => {
+    let a = document.activeElement; while (a?.shadowRoot?.activeElement) a = a.shadowRoot.activeElement;
+    return !!a?.closest?.('textarea,select,[contenteditable],input:not([type=checkbox],[type=radio],[type=button],[type=submit],[type=range])')
+      || document.documentElement.classList.contains('k-lb-open') || open(document)
+      || [...document.querySelectorAll('dev-panel')].some((h) => h.shadowRoot && open(h.shadowRoot));
+  };
+  let v;
+  setInterval(() => fetch('/__dev/version').then((r) => r.text()).then((n) => {
+    if (v === undefined) v = n;
+    else if (n !== v && !busy()) { try { sessionStorage.setItem(key, String(scrollY)); } catch {} location.reload(); }
+  }).catch(() => {}), 800);
+}
+const RELOAD = `<script>(${liveReload})()</script>`;
 const INJECT = [
   css && '<link rel="stylesheet" href="/__dev/variants.css">',
   '<script src="/__dev/devpanel.js"></script>',
@@ -57,7 +76,9 @@ const htmlEsc = (s) => s.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'))
 // Open/Archived, focus reading), dark only, and the tab title. A page that loads kit.js itself (options.mjs) is left alone.
 function kitPage(html) {
   if (/<script[^>]*\bkit\.js\b/.test(html)) return html;
-  const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${htmlEsc(TITLE)}</title>\n<script src="/__dev/kit.js"></script>`;
+  // the page may name itself '<tab title> · A1' (several pages from one chat); any other title is replaced
+  const own = pageTitle(html), title = titleOk(own, TITLE) ? own : TITLE;
+  const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${htmlEsc(title)}</title>\n<script src="/__dev/kit.js"></script>`;
   html = html.replace(/<title>[\s\S]*?<\/title>/i, '');
   html = /<html[^>]*>/i.test(html) ? html.replace(/<html([^>]*)>/i, (m, a) => `<html${a.replace(/\sdata-theme="[^"]*"/, '')} data-theme="dark">`)
     : `<!doctype html>\n<html lang="en" data-theme="dark">\n` + html;
@@ -66,11 +87,16 @@ function kitPage(html) {
   return at < 0 ? html + RELOAD : html.slice(0, at) + RELOAD + '\n' + html.slice(at);
 }
 
-let version = Date.now();
+let version = Date.now(), quietT;
 // Reload only for web files. A browser profile, cache or tmp folder inside the site writes nonstop and
 // would reload the page every 800 ms (2026-11-27: a headless Chrome profile under site-v3/tmp did).
+// Editor swap and temp files (.swp, page.html~, page.html.tmp.123, #page#) fail the WEB test.
 const WEB = /\.(html?|css|m?js|json|svg|png|jpe?g|webp|gif|avif|woff2?|mp4|webm)$/i, SKIP = /(^|[\\/])(\.|tmp[\\/]|node_modules[\\/]|prof-)/;
-const reload = (_, f) => { if (f && (!WEB.test(f) || SKIP.test(f))) return; version = Date.now(); };
+// An agent writes a page many times in a few seconds; moving the version on each write reloaded the page again and
+// again under the reader. The version moves only after QUIET ms with no change: one reload per burst.
+// examples/servecheck.mjs fails when this debounce goes.
+const QUIET = 1500;
+const reload = (_, f) => { if (f && (!WEB.test(f) || SKIP.test(f))) return; clearTimeout(quietT); quietT = setTimeout(() => { version = Date.now(); }, QUIET); };
 if (!shotDir) { // shot mode never reloads, so writing shots inside the site can't restart a page mid-shot
   fs.watch(root, { recursive: true }, reload);
   for (const f of Object.values(DEV)) fs.watch(f, reload);

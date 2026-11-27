@@ -21,14 +21,13 @@ if (!pagePath.endsWith('.html') || !fs.existsSync(pagePath)) { console.error('us
 const cloud = argv.includes('--cloud');
 const pageHtml = fs.readFileSync(pagePath, 'utf8');
 const markupOnly = /<main[^>]*\bdata-kit\b/.test(pageHtml) && !/<script[^>]*\bkit\.js\b/.test(pageHtml);
-const want = (await import('../title.mjs')).tabTitle();
-const pageTitle = (pageHtml.match(/<title>([^<]*)<\/title>/i) || [])[1]?.trim() || '';
-// Title rule: exactly the tab title from ../title.mjs, so the reader knows which chat to paste choices into. Kit pages are "Kit > ...".
-if (!markupOnly) {
-  const title = pageTitle;
-  if (!title.startsWith('Kit > ') && title !== want) {
-    console.error(`kitcheck: <title> is "${title}"; it must be exactly "${want}"`); process.exit(1);
-  }
+const T = await import('../title.mjs'), want = T.tabTitle(), pageTitle = T.pageTitle(pageHtml);
+// Title rule: the tab title from ../title.mjs, so the reader knows which chat to paste choices into, plus an optional
+// ' · <short name>' when one chat has several pages. Kit pages are "Kit > ...". serve.mjs keeps a markup-only page's
+// title only when it passes the same rule, and replaces any other.
+const shown = T.titleOk(pageTitle, want) ? pageTitle : want;
+if (!markupOnly && !pageTitle.startsWith('Kit > ') && !T.titleOk(pageTitle, want)) {
+  console.error(`kitcheck: <title> is "${pageTitle}"; it must be "${want}" or "${want} · <short name>"`); process.exit(1);
 }
 const out = path.resolve(outAt >= 0 ? argv[outAt + 1] : path.join(process.env.TMPDIR || os.tmpdir(), 'kitcheck', path.basename(pagePath, '.html')));
 fs.mkdirSync(out, { recursive: true });
@@ -40,7 +39,7 @@ const root = path.dirname(pagePath);
 const kitFallback = markupOnly || cloud || pageTitle.startsWith('Kit > ');
 const missing = new Set();
 const injected = () => {
-  const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${want.replace(/[<&]/g, c => c === '<' ? '&lt;' : '&amp;')}</title>\n<script src="kit.js"></script>`;
+  const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${shown.replace(/[<&]/g, c => c === '<' ? '&lt;' : '&amp;')}</title>\n<script src="kit.js"></script>`;
   return `<!doctype html>\n<html lang="en" data-theme="dark">\n<head>${head}</head>\n<body>\n` + pageHtml.replace(/<title>[\s\S]*?<\/title>/i, '') + '\n</body></html>';
 };
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml' };
