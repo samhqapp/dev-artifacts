@@ -68,12 +68,28 @@ the overlay. Generic improvements go into this repo; user-specific notes stay in
    `node <repo>/serve.mjs <site dir> --variants v.js --css v.css --shot <scratch>/shots --each --sizes 1440x900,390x844`
    Add `--open <group>` to check one group in the dock. Fix what looks wrong and shoot again only after a change.
 4. Start the server for the user: `node <repo>/serve.mjs <site dir> --variants v.js --css v.css`
-   (run it in the background with a deadline). Open the printed URL in the default browser.
+   in the background. Its exit condition is the pasted Copy choices, not a timer (see "An open pick is locked").
+   Open the printed URL in the default browser.
 5. Ask the user to paste the text from **Copy choices**, and wait for it.
 6. Move the picked CSS into the real site files, written the site's way (no `data-dv-*`).
    Stop the server and delete the scratch folder.
 
 For Vite or Next dev servers, see "Vite or Next dev" in the README; `--shot` covers static sites only.
+
+## An open pick is locked
+
+From the moment a page (overlay or options page) is shown until the user pastes its Copy choices, it is
+locked. The user may be writing long comments in it, and the only copy lives in that browser tab. Nothing may
+change it:
+
+- Keep its server running: no timer, no idle stop, no restart on another port (picks and comments are stored per
+  origin, so a new port shows an empty page). If it dies, restart it on the same port at once.
+- Never change its groups, options, variants files, or the site files it serves. Never reload or re-open its tab.
+  Work for the next round goes into new files and waits until the paste arrives.
+- Any other page goes on its own new port, never on the locked page's port. Open it with `open-page`, which
+  closes a same-title tab only on the same port.
+- When the paste arrives, the lock ends: apply the picks, then change or stop the page.
+- Before you report "page is open", check that the locked page still answers on its port.
 
 ## Rules for options
 
