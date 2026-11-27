@@ -13,7 +13,10 @@
      'many'   the same with a filter field (8 or more options),
      'images' a grid of thumbnails with a big preview (any option with img),
      'grid'   a Word-style size grid: give cols and rows, and options = cols x rows cells, row by row
-              (hover fills the cells up to the pointer and names that cell, a click picks it).
+              (hover fills the cells up to the pointer and names that cell, a click picks it),
+     'wallpaper' no options: every picture in ~/Pictures (local_wallpapers, local_wallpapers_gradients, depth, unsplash)
+              from serve.mjs. The dock row shows the pick as a thumbnail and Browse, which opens a big gallery with search
+              and groups. apply(url, { f, label }) gets the picture's URL (null for Current). Copy choices: "label (folder/file)".
    Every popover ends with the group's comment field. A group without `page` belongs to the page where its target first
    shows up. Picks, comments, and the list of groups are kept for the whole site (one localStorage key per origin).
    The tab title is exactly '<project> > <Orca tab>' (or the repo folder name), which serve.mjs puts in front of this
@@ -447,6 +450,9 @@ const KIT_CSS = String.raw`
   const KEY = 'devpanel', GO = 'devpanel:go', DOCK_KEY = 'devpanel:dock' + SET, FOCUS_KEY = 'devpanel:focus' + SET, BADGE_KEY = 'devpanel:badges' + SET;
   // Loaded from another origin (serve.mjs on 4799 inside a Vite app): the page is an SPA that routes itself.
   const me = document.currentScript, spa = !!me && new URL(me.src, location.href).origin !== location.origin;
+  // the wallpaper gallery lives on the server that served this file (serve.mjs), also inside a Vite or Next app
+  const WB = (me && me.src ? new URL(me.src, location.href).origin : location.origin) + '/__dev/wall/';
+  const wurl = (f, w) => WB + (w ? `th/${w}/` : 'img/') + f.split('/').map(encodeURIComponent).join('/');
   const TITLE = String(window.__dvTitle || ''); // '<project> > <Orca tab>', set by serve.mjs in front of this file
   const forced = Object.fromEntries((Q.get('dv-pick') || '').split(',').map((s) => s.split(':')).filter((p) => p[1] > 0).map(([k, v]) => [k, +v]));
   // overall: the dock's comment on the whole page. old: picks and comments of past rounds, shown in Archived.
@@ -498,7 +504,7 @@ const KIT_CSS = String.raw`
   // Its typed pick and comment become an old-round item in Archived; Unarchive puts them back while the group exists.
   function retire(id, m) {
     const p = st.picks[id], n = st.notes[id];
-    if (p || n) st.old.push({ id, label: m.label || id, pick: p ? (m.opts || [])[p - 1] || null : null, note: n || '' });
+    if (p || n) st.old.push({ id, label: m.label || id, pick: p ? (typeof p === 'object' ? p.label : (m.opts || [])[p - 1]) || null : null, note: n || '' });
     delete st.picks[id]; delete st.notes[id]; delete st.fin[id];
   }
   function unarchive(k) {
@@ -777,6 +783,81 @@ svg { display: block; flex: none; }
   .dv-row { padding: 9px 12px 9px 10px; }
   .od-pop, .od-pop.od-up:not(.od-show) { border-radius: 20px; transform: translateY(12px); }
 }
+/* kind 'wallpaper': the dock row shows the pick as a small thumbnail, then Browse */
+.od-dock .dv-g > .dv-wp { display: inline-flex; align-items: center; gap: 8px; max-width: 220px; padding-left: 5px; }
+.od-dock .dv-g > .dv-browse { flex: none; }
+.dv-wp img { width: 34px; height: 22px; border-radius: 5px; object-fit: cover; flex: none; box-shadow: 0 0 0 .5px rgba(255,255,255,.18); }
+.dv-wp span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the wallpaper gallery: one big dark dialog, 80% of the window (nearly all of it on a phone) */
+.wp-scrim { position: fixed; inset: 0; z-index: 2147483004; pointer-events: auto; display: grid; place-items: center; background: rgba(0,0,0,.55); }
+.wp { width: min(80vw, 1600px); height: 80vh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden;
+  background: rgb(28,28,30); color: var(--od-ink); border-radius: 18px; border: .5px solid rgba(255,255,255,.12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 .5px rgba(0,0,0,.6), 0 32px 90px rgba(0,0,0,.55); font: 14px/1.35 var(--od-font); }
+.wp-head { display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 20px; border-bottom: .5px solid var(--sep); }
+.wp-t { font: 600 17px/1.2 var(--od-font); letter-spacing: -.01em; white-space: nowrap; }
+.wp-n { color: var(--od-muted); font-variant-numeric: tabular-nums; white-space: nowrap; margin-right: auto; }
+.wp-q { width: 340px; min-width: 0; height: 34px; padding: 0 12px; border-radius: 10px; border: .5px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.06); color: var(--od-ink); font: 14px var(--od-font); }
+.wp-q::placeholder { color: var(--od-muted); }
+.wp-q:focus { border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.09); }
+.wp-x { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--od-muted); flex: none; }
+.wp-x:hover { background: rgba(255,255,255,.1); color: var(--od-ink); }
+.wp-x svg { width: 12px; height: 12px; }
+.wp-main { display: grid; grid-template-columns: 210px minmax(0, 1fr) 300px; min-height: 0; }
+.wp-side { display: grid; align-content: start; gap: 2px; padding: 10px 8px; border-right: .5px solid var(--sep); overflow-y: auto; scrollbar-width: none; }
+.wp-s { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 32px; padding: 0 10px; border-radius: 8px;
+  color: var(--od-muted); font-weight: 500; text-align: left; white-space: nowrap; transition: background-color 120ms ease; }
+.wp-s.sub { padding-left: 22px; }
+.wp-s span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wp-s i { flex: none; font-style: normal; font-size: 12px; font-variant-numeric: tabular-nums; }
+.wp-s:hover { background: var(--dv-hov); color: var(--od-ink); }
+.wp-s[aria-pressed="true"] { background: var(--dv-sel); color: var(--od-ink); }
+.wp-mid { position: relative; min-height: 0; }
+.wp-sc { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; padding: 16px; }
+.wp-sc::-webkit-scrollbar { display: none; }
+.wp-knob { position: absolute; right: 3px; top: 0; width: 4px; border-radius: 2px; background: var(--od-ink); opacity: 0; pointer-events: none; transition: opacity .4s ease; }
+.wp-knob.on { opacity: .3; transition-duration: .12s; }
+.wp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: 14px 12px; }
+.wp-tile { display: grid; gap: 7px; min-width: 0; padding: 0; text-align: left; border-radius: 10px; }
+.wp-tile .th { position: relative; aspect-ratio: 16 / 10; border-radius: 10px; overflow: hidden; background: rgba(255,255,255,.06);
+  display: grid; place-items: center; color: var(--od-muted); font-weight: 600; }
+.wp-tile .th img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 180ms ease; }
+.wp-tile .th img.ok { opacity: 1; }
+.wp-tile .th::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.12); transition: box-shadow 120ms ease; }
+.wp-tile:hover .th::after { box-shadow: inset 0 0 0 1px rgba(255,255,255,.4); }
+.wp-tile[aria-selected="true"] .th::after { box-shadow: inset 0 0 0 2.5px var(--od-blue), inset 0 0 0 3.5px rgba(0,0,0,.45); }
+.wp-tile .nm { font: 500 13px/1.3 var(--od-font); color: var(--od-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
+.wp-tile:hover .nm { color: var(--od-ink); }
+.wp-tile[aria-selected="true"] .nm { color: var(--blue-ink); }
+.wp-none { margin: 0; padding: 48px 0; color: var(--od-muted); text-align: center; }
+.wp-pv { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 16px; border-left: .5px solid var(--sep); }
+.wp-big { position: relative; aspect-ratio: 16 / 10; margin-bottom: 10px; border-radius: 12px; overflow: hidden; background: rgba(255,255,255,.06) center / contain no-repeat; }
+.wp-big::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 .5px rgba(255,255,255,.12); pointer-events: none; }
+.wp-big img { width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 160ms ease; }
+.wp-big img.ok { opacity: 1; }
+.wp-big.cur img { display: none; }
+.wp-big.cur::before { content: "Current"; position: absolute; inset: 0; display: grid; place-items: center; color: var(--od-muted); font-weight: 600; }
+.wp-pv b { font: 600 16px/1.3 var(--od-font); letter-spacing: -.01em; }
+.wp-pv small { font-size: 13px; color: var(--od-muted); overflow-wrap: anywhere; }
+.wp-foot { display: flex; align-items: flex-end; gap: 16px; padding: 12px 14px 12px 20px; border-top: .5px solid var(--sep); }
+.wp-foot .k-comment { flex: 1; margin: 0; min-height: 36px; max-height: 120px; overflow-y: auto; padding: 7px 12px; font-size: 14px; box-shadow: none;
+  border-radius: 10px; background: rgba(255,255,255,.05); border: .5px solid rgba(255,255,255,.08); scrollbar-width: none; }
+.wp-foot .k-comment:focus { border-color: rgba(255,255,255,.22); }
+.wp-foot .k-final-bar { flex: none; margin: 0; padding: 0; height: 36px; font-size: 14px; }
+.wp-done { flex: none; height: 36px; padding: 0 20px; border-radius: 10px; background: var(--od-blue); color: #fff; font-weight: 600; }
+.wp-done:hover { filter: brightness(1.08); }
+@media (max-width: 1180px) { .wp-main { grid-template-columns: 170px minmax(0, 1fr); } .wp-pv { display: none; } }
+@media (max-width: 640px) {
+  .wp { width: calc(100vw - 16px); height: calc(100dvh - 32px); border-radius: 16px; }
+  .wp-head { flex-wrap: wrap; padding: 10px 8px 10px 14px; row-gap: 10px; }
+  .wp-q { order: 3; flex: 1 1 100%; width: auto; margin-right: 6px; }
+  .wp-main { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .wp-side { display: flex; overflow-x: auto; border-right: 0; border-bottom: .5px solid var(--sep); padding: 8px; gap: 4px; }
+  .wp-s { flex: none; } .wp-s.sub { padding-left: 10px; }
+  .wp-sc { padding: 12px; }
+  .wp-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px 10px; }
+  .wp-foot { flex-wrap: wrap; padding: 10px 12px; gap: 10px; } .wp-foot .k-comment { flex: 1 1 100%; } .wp-foot .k-final-bar { margin-right: auto; }
+}
 @media (prefers-reduced-motion: reduce) { .loading::after { animation: none; width: 100%; background: color-mix(in srgb, var(--od-blue) 8%, transparent); }
   .dv-sel svg, .dv-lb, .dv-lb.show { transition: none; }
   /* every move becomes a plain fade */
@@ -1035,12 +1116,14 @@ svg { display: block; flex: none; }
   }
 
   const pick = (g) => st.picks[g.id] || 1;
+  const wpick = (g) => { const p = st.picks[g.id]; return p && typeof p === 'object' && p.f ? p : null; };
   function setVar(g, i, force) {
     if (g.cur === i && !force) return; // never apply the same value twice
     const changed = g.cur !== i, attr = 'data-dv-' + g.id, root = document.documentElement;
     g.cur = i;
-    if (i === 1 && g.current !== false) root.removeAttribute(attr); else root.setAttribute(attr, String(i));
-    try { g.apply && g.apply(i); } catch (e) { console.error('[dev artifacts]', g.id, e); }
+    const w = g.kind === 'wallpaper' && typeof i === 'object' ? i : null; // a wallpaper pick is { f, label }
+    if (i === 1 && g.current !== false) root.removeAttribute(attr); else root.setAttribute(attr, w ? w.f : String(i));
+    try { g.apply && (g.kind === 'wallpaper' ? g.apply(w && wurl(w.f), w) : g.apply(i)); } catch (e) { console.error('[dev artifacts]', g.id, e); }
     if (changed) { if (od) od.freeze = performance.now() + 500; settle(g, i); }
     schedule();
   }
@@ -1095,6 +1178,12 @@ svg { display: block; flex: none; }
   // always shows), or for a comment group a select button with the comment. A blue spot after the name: it has a comment.
   function rowHTML(g) {
     const k = kind(g), n = inlineN(g), p = pick(g);
+    if (k === 'wallpaper') { // the pick as a thumbnail, then Browse; both open the gallery
+      const w = wpick(g);
+      return `<button type="button" class="dv-lab k-seg-label" aria-haspopup="dialog"${st.notes[g.id] ? ' data-note' : ''} title="Open the gallery"><span>${esc(g.label)}</span></button>`
+        + `<button type="button" class="dv-o dv-wp" aria-haspopup="dialog" aria-pressed="true" title="${esc(w ? w.label : 'Current')}">${w ? `<img src="${esc(wurl(w.f, 480))}" alt="">` : ''}<span>${esc(w ? w.label : 'Current')}</span></button>`
+        + '<button type="button" class="dv-o dv-browse" aria-haspopup="dialog">Browse</button>';
+    }
     const o = (j) => `<button type="button" class="dv-o" data-i="${j}" aria-pressed="${p === j}">${swatch(g, j)}${esc(g.opts[j - 1].name)}</button>`;
     return `<button type="button" class="dv-lab k-seg-label" aria-haspopup="dialog"${st.notes[g.id] ? ' data-note' : ''} title="${k === 'note' ? 'Click to comment' : 'Click for the comment' + (hasMore(g) ? ', every option' : '') + ' and Final'}"><span>${esc(g.label)}</span></button>`
       + (k === 'note' ? `<button type="button" class="dv-sel" aria-haspopup="dialog" aria-expanded="${popG === g}"><span>${esc((st.notes[g.id] || '').trim().split('\n')[0] || 'Add a comment')}</span>${CHEV}</button>`
@@ -1201,6 +1290,7 @@ svg { display: block; flex: none; }
 
   // The group's popover: options by kind, then the comment field. It grows up out of the dock's group.
   function popFor(g, note, dot) {
+    if (kind(g) === 'wallpaper') { if (curId !== g.id) show(g); return openWall(g); } // the dot, the name, Browse, ?dv-open
     fromDot = !!dot;
     if (dockState !== 'open') setDock('open');
     if (curId !== g.id) show(g);
@@ -1275,6 +1365,130 @@ svg { display: block; flex: none; }
     ta.oninput = () => { const v = ta.value; if (v.trim()) st.notes[g.id] = v; else delete st.notes[g.id]; save(); grow(); renderRows(); };
     requestAnimationFrame(grow);
   }
+  // The wallpaper gallery: every picture in the owner's folders (serve.mjs lists them), groups on the left, search on
+  // top, a big preview on the right. A click picks and applies at once, and the dialog stays open to compare.
+  // Esc, Enter, Done, or a click outside closes it. Arrow keys move the pick through the grid.
+  let wd = null;
+  function openWall(g) {
+    if (wd) wd.close(true);
+    od.close(); tipFor(null);
+    const scrim = mk('div', 'wp-scrim'), d = mk('div', 'wp');
+    d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', g.label);
+    d.innerHTML = `<header class="wp-head"><b class="wp-t">${esc(g.label)}</b><span class="wp-n"></span>`
+      + `<input type="search" class="wp-q" placeholder="Search name, folder, or group" aria-label="Search wallpapers">`
+      + `<button type="button" class="wp-x" aria-label="Close" title="Close (Esc)">${svg('M3 3l6 6M9 3 3 9')}</button></header>`
+      + `<div class="wp-main"><nav class="wp-side" aria-label="Groups"></nav><div class="wp-mid"><div class="wp-sc">`
+      + `<div class="wp-grid" role="listbox" aria-label="${esc(g.label)}">${'<span class="wp-tile"><span class="th"></span><span class="nm">&nbsp;</span></span>'.repeat(12)}</div>`
+      + `<p class="wp-none" hidden></p></div><div class="wp-knob"></div></div>`
+      + `<aside class="wp-pv"><div class="wp-big"><img alt=""></div><b></b><small class="wp-meta"></small><small class="wp-file"></small></aside></div>`
+      + `<footer class="wp-foot"><textarea class="k-comment" rows="1" placeholder="Comment on ${esc(g.label)}"></textarea>`
+      + `<div class="k-final-bar"><label for="wp-fin">Final</label><button type="button" id="wp-fin" class="k-final" role="switch" aria-checked="${fin(g.id)}"></button></div>`
+      + `<button type="button" class="wp-done">Done</button></footer>`;
+    scrim.append(d); sh.append(scrim);
+    const $ = (s) => d.querySelector(s), grid = $('.wp-grid'), qi = $('.wp-q'), side = $('.wp-side'), sc = $('.wp-sc'), knob = $('.wp-knob');
+    const big = $('.wp-big'), bigImg = $('.wp-big img'), ta = $('textarea');
+    let all = [], sec = 'all', q = '';
+    const inSec = (w) => sec === 'all' || sec === 's:' + w.src || (w.src === 'Unsplash' && sec === 'g:' + w.group);
+    const shown = () => { const ws = q.split(/\s+/).filter(Boolean); return all.filter((w) => inSec(w) && ws.every((x) => w.hay.includes(x))); };
+    const byK = (k) => (+k < 0 ? null : all[+k]);
+    function drawSide() {
+      const n = (f) => all.filter(f).length, gs = [...new Set(all.filter((w) => w.src === 'Unsplash' && w.group).map((w) => w.group))].sort();
+      const item = (k, name, c, sub) => `<button type="button" class="wp-s${sub ? ' sub' : ''}" data-k="${esc(k)}" aria-pressed="${sec === k}"><span>${esc(name)}</span><i>${c}</i></button>`;
+      side.innerHTML = item('all', 'All', all.length) + ['Local', 'Gradients', 'Depth', 'Unsplash'].map((s) => item('s:' + s, s, n((w) => w.src === s))
+        + (s === 'Unsplash' ? gs.map((x) => item('g:' + x, x, n((w) => w.src === s && w.group === x), true)).join('') : '')).join('');
+    }
+    function draw() {
+      const list = shown(), cur = wpick(g), withCur = sec === 'all' && !q;
+      grid.innerHTML = (withCur ? `<button type="button" class="wp-tile" role="option" data-k="-1" aria-selected="${!cur}"><span class="th">Current</span><span class="nm">Current, no change</span></button>` : '')
+        + list.map((w) => `<button type="button" class="wp-tile" role="option" data-k="${w.k}" aria-selected="${!!cur && cur.f === w.f}" title="${esc(w.label)}"><span class="th"><img loading="lazy" decoding="async" alt="" src="${esc(wurl(w.f, 480))}"></span><span class="nm">${esc(w.label)}</span></button>`).join('');
+      $('.wp-n').textContent = `${list.length} of ${all.length}`;
+      const none = $('.wp-none'); none.hidden = !!list.length || withCur;
+      none.textContent = q ? `No wallpaper matches "${q}".` : 'No pictures in this group yet.';
+      if (!still.matches) [...grid.children].slice(0, 24).forEach((n, j) => n.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
+        { duration: 200, delay: j * 12, easing: EASE2, fill: 'backwards' }));
+      fitKnob();
+    }
+    // the big preview: the small thumbnail at once, then the 1600 px one fades in over it
+    function pv(w) {
+      big.style.backgroundImage = w ? `url("${wurl(w.f, 480)}")` : '';
+      if (!w) { bigImg.removeAttribute('src'); bigImg.dataset.f = ''; } else if (bigImg.dataset.f !== w.f) { bigImg.classList.remove('ok'); bigImg.dataset.f = w.f; bigImg.src = wurl(w.f, 1600); }
+      big.classList.toggle('cur', !w);
+      $('.wp-pv b').textContent = w ? w.label : 'Current';
+      $('.wp-meta').textContent = w ? [w.src, w.group, w.by && 'Photo by ' + w.by].filter(Boolean).join(' · ') : 'The page as it is now, with no wallpaper change.';
+      $('.wp-file').textContent = w ? '~/Pictures/' + w.f : '';
+    }
+    const curItem = () => { const c = wpick(g); return c && all.find((w) => w.f === c.f) || (c ? { ...c, src: '', group: '', by: '' } : null); };
+    function pickW(w) {
+      if (w) st.picks[g.id] = { f: w.f, label: w.label }; else delete st.picks[g.id];
+      save(); setVar(g, wpick(g) || 1, true); sync();
+      grid.querySelectorAll('[aria-selected]').forEach((b) => b.setAttribute('aria-selected', String((w ? String(w.k) : '-1') === b.dataset.k)));
+      pv(w);
+    }
+    const into = (b, center) => { // keep a tile in view inside the grid's own scroller (scrollIntoView would move the page)
+      const t = b.offsetTop, h = b.offsetHeight;
+      if (center) sc.scrollTop = t - (sc.clientHeight - h) / 2;
+      else if (t < sc.scrollTop) sc.scrollTop = t - 14; else if (t + h > sc.scrollTop + sc.clientHeight) sc.scrollTop = t + h - sc.clientHeight + 14;
+    };
+    // the overlay knob: no track, thin, shows while scrolling or with the pointer over the grid, fades 2 s after
+    let kt = 0;
+    function fitKnob(show) {
+      const ch = sc.clientHeight, sh_ = sc.scrollHeight;
+      if (sh_ <= ch + 1) return knob.classList.remove('on');
+      const h = Math.max(40, ch * ch / sh_);
+      knob.style.height = h + 'px'; knob.style.transform = `translateY(${sc.scrollTop / (sh_ - ch) * (ch - h)}px)`;
+      if (show) { knob.classList.add('on'); clearTimeout(kt); kt = setTimeout(() => knob.classList.remove('on'), 2000); }
+    }
+    sc.onscroll = () => fitKnob(true); sc.onpointerenter = () => fitKnob(true);
+    grid.addEventListener('load', (e) => e.target.classList && e.target.classList.add('ok'), true);
+    bigImg.onload = () => bigImg.classList.add('ok');
+    grid.onclick = (e) => { const b = e.target.closest('[data-k]'); if (b) pickW(byK(b.dataset.k)); };
+    grid.onpointerover = (e) => { const b = e.target.closest('[data-k]'); if (b && !b.contains(e.relatedTarget) && e.pointerType !== 'touch') pv(byK(b.dataset.k)); };
+    grid.onpointerleave = () => pv(curItem());
+    side.onclick = (e) => { const b = e.target.closest('[data-k]'); if (!b) return; sec = b.dataset.k; drawSide(); draw(); sc.scrollTop = 0; };
+    qi.oninput = () => { q = qi.value.trim().toLowerCase(); draw(); sc.scrollTop = 0; };
+    ta.value = st.notes[g.id] || '';
+    ta.oninput = () => { const v = ta.value; if (v.trim()) st.notes[g.id] = v; else delete st.notes[g.id]; save(); renderRows(); };
+    $('.k-final').onclick = (e) => {
+      const on = !fin(g.id); e.currentTarget.setAttribute('aria-checked', String(on));
+      if (on) st.fin[g.id] = true; else delete st.fin[g.id];
+      save(); setTimeout(() => { close(); sync(); od.sync(); }, 220);
+    };
+    const close = (now) => {
+      if (wd !== api) return; wd = null; clearTimeout(kt);
+      if (now || still.matches) return scrim.remove();
+      scrim.style.pointerEvents = 'none';
+      scrim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, easing: 'ease-in' }).onfinish = () => scrim.remove();
+      d.animate([{ transform: 'none' }, { transform: 'scale(.98)' }], { duration: 150, easing: 'ease-in', fill: 'forwards' });
+    };
+    const api = { close }; wd = api;
+    $('.wp-x').onclick = $('.wp-done').onclick = () => close();
+    scrim.onclick = (e) => { if (e.target === scrim) close(); };
+    d.onkeydown = (e) => {
+      e.stopPropagation(); // the page and the dock's keys stay out while the gallery is open
+      const t = e.composedPath()[0], tag = t && t.tagName;
+      if (e.key === 'Escape') { e.preventDefault(); return close(); }
+      if (tag === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'Enter' && !(tag === 'BUTTON' && t !== qi)) { e.preventDefault(); return close(); }
+      if (!/^Arrow/.test(e.key) || (tag === 'INPUT' && /Left|Right/.test(e.key))) return;
+      const tiles = [...grid.querySelectorAll('[data-k]')]; if (!tiles.length) return;
+      e.preventDefault();
+      const cols = tiles.filter((b) => b.offsetTop === tiles[0].offsetTop).length, at = tiles.findIndex((b) => b.getAttribute('aria-selected') === 'true');
+      const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -cols, ArrowDown: cols }[e.key];
+      const b = tiles[at < 0 ? 0 : Math.min(Math.max(at + step, 0), tiles.length - 1)];
+      pickW(byK(b.dataset.k)); into(b);
+    };
+    if (!still.matches) {
+      scrim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+      d.animate([{ opacity: 0, transform: 'scale(.97) translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE2 });
+    }
+    if (matchMedia('(hover: hover)').matches) qi.focus({ preventScroll: true });
+    fetch(WB + 'index.json').then((r) => (r.ok ? r.json() : Promise.reject())).then((list) => {
+      if (wd !== api) return;
+      all = list.map((w, k) => ({ ...w, k, hay: `${w.label} ${w.f} ${w.src} ${w.group} ${w.by}`.toLowerCase() }));
+      drawSide(); draw(); pv(curItem());
+      const s = grid.querySelector('[aria-selected="true"]'); if (s) into(s, true);
+    }, () => { grid.innerHTML = ''; const n = $('.wp-none'); n.hidden = false; n.textContent = 'The wallpaper list did not load. Is the page served by serve.mjs?'; });
+  }
   // The keyboard and hover spot in a popover list: highlighted, kept in view, previewed on the page.
   function activate(g, b, prev) {
     od.body.querySelectorAll('.on').forEach((x) => x.classList.remove('on'));
@@ -1311,7 +1525,7 @@ svg { display: block; flex: none; }
     if (!popG) {
       // focus on a dock row: every arrow steps through that group's options
       const r = arrow && t && rows.contains(t) && t.closest('[data-id]'), g = r && groups.find((x) => x.id === r.dataset.id);
-      if (!g || !g.opts.length) return;
+      if (!g || !g.opts.length || g.kind === 'wallpaper') return;
       e.preventDefault(); curId = g.id; stepPick(g, /Right|Down/.test(e.key) ? 1 : -1);
       return (r.querySelector(`.dv-o[data-i="${pick(g)}"]`) || r.querySelector('.dv-moreo') || r.querySelector('.dv-lab')).focus({ preventScroll: true });
     }
@@ -1341,7 +1555,7 @@ svg { display: block; flex: none; }
       const all = browsable().filter(inSet), pages = [...new Set(all.map(home))];
       body.innerHTML = `<p class="k-hint">Click a group to go to it. Copy choices copies every pick and comment as a list to paste in chat.</p><div class="dv-list">${pages.map((p) => `<div class="dv-ghead">${p === null ? 'Page not seen yet' : esc(p)}${p !== null && p === here() ? '<i> · this page</i>' : ''}</div>`
         + all.filter((m) => home(m) === p).map((m) => {
-          const i = st.picks[m.id] || 1, name = m.opts && m.opts[i - 1];
+          const i = st.picks[m.id] || 1, name = typeof i === 'object' ? i.label : m.opts && m.opts[i - 1];
           return `<button type="button" class="dv-row" data-id="${esc(m.id)}" aria-selected="${m.id === curId}"${p === null ? ' disabled title="Open its page once so the dock knows where it is"' : ''}><span class="ck">✓</span><span><b>${esc(m.label)}</b><small>${m.opts && m.opts.length ? esc(name || '?') : 'Comment'}</small></span></button>`;
         }).join('')).join('')}</div>`;
       body.querySelector('.dv-list').onclick = (e) => { const b = e.target.closest('.dv-row'); if (b && !b.disabled) goTo(b.dataset.id, true); };
@@ -1475,7 +1689,8 @@ svg { display: block; flex: none; }
     const ov = (st.overall || '').trim();
     return (ov ? ['- Overall: ' + ov.split('\n').join('\n  ')] : []).concat(all.map((m) => {
       const i = st.picks[m.id] || 1, note = (st.notes[m.id] || '').trim(), co = !(m.opts && m.opts.length);
-      let s = `- ${m.label}${many && m.page ? ` (${home(m)})` : ''}${co ? (note ? ':' : '') : `: ${i} ${m.opts[i - 1] || '?'}`}`;
+      const val = m.wall ? (typeof i === 'object' ? `${i.label} (${i.f})` : 'Current') : `${i} ${m.opts[i - 1] || '?'}`;
+      let s = `- ${m.label}${many && m.page ? ` (${home(m)})` : ''}${co ? (note ? ':' : '') : `: ${val}`}`;
       if (note) { const [first, ...rest] = note.split('\n'); s += (co ? ' ' : ' - ') + first + rest.map((l) => '\n  ' + l).join(''); }
       return s;
     })).join('\n');
@@ -1542,9 +1757,10 @@ svg { display: block; flex: none; }
     new MutationObserver(put).observe(document.head || document.documentElement, { childList: true, subtree: true, characterData: true });
   }
 
-  const KINDS = ['flat', 'select', 'many', 'images', 'grid'];
+  const KINDS = ['flat', 'select', 'many', 'images', 'grid', 'wallpaper'];
   window.DevPanel = {
     group(c) {
+      if (c && c.kind === 'wallpaper') c = { ...c, options: [{ name: '' }], current: true }; // a placeholder, so the group is not skipped
       if (!c || !c.id || !c.target || !Array.isArray(c.options)) throw new Error('DevPanel.group needs id, target, options');
       if (!/^[a-z0-9-]+$/.test(c.id)) throw new Error('DevPanel id must be lowercase letters, digits, or dashes: ' + c.id);
       if (c.kind && !KINDS.includes(c.kind)) throw new Error(`DevPanel kind must be one of ${KINDS.join(', ')}: ${c.kind}`);
@@ -1560,6 +1776,7 @@ svg { display: block; flex: none; }
       const sig = g.opts.map((o) => o.name).join('\n');
       if (m.sig && m.sig !== sig) retire(g.id, m);
       Object.assign(m, { label: g.label, opts: g.opts.map((o) => o.name), sig });
+      if (g.kind === 'wallpaper') { m.wall = true; if (!wpick(g)) delete st.picks[g.id]; }
       if (forced[g.id]) st.picks[g.id] = forced[g.id];
       if (pick(g) > g.opts.length) delete st.picks[g.id];
       if (c.page) m.page = [].concat(c.page);

@@ -133,6 +133,23 @@ change it:
 - The "2 / 5" count is the site total of groups to pick. Clicking it lists every group by page with its pick; a row goes there.
 - Picks, comments, and Copy choices cover the whole site (one store per origin, or per `site`, see below).
 
+## Wallpaper choices
+
+Any choice of a wallpaper or background picture uses the `wallpaper` group kind, never a short hand-picked option list:
+
+```js
+DevPanel.group({ id: 'hero-bg', label: 'Hero wallpaper', target: '.hero', kind: 'wallpaper',
+  apply(url) { document.querySelector('.hero').style.backgroundImage = url ? `url("${url}")` : ''; } });
+```
+
+- It takes no `options`. `serve.mjs` lists every picture in `~/Pictures/local_wallpapers`, `local_wallpapers_gradients`,
+  `depth`, and `unsplash` (read only; labels and groups from an `index.json` in the folder when it has one) and makes
+  cached thumbnails with `sips` under `$AGENT_DATA_DIR/dev-artifacts/wall-thumbs`.
+- The dock row shows the pick as a thumbnail plus Browse. Browse (or the name, or the dot) opens the gallery: a big dialog
+  with search, groups on the left, a big preview on hover, the comment and Final. A click picks and calls `apply(url, { f, label })`
+  at once (`url` is null for Current). Arrow keys move the pick; Esc, Enter, or Done close it.
+- Copy choices writes `- Hero wallpaper: Frozen lake at dawn (unsplash/mountains-frozen-lake.jpg) - comment`.
+
 ## One site with routes, or several sites
 
 - One site with several pages or routes (a web app): back and next cross pages. This is the default.

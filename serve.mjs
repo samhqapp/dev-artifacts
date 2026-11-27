@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { tabTitle } from './title.mjs';
 
 const args = process.argv.slice(2);
@@ -101,6 +102,7 @@ function handle(req, res) {
     req.pipe(up);
     return;
   }
+  if (url.startsWith('/__dev/wall/')) { wall(req, res, url.slice('/__dev/wall/'.length)); return; }
   if (url === '/__dev/version') { res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' }).end(String(version)); return; }
   const inAssets = assets && url.startsWith('/__dev/assets/'), base = inAssets ? assets : root;
   const abs = DEV[url] || (inAssets ? path.join(assets, url.slice('/__dev/assets'.length)) : path.join(root, url));
@@ -121,6 +123,86 @@ function handle(req, res) {
     else body = at < 0 ? html + INJECT : html.slice(0, at) + INJECT + '\n' + html.slice(at);
   }
   res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' }).end(body);
+}
+
+// ---- wallpapers: the 'wallpaper' group kind's gallery, read only from the owner's picture folders ----
+// /__dev/wall/index.json  every picture: { f: '<folder>/<file>', label, src, group, by }
+// /__dev/wall/img/<folder>/<file>  the picture itself (HEIC and TIFF come as a 2560 px JPEG, browsers can't show them)
+// /__dev/wall/th/<480|1600>/<folder>/<file>  a cached JPEG thumbnail (sips), kept outside the picture folders
+// An optional <folder>/index.json ([{ file, label, group, photographer }]) names the pictures; others get a label from the file name.
+const PICS = path.join(os.homedir(), 'Pictures');
+const WALLS = { local_wallpapers: 'Local', local_wallpapers_gradients: 'Gradients', depth: 'Depth', unsplash: 'Unsplash' };
+const IMG = /\.(jpe?g|png|webp|gif|avif|heic|heif|tiff?)$/i, WEBIMG = /\.(jpe?g|png|webp|gif|avif)$/i;
+const THUMBS = path.join(process.env.AGENT_DATA_DIR || os.tmpdir(), 'dev-artifacts', 'wall-thumbs');
+const nice = (f) => {
+  const s = f.replace(/\.[^.]+$/, '').replace(/[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi, '').replace(/[-_\s]+/g, ' ').replace(/^\d+ /, '').trim() || f;
+  return s[0].toUpperCase() + s.slice(1);
+};
+function wallIndex() {
+  const out = [];
+  for (const [dir, src] of Object.entries(WALLS)) {
+    const abs = path.join(PICS, dir), meta = {};
+    try { // the index can be half written while another job fills the folder: then the file names are enough
+      const j = JSON.parse(fs.readFileSync(path.join(abs, 'index.json'), 'utf8'));
+      const list = Array.isArray(j) ? j : Array.isArray(j.items) ? j.items : Object.entries(j).map(([file, v]) => ({ file, ...v }));
+      for (const m of list) if (m && m.file) meta[path.basename(m.file)] = m;
+    } catch {}
+    let names = []; try { names = fs.readdirSync(abs); } catch {}
+    for (const f of names.sort((a, b) => a.localeCompare(b))) {
+      if (f.startsWith('.') || !IMG.test(f)) continue;
+      const m = meta[f] || {};
+      out.push({ f: `${dir}/${f}`, label: m.label || nice(f), src, group: m.group || '', by: m.photographer || '' });
+    }
+  }
+  return out;
+}
+// '<folder>/<file>' to its real path, only for a picture directly inside one of the folders (no ../, no links out)
+function wallFile(rel) {
+  const [dir, name, ...rest] = rel.split('/');
+  if (!Object.hasOwn(WALLS, dir) || !name || rest.length || name.startsWith('.') || !IMG.test(name)) return null;
+  try {
+    const base = fs.realpathSync(path.join(PICS, dir)), real = fs.realpathSync(path.join(base, name));
+    return path.dirname(real) === base && fs.statSync(real).isFile() ? real : null;
+  } catch { return null; }
+}
+// sips makes the thumbnails, 4 at a time; the cache key holds the file's size and time, so an edited picture gets a new one
+const jobs = new Map(), waiting = []; let busy = 0;
+function thumb(src, w) {
+  const s = fs.statSync(src), out = path.join(THUMBS, createHash('sha1').update(`${src}|${s.size}|${s.mtimeMs}|${w}`).digest('hex') + '.jpg');
+  if (fs.existsSync(out)) return Promise.resolve(out);
+  if (!jobs.has(out)) jobs.set(out, new Promise((ok, no) => {
+    const go = () => {
+      busy++; fs.mkdirSync(THUMBS, { recursive: true });
+      const tmp = out + '.part.jpg';
+      spawn('sips', ['-Z', String(w), '-s', 'format', 'jpeg', '-s', 'formatOptions', '80', src, '--out', tmp], { stdio: 'ignore' })
+        .on('error', () => done(1)).on('close', (c) => done(c));
+      function done(c) {
+        busy--; jobs.delete(out); waiting.shift()?.();
+        try { if (c) throw new Error('sips failed'); fs.renameSync(tmp, out); ok(out); } catch (e) { fs.rmSync(tmp, { force: true }); no(e); }
+      }
+    };
+    busy < 4 ? go() : waiting.push(go);
+  }));
+  return jobs.get(out);
+}
+// The thumbnail cache: drop files older than 30 days, then the oldest until it is under 500 MB (they come back on demand).
+try {
+  const files = fs.readdirSync(THUMBS).map((n) => { const p = path.join(THUMBS, n), s = fs.statSync(p); return { p, t: s.mtimeMs, b: s.size }; })
+    .sort((a, b) => b.t - a.t);
+  let total = 0;
+  for (const f of files) { total += f.b; if (Date.now() - f.t > 30 * 864e5 || total > 500e6) fs.rmSync(f.p, { force: true }); }
+} catch {}
+function wall(req, res, rest) {
+  // the overlay may load from this server inside a Vite or Next app on another local port: let only local pages read the list
+  const o = req.headers.origin, cors = o && /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/.test(o) ? { 'Access-Control-Allow-Origin': o } : {};
+  if (rest === 'index.json') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors }).end(JSON.stringify(wallIndex())); return; }
+  const m = rest.match(/^(img|th\/(480|1600))\/(.+)$/), src = m && wallFile(m[3]);
+  if (!src) { res.writeHead(404).end(); return; }
+  const send = (p, type) => { res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'max-age=300' }); fs.createReadStream(p).pipe(res); };
+  const orig = () => (WEBIMG.test(src) ? send(src, TYPES[path.extname(src).toLowerCase()]) : res.writeHead(404).end());
+  const w = m[1] === 'img' ? (WEBIMG.test(src) ? 0 : 2560) : +m[2];
+  if (!w) return orig();
+  thumb(src, w).then((p) => send(p, 'image/jpeg'), orig); // no sips (not a Mac): the original, when a browser can show it
 }
 
 // ---- --shot: headless Chrome over the DevTools protocol (Node 22's built-in WebSocket) ----
