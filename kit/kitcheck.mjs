@@ -8,6 +8,7 @@
 // 12 the preview opening above Fit or real size, or losing its zoom on the next image.
 // Fixtures: kitcheck-fixtures/<check>-fail.html exits 1, <check>-pass.html exits 0.
 // 13 a file that answers 404, or a data-kit page with no dock (kit.js never ran).
+// 14 a striped (zebra) row whose text starts or ends less than 10 px from the stripe's edge.
 // Usage: node kitcheck.mjs <page.html> [--out <dir>] [--cloud]   Exit: 0 clean, 1 offenders, 2 could not run.
 // No npm packages: it drives Playwright's headless shell (or Chrome) over the DevTools protocol with Node's own WebSocket.
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path'; import os from 'node:os'; import { spawn } from 'node:child_process';
@@ -188,6 +189,17 @@ function check() {
     if (sides.length === 2 || sides.length === 3) bad.push(`border on ${sides.join(', ').toLowerCase()} only: ${name(e)}`);
     else if (sides.length === 4 && ws.size > 1) bad.push(`border widths differ (${['Top', 'Right', 'Bottom', 'Left'].map(k => s[`border${k}Width`]).join(' ')}): ${name(e)}`);
   }
+  // 14. Zebra overshoot: a striped row's stripe runs 12-16 px past its text on both sides; no text within 10 px of its edge.
+  // The stripe is a list row, a whole table row (every cell striped), or a lone striped cell (stacked phone tables).
+  const bgOn = e => alpha(cs(e).backgroundColor) > 0;
+  const stripes = new Set([...document.querySelectorAll('.k-list > .k-row, tr')].filter(r => r.getClientRects().length && (bgOn(r) || (r.cells?.length && [...r.cells].every(bgOn)))));
+  document.querySelectorAll('td, th').forEach(c => { if (!stripes.has(c.parentElement) && c.getClientRects().length && bgOn(c)) stripes.add(c); });
+  for (const row of stripes) { const R = row.getBoundingClientRect(), w = document.createTreeWalker(row, NodeFilter.SHOW_TEXT); let l = Infinity, r = -Infinity;
+    for (let t; (t = w.nextNode());) { if (!t.data.trim() || !t.parentElement.getClientRects().length) continue;
+      const g = document.createRange(); g.selectNodeContents(t); for (const b of g.getClientRects()) if (b.width > 0) { l = Math.min(l, b.left); r = Math.max(r, b.right); } }
+    if (l === Infinity) continue;
+    const m = Math.min(l - R.left, R.right - r);
+    if (m < 10 - .5) bad.push(`zebra: text ${Math.round(m)}px from its stripe's ${l - R.left < R.right - r ? 'left' : 'right'} edge (needs 12-16 px; give the row's first and last cell 14px side padding): ${name(row)}`); }
   // 10. Dock covers content: scrolled to the very bottom, the last content ends 12 px above the floating dock.
   // This also covers text under the dock on a page that cannot scroll it out (no scroll room means the bottom is the top).
   const roots = [document, ...[...document.querySelectorAll('*')].filter(e => e.shadowRoot).map(e => e.shadowRoot)];

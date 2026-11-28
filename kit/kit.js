@@ -1150,8 +1150,20 @@
     }
     if (views) dock.append(seg('View', [['page', 'Page'], ['slides', 'Slides']], 'view', api.view));
     /* Open/Archived switch. Open shows what is not finalized, Archived what is. */
-    const sw = items.length ? seg('Items', [['open', 'Open'], ['archived', 'Archived']], 'arch', v => { arch = v === 'archived'; refresh(); scrollTo({ top: 0, behavior: 'auto' }); }) : null;
-    if (sw) dock.append(sw);
+    /* A page with its own archive page: <meta name="k-archive" content="archive.html"> turns Archived into a link with an
+       external arrow where the count was; the archive page points back with <meta name="k-current" content="index.html">. */
+    const meta = n => document.querySelector(`meta[name="${n}"]`)?.content, archUrl = meta('k-archive'), curUrl = meta('k-current');
+    const ARROW = '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left:5px;vertical-align:-1px"><path d="M4 2.5h5.5V8M9.5 2.5 2.5 9.5"/></svg>';
+    const sw = items.length || archUrl || curUrl ? seg('Items', [['open', 'Open'], ['archived', 'Archived']], 'arch', v => {
+      const to = v === 'archived' ? archUrl : curUrl; if (to) { location.href = to; return; }
+      arch = v === 'archived'; refresh(); scrollTo({ top: 0, behavior: 'auto' }); }) : null;
+    const swLabels = (n = 0) => {
+      if (curUrl) sw.children[0].textContent = '← Current'; else sw.children[0].textContent = 'Open ' + (items.length - n);
+      if (archUrl) sw.children[1].innerHTML = 'Archived' + ARROW; else sw.children[1].textContent = curUrl ? 'Archived' : 'Archived ' + n;
+      if (archUrl) sw.children[1].title = 'Open the archive page';
+      if (curUrl) sw.children[0].title = 'Back to the current page';
+    };
+    if (sw) { dock.append(sw); swLabels(); sw.children[curUrl ? 1 : 0].setAttribute('aria-pressed', 'true'); }
     $$('.k-seg[data-dock]').forEach(s => dock.append(s)); // a page's own switch (it handles its own buttons)
     const empty = el('p', 'k-hint k-empty'); empty.hidden = true; cfg.append(empty);
     function refresh() {
@@ -1166,8 +1178,8 @@
       parts = all.filter(p => !p.classList.contains('k-gone'));
       cur = parts.length ? Math.max(0, parts.indexOf(was)) : -1;
       const n = items.filter(it => it.own()).length;
-      sw.children[0].textContent = 'Open ' + (items.length - n); sw.children[1].textContent = 'Archived ' + n;
-      sw.children[0].setAttribute('aria-pressed', String(!arch)); sw.children[1].setAttribute('aria-pressed', String(arch));
+      swLabels(n);
+      sw.children[0].setAttribute('aria-pressed', String(!arch && !curUrl)); sw.children[1].setAttribute('aria-pressed', String(arch || !!curUrl));
       empty.hidden = items.some(it => !it.el.classList.contains('k-gone'));
       empty.textContent = arch ? 'Nothing is archived yet.' : 'Everything is finalized. See Archived.';
       paint(); if (!slides()) fromScroll();

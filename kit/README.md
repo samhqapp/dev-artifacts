@@ -35,7 +35,8 @@ Before every publish, run `node <dev-artifacts>/kit/kitcheck.mjs <page.html>` an
 - Image cut: an image cut by `object-fit: cover`/`none` or by a clipping parent (`.k-cover`, `.k-av` and `.k-tall` crop on purpose).
 - Half border: a border on only 2 or 3 sides, or with uneven widths (a one-side divider is fine).
 - Dock covers: at the page bottom, the last content ends less than 12 px above the dock (`.k-dock`, `.od-dock`, `.dock`).
-- Missing file: any file the page asks for answers 404, or a `data-kit` page has no dock (kit.js never ran). A local options page is markup only: kitcheck injects the kit, dark theme and title as `serve.mjs` does, so never add `<script src="kit.js">` or `<title>` to it. A published page whose kit comes from the files map runs with `--cloud`.
+- Missing file: any file the page asks for answers 404, or a `data-kit` page has no dock (kit.js never ran). A local options page is markup only: kitcheck injects the kit, dark theme and title as `serve.mjs` does, so never add `<script src="kit.js">` or `<title>` to it (only a `<title>` with ` · <short name>` is kept). A published page whose kit comes from the files map runs with `--cloud`.
+- Zebra overshoot: a striped row (list row, table row, or a stacked phone cell) has its text less than 10 px from the stripe's left or right edge. The stripe must run 12-16 px past the row's first and last text; give the first and last cell 14 px side padding.
 
 Each new check has a failing and a passing page in `kitcheck-fixtures/`. It serves the page's own folder; kit files missing there come from this folder. Fix an offender in the kit, not with page CSS, unless the page's own markup causes it. Screenshots: on a first publish or a layout change, look at the desktop Light and phone Dark shots; on a text-only update with exit 0, skip them; on a failure, look at each failing shot.
 
@@ -146,6 +147,8 @@ One row per option on one shared axis. Put the question in a `k-h2` and one how-
 ## Final row
 
 Every part, every group outside a part, and every comment card ends with a footer row: "Final" left, a macOS switch right (track and knob, system blue when on). It is a `button[role=switch]` with `aria-checked`; Tab reaches it, Space or Enter toggles it, and a click on the label toggles it too. On moves the item to Archived; Copy choices leaves it out.
+
+Separate archive page: when old items live on their own page, add `<meta name="k-archive" content="archive.html">` to the current page. The dock's Archived segment then shows a small external arrow where the count was, and a click opens that page in the same tab. On the archive page, `<meta name="k-current" content="./">` turns the Open segment into "← Current", which goes back. Without either meta, Open/Archived switches finalized items in place as above.
 
 ## Image lightbox (preview panel)
 

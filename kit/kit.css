@@ -112,6 +112,7 @@ tbody > tr:nth-child(even) > td { background: var(--zebra); }
 .k-mx :is(th, td) { padding: 10px 6px; text-align: center; vertical-align: top; }
 .k-mx th { vertical-align: bottom; line-height: 1.25; }
 .k-mx :is(th, td):first-child { padding-left: 14px; text-align: left; min-width: 150px; }
+.k-mx :is(th, td):last-child { padding-right: 14px; } /* zebra stripes run 14 px past the row's text on both ends */
 .k-mx td:first-child { font-weight: 600; }
 .k-mx td:last-child { white-space: nowrap; font-weight: 600; }
 .k-mx td small { display: block; margin-top: 4px; font-size: 12px; line-height: 1.25; color: var(--muted); }
@@ -439,6 +440,7 @@ a.k-at:hover, .k-meta a:hover { text-decoration: underline; }
 .k-prose code { font: .86em var(--mono); padding: 1px 4px; border-radius: 5px; background: var(--soft); }
 .k-prose table { font-size: var(--fs-sm); background: transparent; }
 .k-prose th, .k-prose td { padding: 6px 10px; white-space: nowrap; } /* a narrow column scrolls the table (wrap it in .k-table), never squeezes its cells */
+.k-prose :is(th, td):first-child { padding-left: 14px; } .k-prose :is(th, td):last-child { padding-right: 14px; }
 .k-reply { margin-left: 34px; padding: 14px; border-radius: 18px; background: var(--blue-bg); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .k-reply > .k-group { margin: 0; }
 /* Text-heavy options (replies, drafts) stack as full-width cards, one under another, so each reads like a comment.
