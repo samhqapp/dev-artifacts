@@ -37,6 +37,7 @@ Before every publish, run `node <dev-artifacts>/kit/kitcheck.mjs <page.html>` an
 - Dock covers: at the page bottom, the last content ends less than 12 px above the dock (`.k-dock`, `.od-dock`, `.dock`).
 - Missing file: any file the page asks for answers 404, or a `data-kit` page has no dock (kit.js never ran). A local options page is markup only: kitcheck injects the kit, dark theme and title as `serve.mjs` does, so never add `<script src="kit.js">` or `<title>` to it (only a `<title>` with ` · <short name>` is kept). A published page whose kit comes from the files map runs with `--cloud`.
 - Zebra overshoot: a striped row (list row, table row, or a stacked phone cell) has its text less than 10 px from the stripe's left or right edge. The stripe must run 12-16 px past the row's first and last text; give the first and last cell 14 px side padding.
+- Uneven row: cards in one row of a card grid (`k-shots`, `k-options`, `k-todos`, `k-steps`, `k-cols`) differ in height by more than 1 px. The kit grids stretch every card to the row height and the shot caption fills the rest, so the picture keeps one shape (`--ratio`, set it on `.k-shots` for the whole row) with the card color in the empty sides.
 
 Each new check has a failing and a passing page in `kitcheck-fixtures/`. It serves the page's own folder; kit files missing there come from this folder. Fix an offender in the kit, not with page CSS, unless the page's own markup causes it. Screenshots: on a first publish or a layout change, look at the desktop Light and phone Dark shots; on a text-only update with exit 0, skip them; on a failure, look at each failing shot.
 
@@ -149,6 +150,8 @@ One row per option on one shared axis. Put the question in a `k-h2` and one how-
 Every part, every group outside a part, and every comment card ends with a footer row: "Final" left, a macOS switch right (track and knob, system blue when on). It is a `button[role=switch]` with `aria-checked`; Tab reaches it, Space or Enter toggles it, and a click on the label toggles it too. On moves the item to Archived; Copy choices leaves it out.
 
 Separate archive page: when old items live on their own page, add `<meta name="k-archive" content="archive.html">` to the current page. The dock's Archived segment then shows a small external arrow where the count was, and a click opens that page in the same tab. On the archive page, `<meta name="k-current" content="./">` turns the Open segment into "← Current", which goes back. Without either meta, Open/Archived switches finalized items in place as above.
+
+To-do sheet: add `<meta name="k-todo" content="todo.json">` and the dock gets a To-do button. It opens a sheet that rises from the dock, at most 70% of the window tall, that scrolls inside. Esc or a click outside closes it. The JSON loads fresh on every open: `{ "groups": [{ "name": "My tasks", "rows": [{ "status": "now", "state": "now: research", "title": "...", "line": "one plain line", "detail": "shown by the ? button" }] }] }`. Status glyphs: `now` ▶ blue, `todo` ○, `waiting` ◷ amber, `overdue` ! red, `failed` ✗ red, `done` ✓ green. Each group header shows its row count.
 
 ## Image lightbox (preview panel)
 

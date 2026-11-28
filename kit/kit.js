@@ -1236,6 +1236,35 @@
       };
       dock.append(copy);
     }
+    /* To-do sheet: <meta name="k-todo" content="todo.json"> adds a To-do button. The sheet rises from the dock (at most 70%
+       of the window), loads the JSON fresh on every open, and closes on Esc or a click outside. JSON: { groups: [{ name,
+       rows: [{ status: now|todo|waiting|failed|done, state, title, line, detail }] }] }. "?" opens a row's detail. */
+    const todoUrl = meta('k-todo');
+    if (todoUrl) {
+      const tb = el('button', 'k-todo-btn', 'To-do'), sh = el('div', 'k-sheet');
+      tb.type = 'button'; tb.setAttribute('aria-haspopup', 'dialog'); tb.setAttribute('aria-expanded', 'false');
+      sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-label', 'To-do'); sh.tabIndex = -1;
+      const GL = { now: '▶', todo: '○', waiting: '◷', overdue: '!', failed: '✗', done: '✓' };
+      const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const row = r => `<div class="k-row k-sheet-r" data-status="${esc(r.status)}"><i aria-hidden="true">${GL[r.status] || '○'}</i><div><b>${esc(r.title)}</b>`
+        + (r.state ? `<small>${esc(r.state)}</small>` : '') + (r.line ? `<span>${esc(r.line)}</span>` : '') + (r.detail ? `<p hidden>${esc(r.detail)}</p>` : '')
+        + `</div>${r.detail ? '<button type="button" class="k-q" aria-label="Detail" aria-expanded="false">?</button>' : ''}</div>`;
+      const open = v => {
+        sh.classList.toggle('k-show', v); tb.setAttribute('aria-expanded', String(v)); tb.setAttribute('aria-pressed', String(v));
+        if (!v) return;
+        sh.style.setProperty('--k-sheet-b', (innerHeight - dock.getBoundingClientRect().top + 10) + 'px');
+        fetch(todoUrl, { cache: 'no-store' }).then(r => r.json()).then(j => {
+          sh.innerHTML = (j.groups || []).map(g => `<section class="k-sheet-g"><h3>${esc(g.name)}<span>${(g.rows || []).length}</span></h3>`
+            + `<div class="k-list">${(g.rows || []).map(row).join('')}</div></section>`).join('') || '<p class="k-sheet-empty">Nothing to do yet.</p>';
+        }).catch(() => { sh.innerHTML = `<p class="k-sheet-empty">Could not load ${esc(todoUrl)}.</p>`; });
+      };
+      tb.onclick = () => open(!sh.classList.contains('k-show'));
+      sh.onclick = e => { const q = e.target.closest('.k-q'); if (!q) return; const p = q.parentElement.querySelector('p');
+        p.hidden = !p.hidden; q.setAttribute('aria-expanded', String(!p.hidden)); };
+      d.addEventListener('keydown', e => { if (e.key === 'Escape' && sh.classList.contains('k-show')) open(false); });
+      d.addEventListener('pointerdown', e => { if (sh.classList.contains('k-show') && !sh.contains(e.target) && !tb.contains(e.target)) open(false); });
+      d.body.append(sh); dock.insertBefore(tb, dock.querySelector('.k-clear, .k-copy'));
+    }
     if (od) dock.insertBefore(od.controls, dock.querySelector('.k-clear, .k-copy'));
     if (dock.children.length) d.body.append(dock);
     // Check for motion now and once all styles are in; hold what already runs when the saved state is Pause or Off.

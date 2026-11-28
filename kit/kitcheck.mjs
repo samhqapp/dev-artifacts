@@ -9,6 +9,7 @@
 // Fixtures: kitcheck-fixtures/<check>-fail.html exits 1, <check>-pass.html exits 0.
 // 13 a file that answers 404, or a data-kit page with no dock (kit.js never ran).
 // 14 a striped (zebra) row whose text starts or ends less than 10 px from the stripe's edge.
+// 15 cards in one row of a card grid (k-shots, k-options, k-todos, k-steps, k-cols) that differ in height by more than 1 px.
 // Usage: node kitcheck.mjs <page.html> [--out <dir>] [--cloud]   Exit: 0 clean, 1 offenders, 2 could not run.
 // No npm packages: it drives Playwright's headless shell (or Chrome) over the DevTools protocol with Node's own WebSocket.
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path'; import os from 'node:os'; import { spawn } from 'node:child_process';
@@ -200,6 +201,13 @@ function check() {
     if (l === Infinity) continue;
     const m = Math.min(l - R.left, R.right - r);
     if (m < 10 - .5) bad.push(`zebra: text ${Math.round(m)}px from its stripe's ${l - R.left < R.right - r ? 'left' : 'right'} edge (needs 12-16 px; give the row's first and last cell 14px side padding): ${name(row)}`); }
+  // 15. Even rows: every card in one row of a card grid has the same height (within 1 px).
+  for (const grid of document.querySelectorAll('.k-shots, .k-options, .k-todos, .k-steps, .k-cols')) {
+    const rows = new Map();
+    for (const c of grid.children) { if (!c.getClientRects().length || cs(c).position === 'absolute') continue; const r = c.getBoundingClientRect(), k = Math.round(r.top);
+      rows.set(k, [...(rows.get(k) || []), [c, r.height]]); }
+    for (const cards of rows.values()) { if (cards.length < 2) continue; const hs = cards.map(x => x[1]), lo = Math.min(...hs), hi = Math.max(...hs);
+      if (hi - lo > 1) bad.push(`uneven row: cards ${Math.round(lo)}-${Math.round(hi)}px tall in one row (make the grid align-items: stretch and let the caption fill): ${name(cards[hs.indexOf(lo)][0])}`); } }
   // 10. Dock covers content: scrolled to the very bottom, the last content ends 12 px above the floating dock.
   // This also covers text under the dock on a page that cannot scroll it out (no scroll room means the bottom is the top).
   const roots = [document, ...[...document.querySelectorAll('*')].filter(e => e.shadowRoot).map(e => e.shadowRoot)];
