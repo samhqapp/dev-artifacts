@@ -153,6 +153,20 @@ Separate archive page: when old items live on their own page, add `<meta name="k
 
 To-do sheet: add `<meta name="k-todo" content="todo.json">` and the dock gets a To-do button. It opens a sheet that rises from the dock, at most 70% of the window tall, that scrolls inside. Esc or a click outside closes it. The JSON loads fresh on every open: `{ "groups": [{ "name": "My tasks", "rows": [{ "status": "now", "state": "now: research", "title": "...", "line": "one plain line", "detail": "shown by the ? button" }] }] }`. Status glyphs: `now` ▶ blue, `todo` ○, `waiting` ◷ amber, `overdue` ! red, `failed` ✗ red, `done` ✓ green. Each group header shows its row count.
 
+## Split page and rating tiles
+
+Split page: `<div class="k-split"><div class="k-split-l">…the parts…</div><div class="k-split-r">…</div></div>` inside `.k-wrap`. The left pane is a sidebar about 40% wide that scrolls on its own, with the overlay scroll bar (no track or gutter; a thin knob shows while scrolling or near the right edge, fades 2 s later, and can be dragged). On a phone the panes stack, right pane first.
+
+Rating tiles: one `<meta name="k-rate" content="rate-x.json">` per idea, and a `<div class="k-tiles"></div>` where the tiles go (usually in `.k-split-r`). Each idea is a tile: its icon, its name, and "N methods · M rated by you". A click opens the rating modal (at most 90% of the window; the title row and the score bar stay, the middle scrolls):
+
+- Left: the methods, each with its name, its quality, and the owner's score once rated. Hidden on a phone.
+- Middle: the selected method's reel. A moving clip and the method's line on top, then one row per frame (time, label, one image per column) under sticky column labels. Every image opens in the lightbox; Left and Right step through the columns of that frame.
+- Bottom: "Your score" 0-100 (slider and number field), a short note, Prev and Next. Up/Down (outside a field) or Prev/Next move between methods.
+- Scores and notes save in the page state as the owner goes (per `data-round`), so a reload keeps them. Clear empties them. Copy choices adds one line per idea: `- Background subtraction ratings: Apple Vision flow 72 (keeps the hand), RAFT-small flow 55`.
+- Any element with `data-rate="rate-x.json#<method key>"` opens the modal at that method (add `data-no-zoom` on a `.k-shot`).
+
+JSON: `{ "idea", "icon": "<svg …>", "about", "qualityLabel", "cols": ["Original", …], "clip": "clip label", "reel": "reel.json", "methods": [{ "key", "name", "quality": 60, "line" }] }`. `reel` is a separate file `{ "<key>": { "thumb", "frames": [{ "t", "label", "<col>": "img url", … }], "anim" }}` that is merged into each method by `key`, so other pages can reuse it; methods may also carry `frames` and `anim` inline. Frame images are 360 x 640 (9:16); the column order is the key order of the first frame.
+
 ## Image lightbox (preview panel)
 
 Every image in `.k-wrap` or `.k-shot` (and any `img[data-zoom]`) opens on a click, Enter or Space (cursor `zoom-in`). No markup needed. Add `data-no-zoom` to an image to opt out; an image inside a link stays a link. Images added later work too. An HTML mockup with `data-zoom="Title"` (any element, not only `img`) opens in the same panel as a live copy of the node at its own layout size, so CSS motion keeps running; it zooms, pans and steps like an image, with no Download.

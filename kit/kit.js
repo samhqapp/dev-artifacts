@@ -718,7 +718,7 @@
         const l = [...o.querySelectorAll('.k-zoomable')]; return l.length > 1 ? 'i:' + l.indexOf(n) : '';
       };
       // ...and inside the image's own group (option group, screenshot grid, or part): arrows never jump to the next group.
-      const scope = img.closest('.k-group, .k-shots, .k-part'), here = vis().filter(n => !scope || scope.contains(n));
+      const scope = img.closest('.k-group, .k-shots, .k-part, [data-zoom-group]'), here = vis().filter(n => !scope || scope.contains(n));
       const s = slot(img), list = s ? here.filter(n => slot(n) === s) : here, k = list.indexOf(img);
       lb.open(k < 0 ? [img] : list, Math.max(0, k));
     }
@@ -1103,7 +1103,7 @@
     const disarm = () => { clearTimeout(dwell); armed = -1; };
     const nearest = y => { let k = -1, best = Infinity; parts.forEach((p, j) => { const r = p.getBoundingClientRect(), dy = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0; if (dy < best) { best = dy; k = j; } }); return k; };
     addEventListener('pointermove', e => {
-      if (e.pointerType !== 'mouse' || slides() || Date.now() < lock || e.target.closest('.k-dock') || root.classList.contains('k-lb-open')) return;
+      if (e.pointerType !== 'mouse' || slides() || Date.now() < lock || e.target.closest('.k-dock') || root.classList.contains('k-lb-open') || d.querySelector('.k-rate[open]')) return;
       const k = nearest(e.clientY); if (k < 0 || k === armed) return;
       disarm(); armed = k; if (k !== cur) dwell = setTimeout(() => setFocus(k), 55);
     });
@@ -1112,7 +1112,7 @@
     addEventListener('resize', fromScroll);
     all.forEach(p => { p.addEventListener('click', () => !slides() && setFocus(parts.indexOf(p))); p.addEventListener('focusin', () => !slides() && setFocus(parts.indexOf(p))); });
     addEventListener('keydown', e => {
-      if (!parts.length || e.metaKey || e.ctrlKey || e.altKey || e.target.closest('textarea,input,select') || root.classList.contains('k-lb-open')) return; // the preview owns the arrow keys while open
+      if (!parts.length || e.metaKey || e.ctrlKey || e.altKey || e.target.closest('textarea,input,select') || root.classList.contains('k-lb-open') || d.querySelector('.k-rate[open]')) return; // the preview owns the arrow keys while open
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || (e.key === 'PageDown' && slides())) { e.preventDefault(); go(cur + 1); }
       else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || (e.key === 'PageUp' && slides())) { e.preventDefault(); go(cur - 1); }
     });
@@ -1208,7 +1208,7 @@
       pressAnim(); dock.insertBefore(animSeg, dock.querySelector('.k-clear, .k-copy')); if (!dock.isConnected) d.body.append(dock);
     };
     let fb;
-    if (groups.length || items.length) {
+    if (groups.length || items.length || rateUrls.length) {
       /* Two clicks within 3 s empty every pick, comment and Final in place, with no reload. The empty values are saved,
          so they win over data-final and over notes that page code loads (localNote), and kit:change lets that code clear its shared copy. */
       const clear = el('button', 'k-clear', 'Clear'); clear.type = 'button'; let armed = 0;
@@ -1217,11 +1217,14 @@
         clearTimeout(armed); armed = 0; clear.textContent = 'Clear';
         items.forEach(it => { saved.fin[it.k] = false; it.el.removeAttribute('data-final'); $$('[data-final]', it.el).forEach(n => n.removeAttribute('data-final')); });
         groups.forEach(g => { g.ta.value = ''; g.grow(); saved.notes[g.name] = ''; delete saved.picks[g.name]; g.pick = null; g.opts.forEach(o => o.setAttribute('aria-checked', 'false')); });
+        saved.rate = {}; rateReset();
         saveState(); if (items.length) refresh(); groups.forEach(emit);
       };
       dock.append(clear);
     }
-    if (groups.length) {
+    const rateUrls = $$('meta[name="k-rate"]').map(m => m.content);
+    let rateReset = () => {};
+    if (groups.length || rateUrls.length) {
       const copy = el('button', 'k-copy', 'Copy choices'); copy.type = 'button';
       const flash = t => { copy.textContent = t; setTimeout(() => { copy.textContent = 'Copy choices'; }, 1600); };
       const manual = text => {
@@ -1264,6 +1267,130 @@
       d.addEventListener('keydown', e => { if (e.key === 'Escape' && sh.classList.contains('k-show')) open(false); });
       d.addEventListener('pointerdown', e => { if (sh.classList.contains('k-show') && !sh.contains(e.target) && !tb.contains(e.target)) open(false); });
       d.body.append(sh); dock.insertBefore(tb, dock.querySelector('.k-clear, .k-copy'));
+    }
+    /* Split page: .k-split > .k-split-l (a sidebar about 40% wide that scrolls on its own) + .k-split-r. Phones stack them, right first.
+       Overlay scroll bars: knob(scroller) hides the native bar and draws a thin knob that floats over the content, shows while
+       scrolling or while the pointer is near the right edge, fades out 2 s later, and can be dragged. */
+    const knob = sc => {
+      const host = sc.parentElement, k = el('i', 'k-knob'); host.append(k);
+      let t = 0, drag = null;
+      const place = () => {
+        const h = sc.clientHeight, H = sc.scrollHeight; k.hidden = H <= h + 1; if (k.hidden) return;
+        const kh = Math.max(48, h * h / H), y = sc.offsetTop + (sc.scrollTop / (H - h)) * (h - kh);
+        k.style.height = kh + 'px'; k.style.transform = `translateY(${y}px)`;
+      };
+      const show = () => { place(); k.classList.add('k-on'); clearTimeout(t); t = setTimeout(() => !drag && k.classList.remove('k-on'), 2000); };
+      sc.addEventListener('scroll', show, { passive: true });
+      host.addEventListener('pointermove', e => { const r = sc.getBoundingClientRect(); if (e.clientX > r.right - 16) show(); });
+      k.addEventListener('pointerdown', e => { e.preventDefault(); drag = { y: e.clientY, top: sc.scrollTop }; k.classList.add('k-drag'); k.setPointerCapture(e.pointerId); });
+      k.addEventListener('pointermove', e => { if (!drag) return; const h = sc.clientHeight, H = sc.scrollHeight, kh = k.offsetHeight;
+        sc.scrollTop = drag.top + (e.clientY - drag.y) * (H - h) / Math.max(1, h - kh); });
+      k.addEventListener('pointerup', () => { drag = null; k.classList.remove('k-drag'); show(); });
+      new ResizeObserver(place).observe(sc); return show;
+    };
+    $$('.k-split-l').forEach(l => { const inn = el('div', 'k-split-in'); inn.append(...l.childNodes); l.append(inn); knob(inn); });
+
+    /* 7b. Rating tiles: one <meta name="k-rate" content="rate-x.json"> per idea. Each becomes a tile (icon + name) in .k-tiles.
+       A click opens the rating modal: the methods on the left (name, quality, your score), the selected method's reel in the
+       middle (frame rows of image columns, plus a moving clip), and a fixed bar at the bottom with "Your score" 0-100, a note,
+       Prev and Next. Up/Down or Prev/Next move between methods. Scores save in the page state as the owner goes, Copy choices
+       adds "- Idea ratings: Method 70 (note), ...", and Clear empties them. Any [data-rate="rate-x.json#key"] opens the modal
+       at that method. JSON: { idea, icon (SVG markup), about, qualityLabel, cols: [column labels], clip (clip label),
+       reel (URL of { key: { thumb, frames: [{ t, label, <col>: url, ... }], anim } }), methods: [{ key, name, quality, line }] }. */
+    if (rateUrls.length) {
+      saved.rate = saved.rate || {};
+      const H = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+      const ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12h8M12 8v8"/></svg>';
+      const tiles = d.querySelector('.k-tiles');
+      const ideas = rateUrls.map(url => ({ url, ready: fetch(url).then(r => r.json()).then(async j => {
+        const reel = j.reel ? await fetch(j.reel).then(r => r.json()).catch(() => ({})) : {};
+        j.methods = (j.methods || []).map(m => ({ ...(reel[m.key] || {}), ...m }));
+        return j;
+      }) }));
+      const mine = j => (saved.rate[j.idea] = saved.rate[j.idea] || {});
+      const rated = j => j.methods.filter(m => (mine(j)[m.name] || {}).s != null).length;
+      const tileLine = j => `${j.methods.length} methods · ${rated(j)} rated by you`;
+      // The modal: title row and bottom bar stay; the method list and the reel scroll on their own.
+      const dlg = el('dialog', 'k-rate'); dlg.setAttribute('aria-label', 'Rate methods');
+      dlg.innerHTML = `<header class="k-rate-head"><span class="k-rate-ic" aria-hidden="true"></span><div><h3></h3><output></output></div>
+        <button type="button" class="k-rate-x" aria-label="Close">×</button></header>
+        <div class="k-rate-body"><div class="k-rate-side"><nav class="k-rate-list" aria-label="Methods"></nav></div><div class="k-rate-main"><div class="k-rate-sc"></div></div></div>
+        <footer class="k-rate-foot"><label for="k-rate-n">Your score</label><input type="range" min="0" max="100" step="1" aria-label="Your score, 0 to 100">
+        <input type="number" id="k-rate-n" min="0" max="100" step="1" placeholder="–" inputmode="numeric"><input type="text" class="k-rate-note" placeholder="Short note" aria-label="Note">
+        <span class="k-rate-nav"><button type="button" data-step="-1">‹ Prev</button><button type="button" data-step="1">Next ›</button></span></footer>`;
+      d.body.append(dlg);
+      const q = s => dlg.querySelector(s), list = q('.k-rate-list'), sc = q('.k-rate-sc'), range = q('input[type=range]'), num = q('input[type=number]'), note = q('.k-rate-note');
+      knob(list); knob(sc);
+      let J = null, at = 0;
+      const pct = v => typeof v === 'number' ? Math.round(v) + '%' : H(v);
+      const paintList = () => {
+        list.innerHTML = J.methods.map((m, k) => { const r = mine(J)[m.name] || {};
+          return `<button type="button" class="k-rate-row" data-k="${k}" aria-current="${k === at}"><b>${H(m.name)}</b><span>${m.quality != null ? pct(m.quality) + (J.qualityLabel ? ' ' + H(J.qualityLabel) : '') : ''}</span>`
+            + `<em>${r.s != null ? r.s : ''}</em></button>`; }).join('');
+        list.querySelector('[aria-current=true]')?.scrollIntoView({ block: 'nearest' });
+      };
+      const paintScore = () => { const r = mine(J)[J.methods[at].name] || {};
+        range.value = r.s ?? 50; num.value = r.s ?? ''; note.value = r.n || ''; dlg.classList.toggle('k-rate-unset', r.s == null); };
+      const save = (s, n) => {
+        const m = J.methods[at].name, r = mine(J)[m] = { ...(mine(J)[m] || {}) };
+        if (s !== undefined) r.s = s; if (n !== undefined) r.n = n;
+        saveState(); dlg.classList.toggle('k-rate-unset', r.s == null);
+        const row = list.querySelector(`[data-k="${at}"] em`); if (row) row.textContent = r.s ?? '';
+        paintTiles();
+      };
+      const show = k => {
+        at = (k + J.methods.length) % J.methods.length;
+        const m = J.methods[at], keys = Object.keys((m.frames || [])[0] || {}).filter(c => c !== 't' && c !== 'label'), labels = J.cols || keys;
+        q('h3').textContent = J.idea; q('output').textContent = `${at + 1} / ${J.methods.length} · ${m.name}`;
+        sc.style.setProperty('--k-cols', keys.length);
+        sc.innerHTML = `<div class="k-rate-top">${m.anim ? `<figure><img src="${H(m.anim)}" alt="${H(m.name)} · ${H(J.clip || 'Moving clip')}" data-zoom width="288" height="512"><figcaption>${H(J.clip || 'Moving clip')}</figcaption></figure>` : ''}`
+          + `<div><h4>${H(m.name)}</h4>${m.quality != null ? `<p class="k-rate-q">${pct(m.quality)} ${H(J.qualityLabel || '')}</p>` : ''}${m.line ? `<p>${H(m.line)}</p>` : ''}${J.about ? `<p class="k-rate-about">${H(J.about)}</p>` : ''}</div></div>`
+          + `<div class="k-rate-cols"><span></span>${labels.map(c => `<span>${H(c)}</span>`).join('')}</div>`
+          + (m.frames || []).map(f => `<div class="k-rate-fr" data-zoom-group><div class="k-rate-t"><b>${H(f.t)} s</b><span>${H(f.label || '')}</span></div>`
+            + keys.map((c, i) => `<img src="${H(f[c])}" alt="${H(f.t)} s · ${H(labels[i])}" data-zoom width="360" height="640" loading="lazy">`).join('') + '</div>').join('');
+        paintList(); paintScore();
+      };
+      const open = (j, k) => {
+        J = j; q('.k-rate-ic').innerHTML = j.icon || ICON; show(k);
+        if (!dlg.open) { dlg.showModal(); sc.scrollTop = 0; void dlg.offsetWidth; dlg.classList.add('k-show'); }
+      };
+      const close = () => { dlg.classList.remove('k-show'); setTimeout(() => dlg.close(), anim === 'play' && !reduce.matches ? ms('--k-close') : 0); };
+      q('.k-rate-x').onclick = close;
+      dlg.addEventListener('cancel', e => { e.preventDefault(); close(); });
+      dlg.addEventListener('click', e => { if (e.target === dlg) close(); });
+      list.addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (b) show(+b.dataset.k); });
+      q('.k-rate-nav').addEventListener('click', e => { const b = e.target.closest('[data-step]'); if (b) show(at + +b.dataset.step); });
+      range.addEventListener('input', () => { num.value = range.value; save(+range.value); });
+      num.addEventListener('input', () => { if (num.value === '') return save(null); const v = Math.max(0, Math.min(100, Math.round(+num.value))); range.value = v; save(v); });
+      num.addEventListener('blur', () => { const r = mine(J)[J.methods[at].name] || {}; num.value = r.s ?? ''; });
+      note.addEventListener('input', () => save(undefined, note.value));
+      dlg.addEventListener('keydown', e => {
+        e.stopPropagation(); // the page's arrow keys must not move parts behind the modal
+        if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest('input, textarea, select')) return;
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); show(at + (e.key === 'ArrowDown' ? 1 : -1)); }
+      });
+      const paintTiles = () => ideas.forEach(i => i.tile && i.j && (i.tile.querySelector('span:last-child').textContent = tileLine(i.j)));
+      ideas.forEach(i => i.ready.then(j => {
+        i.j = j; if (!tiles) return;
+        i.tile = el('button', 'k-tile'); i.tile.type = 'button';
+        i.tile.innerHTML = `<span class="k-tile-ic" aria-hidden="true">${j.icon || ICON}</span><b>${H(j.idea)}</b><span>${tileLine(j)}</span>`;
+        i.tile.onclick = () => open(j, 0); tiles.append(i.tile);
+      }, () => {}));
+      d.addEventListener('click', e => {
+        const t = e.target.closest && e.target.closest('[data-rate]'); if (!t || dlg.contains(t)) return;
+        const [url, key] = t.dataset.rate.split('#'), i = ideas.find(x => x.url === url);
+        if (i) i.ready.then(j => open(j, Math.max(0, j.methods.findIndex(m => m.key === key))));
+      });
+      $$('[data-rate]').forEach(t => { t.tabIndex = 0; t.setAttribute('role', 'button');
+        t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t.click(); } }); });
+      rateReset = () => { if (J) { paintList(); paintScore(); } paintTiles(); };
+      const base = api.choices;
+      api.choices = () => {
+        const lines = ideas.filter(i => i.j).map(({ j }) => { const r = mine(j);
+          const xs = j.methods.filter(m => r[m.name] && (r[m.name].s != null || r[m.name].n)).map(m => `${m.name} ${r[m.name].s ?? '-'}${r[m.name].n ? ' (' + r[m.name].n + ')' : ''}`);
+          return xs.length ? `- ${j.idea} ratings: ${xs.join(', ')}` : ''; }).filter(Boolean);
+        const b = base(); return [b === 'No open items.' && lines.length ? '' : b, ...lines].filter(Boolean).join('\n');
+      };
     }
     if (od) dock.insertBefore(od.controls, dock.querySelector('.k-clear, .k-copy'));
     if (dock.children.length) d.body.append(dock);
